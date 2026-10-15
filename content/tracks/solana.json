@@ -1,0 +1,20 @@
+{
+  "id": "solana",
+  "slug": "solana",
+  "number": 5,
+  "title": "Solana",
+  "shortTitle": "SOL",
+  "status": "coming",
+  "eyebrow": "TRACK E · SOLANA",
+  "headline": "Coming next — fast lane, different plate",
+  "summary": "Solana address style, SOL for fees, explorer basics, receive/send sim. Scaffold only — not charge-ready yet.",
+  "coachPitch": "Same driving habits; different address shape and fee asset.",
+  "symbol": "sol",
+  "comingBeats": [
+    "Identify a Solana address",
+    "SOL pays the toll",
+    "Receive with network check (sim)",
+    "One Solana certificate at the end of the road"
+  ],
+  "lessons": []
+}

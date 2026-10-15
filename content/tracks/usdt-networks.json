@@ -1,0 +1,20 @@
+{
+  "id": "usdt-networks",
+  "slug": "usdt-networks",
+  "number": 3,
+  "title": "USDT + networks",
+  "shortTitle": "USDT",
+  "status": "coming",
+  "eyebrow": "TRACK C · STABLECOINS",
+  "headline": "Coming next — the network picker that saves money",
+  "summary": "USDT is not one road. Ethereum vs Tron vs others — deposit/withdraw with network checks. Scaffold only.",
+  "coachPitch": "Wrong network is the #1 way people lose stables. We’ll drill the picker hard.",
+  "symbol": "usdt",
+  "comingBeats": [
+    "USDT ≠ one chain",
+    "Network picker drills",
+    "Tron (TRC-20) fee feel + explorer",
+    "One USDT certificate at the end of the road"
+  ],
+  "lessons": []
+}

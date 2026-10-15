@@ -1,0 +1,27 @@
+{
+  "id": "vip",
+  "name": "VIP Vault Access",
+  "shortName": "VIP",
+  "skuHint": "crypto-drive-vip",
+  "priceBand": "$249–$399",
+  "whoFor": "High-touch or non-tech professionals who want a ride-along for the first miles.",
+  "coachPitch": "Same Bitcoin road as Certified. Plus: I sit shotgun for thirty minutes, then you get a private lane for follow-ups.",
+  "features": {
+    "lessons": true,
+    "cheatSheets": true,
+    "fullPractice": true,
+    "certificate": true,
+    "verifyLink": true,
+    "socialShare": true,
+    "liveCall": true,
+    "privateQa": true
+  },
+  "tracks": ["bitcoin", "ethereum", "usdt-networks", "tron", "solana"],
+  "support": {
+    "callLabel": "Book your 30-min ride-along",
+    "callHint": "Wallet setup review and first-miles Q&A. Scheduling link goes live with Gumroad fulfillment.",
+    "qaLabel": "Private Q&A lane",
+    "qaHint": "Async questions for a defined window after purchase — not 24/7 chaos."
+  },
+  "upgradeHint": null
+}

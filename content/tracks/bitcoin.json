@@ -1,0 +1,274 @@
+{
+  "id": "bitcoin",
+  "slug": "bitcoin",
+  "number": 1,
+  "title": "Bitcoin",
+  "shortTitle": "BTC",
+  "status": "ready",
+  "eyebrow": "TRACK A · BITCOIN",
+  "headline": "Meet Bitcoin. Then drive it.",
+  "summary": "Start with how Bitcoin works in plain pictures, then receive, prove, send, and guard the keys. Play money. About 35 minutes.",
+  "coachPitch": "By the end you know what Bitcoin is, you can receive it, prove it arrived, and send a small amount without giving your keys away.",
+  "symbol": "btc",
+  "lessons": [],
+  "drives": [
+    {
+      "id": "btc-intro",
+      "slug": "what-is",
+      "title": "What Bitcoin is",
+      "minutes": "8 min",
+      "job": "Meet the protocol before you touch a wallet",
+      "outcome": "What Bitcoin is and why it matters — you'll explain scarcity, blocks, and sats in plain words.",
+      "steps": [
+        {
+          "id": "btc-intro-satoshi",
+          "slug": "satoshi",
+          "job": "Who started it",
+          "coachLine": "Satoshi published the idea in 2008. The network started in 2009. No company runs it.",
+          "button": "Show me how scarce it is",
+          "action": { "type": "intro", "scene": "satoshi" },
+          "ideaTitle": "Who published the idea",
+          "ideaBody": "In 2008 someone using the name Satoshi Nakamoto published a short paper describing Bitcoin. In 2009 the network went live. No company sits in the driver's seat.",
+          "objective": "After this screen you can say who started Bitcoin and that it is an open network, not a bank product.",
+          "whyItMatters": "Pros meet \"Bitcoin\" in policy decks. Knowing it began as a public paper and a live network stops the myth that a single vendor runs it.",
+          "keyTerms": ["Satoshi Nakamoto", "white paper", "open network"],
+          "misconception": "Bitcoin is a company you can call for support."
+        },
+        {
+          "id": "btc-intro-scarce",
+          "slug": "scarce",
+          "job": "Only 21 million",
+          "coachLine": "Only 21 million bitcoin will ever exist. That is the scarce part.",
+          "button": "How do new coins appear?",
+          "action": { "type": "intro", "scene": "scarce" },
+          "ideaTitle": "The hard cap",
+          "ideaBody": "Only 21 million bitcoin will ever exist. New coins arrive on a schedule. The supply does not stretch when demand rises.",
+          "objective": "After this screen you can explain the 21 million hard cap in one plain sentence.",
+          "whyItMatters": "Scarcity is why people treat bitcoin differently from a bank balance that can be inflated by policy.",
+          "keyTerms": ["21 million", "hard cap", "scarce"],
+          "misconception": "Miners can print as much bitcoin as they want whenever they like."
+        },
+        {
+          "id": "btc-intro-block",
+          "slug": "block",
+          "job": "A page every ten minutes",
+          "coachLine": "About every ten minutes, a page of payments is sealed. The miner who seals it is paid new bitcoin.",
+          "button": "Does that pay stay the same?",
+          "action": { "type": "intro", "scene": "block" },
+          "ideaTitle": "Pages on a shared ledger",
+          "ideaBody": "About every ten minutes, a new block of payments is sealed. The miner who seals it earns new bitcoin as the pay for that work.",
+          "objective": "After this screen you can describe a block as a sealed page of payments that arrives on a roughly ten-minute rhythm.",
+          "whyItMatters": "Waiting for a payment is waiting for that page to seal — not waiting for a bank clerk.",
+          "keyTerms": ["block", "miner", "about ten minutes"],
+          "misconception": "Bitcoin payments clear instantly like a card swipe every time."
+        },
+        {
+          "id": "btc-intro-halving",
+          "slug": "halving",
+          "job": "The pay gets cut in half",
+          "coachLine": "That pay is cut in half on a schedule. New coins slow down. Scarcity holds.",
+          "button": "What is a satoshi?",
+          "action": { "type": "intro", "scene": "halving" },
+          "ideaTitle": "The pay gets cut",
+          "ideaBody": "The miner's new-coin pay is cut in half on a fixed schedule. New supply slows. The hard cap still holds.",
+          "objective": "After this screen you can say that miner rewards shrink over time on a schedule (halving).",
+          "whyItMatters": "Issuance is mechanical, not a board decision. That is part of the scarcity story.",
+          "keyTerms": ["halving", "block reward", "issuance"],
+          "misconception": "Someone can vote to mint unlimited new bitcoin next quarter."
+        },
+        {
+          "id": "btc-intro-sats",
+          "slug": "sats",
+          "job": "Bitcoin is satoshis",
+          "coachLine": "One bitcoin is 100,000,000 satoshis. People usually send sats, not whole coins.",
+          "button": "Show me my balance",
+          "action": { "type": "intro", "scene": "sats" },
+          "ideaTitle": "Bitcoin splits into satoshis",
+          "ideaBody": "One bitcoin is 100,000,000 satoshis. Everyday sends are usually counted in sats, not whole coins.",
+          "objective": "After this screen you can convert the idea \"1 BTC = 100,000,000 sats\" and know why small amounts still make sense.",
+          "whyItMatters": "Pros see tiny decimals on invoices. Sats are the cents — that is normal, not a glitch.",
+          "keyTerms": ["satoshi", "sats", "100,000,000"],
+          "misconception": "You can only send whole bitcoin."
+        },
+        {
+          "id": "btc-intro-cheques",
+          "slug": "cheques",
+          "job": "Balance is unspent cheques",
+          "coachLine": "Your balance is not an account. It is unspent cheques. Add them up.",
+          "button": "That is my balance",
+          "action": { "type": "intro", "scene": "cheques" },
+          "pocketCard": "Balance = the total of your unspent cheques (UTXOs).",
+          "ideaTitle": "Balance is unspent cheques",
+          "ideaBody": "Your balance is not a bank account line. It is the total of unspent cheques (UTXOs) you can still sign. Add them up to see what you hold.",
+          "objective": "After this screen you can treat balance as the sum of unspent cheques, not a single account field.",
+          "whyItMatters": "Explains change, coin selection, and why \"the wallet shows 0.01\" can mean several pieces.",
+          "keyTerms": ["UTXO", "unspent cheque", "balance"],
+          "misconception": "Bitcoin works like a single running account balance at a bank."
+        },
+        {
+          "id": "btc-intro-change",
+          "slug": "change",
+          "job": "Spend, then get the leftover",
+          "coachLine": "You sign one cheque. They get a new cheque. The leftover comes back to you as a new cheque.",
+          "button": "Got it — let me get paid",
+          "action": { "type": "intro", "scene": "change" },
+          "pocketCard": "Spend signs a cheque. Change comes back to you. Play money from here.",
+          "ideaTitle": "Spend, then get the leftover",
+          "ideaBody": "You sign one cheque. They receive a new cheque. The leftover returns to you as a new cheque. The toll peels off as a fee.",
+          "objective": "After this screen you can explain pay + change + fee when spending from an unspent cheque.",
+          "whyItMatters": "Stops panic when a send \"uses\" a larger piece than the invoice — change comes back.",
+          "keyTerms": ["change", "fee", "sign and send"],
+          "misconception": "If you spend from a 1 BTC cheque to pay 0.1, the other 0.9 disappears."
+        }
+      ]
+    },
+    {
+      "id": "btc-paid",
+      "slug": "get-paid",
+      "title": "Get paid",
+      "minutes": "8 min",
+      "job": "Receive a payment and prove it arrived",
+      "outcome": "Getting paid in bitcoin — you'll share an address safely and prove a payment landed.",
+      "steps": [
+        {
+          "id": "btc-paid-address",
+          "slug": "address",
+          "job": "Give them a place to send",
+          "coachLine": "The address is the license plate. The key stays in your pocket.",
+          "button": "That's my address",
+          "action": { "type": "address-check" }
+        },
+        {
+          "id": "btc-paid-receipt",
+          "slug": "receipt",
+          "job": "Prove it arrived",
+          "coachLine": "A screenshot is not proof. This page is the receipt.",
+          "button": "It landed",
+          "action": { "type": "receipt" },
+          "pocketCard": "Address = plate. Explorer = receipt. 3 confirms = landed."
+        },
+        {
+          "id": "btc-paid-explorer",
+          "slug": "explorer",
+          "job": "Prove it arrived — the real receipt",
+          "coachLine": "Every Bitcoin transaction has a public receipt. Let's read one — a real one, already confirmed. Your earlier practice receipt stayed simulated.",
+          "button": "I checked the explorer",
+          "action": {
+            "type": "explorer-read",
+            "txid": "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+            "explorerUrl": "https://mempool.space/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"
+          },
+          "ideaTitle": "A real explorer receipt",
+          "ideaBody": "A txid is a 64-character fingerprint of a transaction. This link opens the well-known 2010 Bitcoin pizza payment on mainnet. You read a public ledger page — not a screenshot from a chat.",
+          "objective": "After this screen you can open a txid on mempool.space and find status, confirmations, block height, fee rate (sat/vB), inputs, outputs, and addresses.",
+          "whyItMatters": "When someone pays you, the explorer — not a JPG — is how you prove it landed.",
+          "keyTerms": ["txid", "confirmations", "fee rate (sat/vB)"],
+          "misconception": "A payment screenshot in chat is as good as an explorer receipt.",
+          "pocketCard": "txid → explorer → status, confirms, block, fee rate, inputs, outputs. Looking up your own addresses on a public site leaks privacy — prefer your own node for real use. Personal drills in this course stay play money."
+        }
+      ]
+    },
+    {
+      "id": "btc-send",
+      "slug": "send",
+      "title": "Send a little",
+      "minutes": "8 min",
+      "job": "Send a tiny test before any real amount",
+      "outcome": "Sending without fear — you'll catch swapped addresses and leave room for the toll.",
+      "steps": [
+        {
+          "id": "btc-send-swap",
+          "slug": "swapped",
+          "job": "The address got swapped",
+          "coachLine": "The start can match. Read the end before you trust a paste.",
+          "button": "Reject this paste",
+          "action": { "type": "clipboard-mismatch" },
+          "pocketCard": "Read the start and the end. Never trust the paste alone."
+        },
+        {
+          "id": "btc-send-fee",
+          "slug": "toll",
+          "job": "Leave room for the toll",
+          "coachLine": "The fee is a toll for the road, not a bank charge.",
+          "button": "Send the test",
+          "action": { "type": "fee-room" },
+          "pocketCard": "Leave room for the toll, or the send cannot leave."
+        },
+        {
+          "id": "btc-send-confirm",
+          "slug": "no-undo",
+          "job": "No undo",
+          "coachLine": "On an exchange this button says Withdraw and they can delay it. In your own wallet, you press send.",
+          "button": "It landed",
+          "action": { "type": "send-confirm" },
+          "pocketCard": "You pressed send. It does not come back."
+        }
+      ]
+    },
+    {
+      "id": "btc-guard",
+      "slug": "guard",
+      "title": "Guard the car",
+      "minutes": "8 min",
+      "job": "See what the key does, then back up the words",
+      "outcome": "Guarding your coins — you'll separate plate from key and seal 12 words on paper.",
+      "steps": [
+        {
+          "id": "btc-guard-key",
+          "slug": "key",
+          "job": "Plate versus key",
+          "coachLine": "Your exchange password is not this key. The exchange holds the real one.",
+          "button": "I've seen both",
+          "action": { "type": "key-contrast" }
+        },
+        {
+          "id": "btc-guard-seed",
+          "slug": "words",
+          "job": "Write the 12 words",
+          "coachLine": "Anyone with the words owns the wallet.",
+          "button": "Continue",
+          "action": { "type": "seed-card" },
+          "pocketCard": "Paper. Two places. Never a photo."
+        }
+      ]
+    },
+    {
+      "id": "btc-test",
+      "slug": "road-test",
+      "title": "Road test",
+      "minutes": "5 min",
+      "job": "Mix the moves. One certificate.",
+      "outcome": "The road test — you'll refuse scams, pick the right network, and stop a bad send.",
+      "steps": [
+        {
+          "id": "btc-test-support",
+          "slug": "support",
+          "job": "Support wants the words",
+          "coachLine": "Nobody real needs those words.",
+          "button": "Close the chat",
+          "action": { "type": "scene", "scene": "support" }
+        },
+        {
+          "id": "btc-test-network",
+          "slug": "network",
+          "job": "Wrong road",
+          "coachLine": "If it starts with 0x, that is not Bitcoin.",
+          "button": "Switch to Bitcoin",
+          "action": { "type": "scene", "scene": "network" }
+        },
+        {
+          "id": "btc-test-mismatch",
+          "slug": "mismatch",
+          "job": "Address does not match",
+          "coachLine": "Verify twice. Send once.",
+          "button": "Stop the send",
+          "action": { "type": "scene", "scene": "mismatch" },
+          "cert": {
+            "certModuleLabel": "Bitcoin — First drive",
+            "certMilestoneLabel": "Can receive, verify, and send Bitcoin (practice)"
+          }
+        }
+      ]
+    }
+  ]
+}

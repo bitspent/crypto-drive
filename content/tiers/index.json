@@ -1,0 +1,12 @@
+{
+  "brand": "Crypto Drive",
+  "defaultDemoTier": "certified",
+  "demoLicenses": {
+    "CD-DRIVE-STARTER": "starter",
+    "CD-DRIVE-2026": "certified",
+    "CD-DRIVE-CERTIFIED": "certified",
+    "CD-DRIVE-VIP": "vip"
+  },
+  "tiers": ["starter", "certified", "vip"],
+  "note": "Gumroad sells the tier SKU. Modules are unlocked inside the tier — they are not separate products."
+}

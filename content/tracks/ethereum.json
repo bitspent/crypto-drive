@@ -1,0 +1,20 @@
+{
+  "id": "ethereum",
+  "slug": "ethereum",
+  "number": 2,
+  "title": "Ethereum",
+  "shortTitle": "ETH",
+  "status": "coming",
+  "eyebrow": "TRACK B · ETHEREUM",
+  "headline": "Coming next — same skills, new road",
+  "summary": "ETH addresses, gas fees, Etherscan-style explorer, and tokens on Ethereum. Scaffold only — not charge-ready yet.",
+  "coachPitch": "You’ll reuse Bitcoin habits: explorer, receive, send — plus gas judgment.",
+  "symbol": "eth",
+  "comingBeats": [
+    "ETH address vs BTC address — don’t mix",
+    "Gas as a changing toll",
+    "Read an ETH tx · receive practice (sim)",
+    "One Ethereum certificate at the end of the road"
+  ],
+  "lessons": []
+}

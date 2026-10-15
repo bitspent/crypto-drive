@@ -1,0 +1,20 @@
+{
+  "id": "tron",
+  "slug": "tron",
+  "number": 4,
+  "title": "Tron",
+  "shortTitle": "TRX",
+  "status": "coming",
+  "eyebrow": "TRACK D · TRON",
+  "headline": "Coming next — the T address and the energy toll",
+  "summary": "Tron addresses start with T. TRX, energy, and bandwidth are the toll. Scaffold only — not charge-ready yet.",
+  "coachPitch": "A Tron address is not a Bitcoin address. Energy and bandwidth are the toll, not a miner fee.",
+  "symbol": "trx",
+  "comingBeats": [
+    "Spot a Tron address (it starts with T)",
+    "Energy and bandwidth, not a Bitcoin fee",
+    "Receive with a network check (sim)",
+    "One Tron certificate at the end of the road"
+  ],
+  "lessons": []
+}
