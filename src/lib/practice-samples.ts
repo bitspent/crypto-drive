@@ -14,7 +14,7 @@ let bip39Cache: string[] | null = null;
 
 function bip39Words(): string[] {
   if (bip39Cache) return bip39Cache;
-  const raw = readFileSync(join(process.cwd(), "tests/bip39-english.txt"), "utf8");
+  const raw = readFileSync(join(process.cwd(), "src/lib/data/bip39-english.txt"), "utf8");
   bip39Cache = raw
     .split("\n")
     .map((w) => w.trim())

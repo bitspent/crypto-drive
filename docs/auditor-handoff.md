@@ -295,7 +295,7 @@ Not applicable — no on-chain practice network.
 
 - `src/lib/practice-samples.ts`
 - `src/lib/practice-types.ts`
-- `tests/bip39-english.txt`
+- `src/lib/data/bip39-english.txt`
 - `tests/practice-samples.test.mjs`
 
 ### Animations

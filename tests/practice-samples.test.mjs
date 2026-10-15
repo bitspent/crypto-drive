@@ -22,7 +22,7 @@ const bitcoin = JSON.parse(
   readFileSync(join(root, "content/tracks/bitcoin.json"), "utf8"),
 );
 const bip39 = new Set(
-  readFileSync(join(root, "tests/bip39-english.txt"), "utf8")
+  readFileSync(join(root, "src/lib/data/bip39-english.txt"), "utf8")
     .split("\n")
     .map((w) => w.trim())
     .filter(Boolean),
