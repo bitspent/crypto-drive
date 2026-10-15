@@ -7,14 +7,9 @@
   "whoFor": "Price-sensitive professionals who want the map before they pay for proof.",
   "coachPitch": "Learn the lanes before you merge. Short cues and cheat sheets — no classroom, no jargon stack.",
   "features": {
-    "lessons": true,
-    "cheatSheets": true,
-    "fullPractice": true,
     "certificate": false,
     "verifyLink": false,
-    "socialShare": false,
-    "liveCall": false,
-    "privateQa": false
+    "liveCall": false
   },
   "tracks": ["bitcoin", "ethereum", "usdt-networks", "tron", "solana"],
   "upgradeHint": "Certified Practitioner adds the verify link for the road test."

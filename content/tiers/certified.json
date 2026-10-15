@@ -8,14 +8,9 @@
   "whoFor": "Serious learners who want proof they can drive — not just notes.",
   "coachPitch": "Same Bitcoin drive as Starter. Finish the road test and put your name on one certificate anyone can check.",
   "features": {
-    "lessons": true,
-    "cheatSheets": true,
-    "fullPractice": true,
     "certificate": true,
     "verifyLink": true,
-    "socialShare": true,
-    "liveCall": false,
-    "privateQa": false
+    "liveCall": false
   },
   "tracks": ["bitcoin", "ethereum", "usdt-networks", "tron", "solana"],
   "upgradeHint": "Want a coach on the call? VIP Vault adds a 30-min ride-along and a private Q&A lane."

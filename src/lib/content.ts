@@ -4,18 +4,12 @@ import path from "path";
 export type TierId = "starter" | "certified" | "vip";
 
 export type TierFeatures = {
-  lessons: boolean;
-  cheatSheets: boolean;
-  /** Full interactive drills for every unlocked track step. */
-  fullPractice: boolean;
-  /** Issue named certificate at road-test end. */
+  /** Issue named certificate at capstone end. */
   certificate: boolean;
   /** Public /verify/[id] link with the certificate. */
   verifyLink: boolean;
-  socialShare: boolean;
   /** VIP ride-along scheduling surface. */
   liveCall: boolean;
-  privateQa: boolean;
 };
 
 export type TierSupport = {

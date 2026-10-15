@@ -13,9 +13,15 @@ function loadTier(id) {
 }
 
 describe("tier feature flags", () => {
-  it("gives Starter full practice without certificate or verify link", () => {
+  it("declares only flags the runtime enforces", () => {
+    for (const id of ["starter", "certified", "vip"]) {
+      const keys = Object.keys(loadTier(id).features).sort();
+      assert.deepEqual(keys, ["certificate", "liveCall", "verifyLink"]);
+    }
+  });
+
+  it("gives Starter practice without certificate or verify link", () => {
     const f = loadTier("starter").features;
-    assert.equal(f.fullPractice, true);
     assert.equal(f.certificate, false);
     assert.equal(f.verifyLink, false);
     assert.equal(f.liveCall, false);
@@ -23,7 +29,6 @@ describe("tier feature flags", () => {
 
   it("gives Certified practice + certificate + verify link", () => {
     const f = loadTier("certified").features;
-    assert.equal(f.fullPractice, true);
     assert.equal(f.certificate, true);
     assert.equal(f.verifyLink, true);
     assert.equal(f.liveCall, false);
@@ -31,7 +36,6 @@ describe("tier feature flags", () => {
 
   it("gives VIP the Certified package plus liveCall", () => {
     const f = loadTier("vip").features;
-    assert.equal(f.fullPractice, true);
     assert.equal(f.certificate, true);
     assert.equal(f.verifyLink, true);
     assert.equal(f.liveCall, true);

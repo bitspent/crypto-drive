@@ -181,7 +181,7 @@ What-is steps and the explorer lesson load `ideaTitle`, `ideaBody`, `objective`,
 | --- | --- | --- | --- | --- | --- |
 | **Fixed** | `/module/*` | Redirects via `resumeHref` or `/track/bitcoin/what-is/satoshi` | `tests/module-redirects.test.mjs` | — | — |
 | **Fixed** | What-is idea panels | Per-step JSON + `IdeaPanel`; no `PictureIntro` | Open any what-is step | — | — |
-| **Fixed** | Tier flags | `fullPractice` / `certificate` / `verifyLink` / `liveCall` | `tests/tier-features.test.mjs` | — | Starter practices all; cert is Certified upsell |
+| **Fixed** | Tier flags | `certificate` / `verifyLink` / `liveCall` (unused flags deleted) | `tests/tier-features.test.mjs` | — | Starter practices all; cert is Certified upsell |
 | **Fixed** | Explorer pedagogy | Model A pizza tx + three graded checks | Get paid → explorer | — | — |
 | **P2** | Journey 3D | Full R3F stack in repo but `JOURNEY_3D_ENABLED = false`; dual animation systems (CSS toys vs 3D worlds) | Code review `enabled.ts` | — | Risk of design drift; auditors may audit unused 3D |
 | **P2** | Persistence | File store only; not multi-instance / durable for production | Deploy two instances | — | Progress/certs not production-safe |
@@ -315,7 +315,7 @@ Not applicable — no on-chain practice network.
 4. Liability stance on displaying BIP39-looking words (even if generated) in screenshots / screen-share contexts.
 5. Timeline and definition of “charge-ready” for Gumroad launch.
 
-*(Resolved in-repo: per-step idea JSON; Model A pizza explorer with graded checks; tier flags `fullPractice` / `certificate` / `verifyLink` / `liveCall`; `/module/*` resume redirects; play-money tag on practice drives.)*
+*(Resolved in-repo: per-step idea JSON; Model A pizza explorer with graded checks; tier flags `certificate` / `verifyLink` / `liveCall` with unused flags deleted; `/module/*` resume redirects; play-money tag on practice drives.)*
 
 ---
 

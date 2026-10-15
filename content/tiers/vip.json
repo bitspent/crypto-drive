@@ -7,14 +7,9 @@
   "whoFor": "High-touch or non-tech professionals who want a ride-along for the first miles.",
   "coachPitch": "Same Bitcoin road as Certified. Plus: I sit shotgun for thirty minutes, then you get a private lane for follow-ups.",
   "features": {
-    "lessons": true,
-    "cheatSheets": true,
-    "fullPractice": true,
     "certificate": true,
     "verifyLink": true,
-    "socialShare": true,
-    "liveCall": true,
-    "privateQa": true
+    "liveCall": true
   },
   "tracks": ["bitcoin", "ethereum", "usdt-networks", "tron", "solana"],
   "support": {

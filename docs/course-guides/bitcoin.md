@@ -28,12 +28,12 @@ The next stop stays locked until the current one is done. Earlier stops stay ope
 
 ## Tier gating
 
-Flags in `content/tiers/*.json`: `fullPractice`, `certificate`, `verifyLink`, `liveCall`.
+Flags in `content/tiers/*.json`: `certificate`, `verifyLink`, `liveCall`. All tiers walk every step; only the certificate is gated.
 
 | | Starter | Certified / VIP |
 | --- | --- | --- |
-| All five stops (`fullPractice`) | Yes | Yes |
-| Road-test certificate + `/verify` | No (upgrade at the end) | Yes (`certificate` + `verifyLink`). Asking again opens the same one. |
+| All six drives, all steps | Yes | Yes |
+| Capstone certificate + `/verify` | No (upgrade at the end) | Yes (`certificate` + `verifyLink`). Asking again opens the same one. |
 | VIP live call | No | VIP only (`liveCall`) |
 
 Demo keys: `CD-DRIVE-STARTER` · `CD-DRIVE-2026` (Certified) · `CD-DRIVE-VIP`.
