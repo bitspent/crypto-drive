@@ -39,5 +39,8 @@ export default defineConfig({
     url: `${BASE_URL}/unlock`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
+    // `next start` boots with NODE_ENV=production, which requires a signing
+    // secret. This test-only value signs disposable e2e practice data.
+    env: { CERT_HASH_SECRET: "e2e-test-secret-not-for-production" },
   },
 });

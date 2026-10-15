@@ -9,14 +9,18 @@ import {
   isValidDemoLicense,
   resolveTierFromLicense,
   type TierId,
-} from "@/lib/content";
-import { findStep, stepBlockedReason } from "@/lib/drive";
+} from "./content";
+import { findStep, stepBlockedReason } from "./drive";
 import {
+  assertCertHashSecret,
+  certHashSecret,
   derivePracticeSeed,
   gradeStepAnswer,
   practiceFor,
   type StepAnswer,
-} from "@/lib/practice-samples";
+} from "./practice-samples";
+
+assertCertHashSecret();
 
 export type Student = {
   id: string;
@@ -220,7 +224,7 @@ export async function issueCertificate(input: {
 
   const id = newId("cert");
   const issuedAt = new Date().toISOString();
-  const secret = process.env.CERT_HASH_SECRET || "crypto-drive-dev-secret";
+  const secret = certHashSecret();
   const hash = createHmac("sha256", secret)
     .update(
       `${id}|${name}|${student.email}|${issuedAt}|${input.moduleSlug}|${student.tier}`,

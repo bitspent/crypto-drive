@@ -114,11 +114,39 @@ function formatBtc(n: number): string {
 }
 
 /**
+ * Fail fast when booting production without a signing secret. Called at module
+ * load by this module and by the store, so `next build` / `next start` refuse
+ * to run undeployable.
+ */
+export function assertCertHashSecret(): void {
+  if (process.env.NODE_ENV === "production" && !process.env.CERT_HASH_SECRET) {
+    throw new Error("CERT_HASH_SECRET must be set in production. See .env.example.");
+  }
+}
+
+assertCertHashSecret();
+
+let warnedCertFallback = false;
+
+/** Signing secret for practice seeds and certificate hashes. */
+export function certHashSecret(): string {
+  const secret = process.env.CERT_HASH_SECRET;
+  if (secret) return secret;
+  if (!warnedCertFallback) {
+    warnedCertFallback = true;
+    console.warn(
+      "[crypto-drive] CERT_HASH_SECRET not set. Using dev fallback. Do not deploy like this.",
+    );
+  }
+  return "crypto-drive-dev-secret";
+}
+
+/**
  * Stable practice seed from email + license. Same pair always yields the same
  * drills. The raw license is not stored — only this hash.
  */
 export function derivePracticeSeed(email: string, license: string): string {
-  const secret = process.env.CERT_HASH_SECRET || "crypto-drive-dev-secret";
+  const secret = certHashSecret();
   return createHmac("sha256", secret)
     .update(`${email.trim().toLowerCase()}|${license.trim().toUpperCase()}`)
     .digest("hex")
