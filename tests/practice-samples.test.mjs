@@ -135,6 +135,19 @@ describe("bitcoin first drive", () => {
     assert.equal(new Set(bodies).size, bodies.length, "duplicate ideaBody in bitcoin.json");
   });
 
+  it("gives all 18 bitcoin steps the full idea panel", () => {
+    const steps = bitcoin.drives.flatMap((d) => d.steps);
+    assert.equal(steps.length, 18);
+    for (const step of steps) {
+      assert.ok(step.ideaTitle?.trim(), `${step.id} missing ideaTitle`);
+      assert.ok(step.ideaBody?.trim(), `${step.id} missing ideaBody`);
+      assert.ok(step.objective?.trim(), `${step.id} missing objective`);
+      assert.ok(step.whyItMatters?.trim(), `${step.id} missing whyItMatters`);
+      assert.ok(Array.isArray(step.keyTerms) && step.keyTerms.length >= 1, `${step.id} keyTerms`);
+      assert.ok(step.misconception?.trim(), `${step.id} missing misconception`);
+    }
+  });
+
   it("ships the verified pizza explorer lesson after the simulated receipt", () => {
     const paid = bitcoin.drives.find((d) => d.slug === "get-paid");
     assert.ok(paid);
