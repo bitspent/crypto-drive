@@ -37,3 +37,10 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# local runtime + e2e artifacts
+.data/
+test-results/
+playwright-report/
+blob-report/
+playwright/.auth/
