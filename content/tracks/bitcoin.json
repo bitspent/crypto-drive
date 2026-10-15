@@ -317,16 +317,192 @@
           "coachLine": "Verify twice. Send once.",
           "button": "Stop the send",
           "action": { "type": "scene", "scene": "mismatch" },
-          "cert": {
-            "certModuleLabel": "Bitcoin — First drive",
-            "certMilestoneLabel": "Can receive, verify, and send Bitcoin (practice)"
-          },
           "ideaTitle": "Mismatch means stop",
           "ideaBody": "When the address on screen differs from the one your recipient gave you, the send stops — no exceptions. A single changed character sends your bitcoin somewhere it cannot come back from. You re-check the source, fix the address, and only then continue.",
           "objective": "After this screen you can halt a send on an address mismatch and re-verify against the recipient's original address.",
           "whyItMatters": "A maker-checker habit on addresses is the cheapest control a finance team can adopt for Bitcoin payments.",
           "keyTerms": ["verify twice", "mismatch", "stop"],
           "misconception": "One wrong character is harmless because the network will correct the address."
+        }
+      ]
+    },
+    {
+      "id": "btc-prove",
+      "slug": "prove-it",
+      "title": "Prove you can drive",
+      "minutes": "12 min",
+      "job": "Verify, decide, recover, explain",
+      "outcome": "The professional capstone — you'll verify a real payment, set a confirmation policy, choose a custody model, and defend Bitcoin to a non-technical executive.",
+      "steps": [
+        {
+          "id": "btc-prove-verify",
+          "slug": "verify",
+          "title": "Prove it arrived — on a real chain",
+          "job": "Read a real mainnet transaction",
+          "coachLine": "Every confirmed payment has a public receipt. We looked at one already. Now read one yourself — this is the exact skill an auditor uses.",
+          "button": "I verified the payment",
+          "action": {
+            "type": "explorer-read",
+            "txid": "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d",
+            "explorerUrl": "https://mempool.space/tx/a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"
+          },
+          "ideaTitle": "The audit skill",
+          "ideaBody": "Verification means not trusting the sender's screenshot. You take the transaction ID, open a public explorer, and read the facts: is it confirmed, how many confirmations, what fee was paid, which addresses moved value. Anyone can do this. No account, no permission, no middleman.",
+          "objective": "After this screen you can independently verify any Bitcoin payment using only a txid and a public explorer.",
+          "whyItMatters": "Every reconciliation, audit, and dispute you'll ever handle starts here. If you can't verify a payment, you can't book it.",
+          "keyTerms": ["Txid", "Confirmation", "Public explorer"],
+          "misconception": "Senders don't need to prove they paid. The chain proves it — you just have to know where to look.",
+          "pocketCard": "Verify the txid, not the sender's word.",
+          "quickCheck": {
+            "question": "What is the minimum you need to independently verify a Bitcoin payment?",
+            "options": [
+              "The sender's phone number and a screenshot",
+              "The transaction ID and a public explorer",
+              "The sender's private key",
+              "A bank statement showing the transfer"
+            ],
+            "answerIndex": 1,
+            "explanation": "A txid plus any public explorer is enough — no account or permission needed."
+          }
+        },
+        {
+          "id": "btc-prove-finality",
+          "slug": "finality",
+          "title": "When is a payment final?",
+          "job": "Set a confirmation policy",
+          "coachLine": "Bitcoin doesn't have a final stamp. It has a probability curve. You decide how many blocks is enough — based on what the payment is for.",
+          "button": "Set my policy",
+          "action": { "type": "policy-pick" },
+          "ideaTitle": "Confirmations are a dial",
+          "ideaBody": "A confirmed block is expensive to reverse. Each additional block makes reversal exponentially harder. So the question isn't 'is it final?' — it's 'how many confirmations do I need for this amount, this counterparty, this risk?' A coffee vendor takes zero. A house deposit waits six.",
+          "objective": "After this screen you can set a confirmation threshold that matches the value and reversibility of what you're selling.",
+          "whyItMatters": "Your confirmation policy is the single most important risk decision you'll make about Bitcoin in an operational setting.",
+          "keyTerms": ["Confirmation threshold", "Reorg", "Probability"],
+          "misconception": "Confirmations are not 'approval'. Nobody approves — blocks just make reversal more expensive every ten minutes.",
+          "pocketCard": "Match confirmations to the cost of being wrong.",
+          "quickCheck": {
+            "question": "A $20 coffee vs a $200,000 house deposit — which needs more confirmations?",
+            "options": [
+              "The coffee — small payments reverse more easily",
+              "The house deposit — higher amount, higher reversal cost",
+              "Neither — one confirmation is always enough",
+              "Both need exactly six"
+            ],
+            "answerIndex": 1,
+            "explanation": "Match confirmations to the cost of being wrong: coffee takes zero, a house deposit waits six."
+          }
+        },
+        {
+          "id": "btc-prove-custody",
+          "slug": "custody",
+          "title": "Who holds the keys?",
+          "job": "Compare four custody models",
+          "coachLine": "Self-custody isn't the only answer. For a company, it's rarely the right one alone. Compare the four models a professional actually chooses between.",
+          "button": "I've compared the models",
+          "action": { "type": "model-compare" },
+          "ideaTitle": "Custody is a trade, not a rule",
+          "ideaBody": "Exchange, self-custody, institutional custodian, multi-sig. Each makes a different trade between convenience, control, recoverability, and legal exposure. None is 'correct' — the right choice depends on who in your organisation needs to sign, what your regulator asks for, and what happens if a key holder dies.",
+          "objective": "After this screen you can explain the custody tradeoffs of four models to a board or regulator.",
+          "whyItMatters": "Custody is the decision your CFO will ask you about first. If you can't answer in one minute, you're not ready to hold Bitcoin on a balance sheet.",
+          "keyTerms": ["Self-custody", "Institutional custodian", "Multi-sig"],
+          "misconception": "Multi-sig is not 'more secure'. It's a different tradeoff — harder to lose, harder to move, more people who can leak.",
+          "pocketCard": "The right custody model is the one your board can defend.",
+          "quickCheck": {
+            "question": "Which model eliminates the risk of a single key holder losing access?",
+            "options": [
+              "Exchange custody",
+              "Self-custody",
+              "Multi-sig — no single key can spend or be lost alone",
+              "A paper backup in one safe"
+            ],
+            "answerIndex": 2,
+            "explanation": "Multi-sig spreads signing across holders, so no one person can lose the funds alone."
+          }
+        },
+        {
+          "id": "btc-prove-fees",
+          "slug": "fees",
+          "title": "What did it cost?",
+          "job": "Choose a fee strategy",
+          "coachLine": "Every transaction competes for space in the next block. The fee you bid decides whether you wait or pay. Match the fee to the urgency — not to your mood.",
+          "button": "Set my fee strategy",
+          "action": { "type": "fee-strategy" },
+          "ideaTitle": "Fees are an auction",
+          "ideaBody": "Blocks are full. Miners pick the highest bidders. When the mempool is quiet, 1 sat/vB is enough. When it's crowded, you'll pay 50 or 100. For a payroll batch you can wait — batching one transaction per batch saves fees across the whole run. For a single urgent payment, you pay the market rate.",
+          "objective": "After this screen you can choose a fee strategy that matches the urgency, the amount, and the budget.",
+          "whyItMatters": "Fees are a line item. A professional treats them like any other cost — predictable, budgeted, justifiable.",
+          "keyTerms": ["sat/vB", "Mempool", "Batching"],
+          "misconception": "Fees are not 'the network taking a cut'. Miners collect them; the amount is a market price for block space.",
+          "pocketCard": "Match the fee to the clock, not the panic.",
+          "quickCheck": {
+            "question": "Payroll runs tomorrow. One urgent supplier payment must land in an hour. Which gets the higher fee?",
+            "options": [
+              "The payroll batch — more recipients cost more",
+              "The supplier payment — higher urgency justifies higher fee",
+              "Both pay the same standard fee",
+              "Neither — fees are optional"
+            ],
+            "answerIndex": 1,
+            "explanation": "Match the fee to the clock: the urgent single send pays priority, the batch waits for economy."
+          }
+        },
+        {
+          "id": "btc-prove-restore",
+          "slug": "restore",
+          "title": "Get your wallet back",
+          "job": "Restore from 12 words",
+          "coachLine": "A backup you've never restored isn't a backup — it's a hope. Enter your twelve words now, into a fresh wallet, and watch the balance come back.",
+          "button": "Restore my wallet",
+          "action": { "type": "seed-restore" },
+          "ideaTitle": "The backup is the proof",
+          "ideaBody": "Your twelve words are the wallet. Any compatible wallet, on any device, will regenerate the same keys — and see the same balance — from those twelve words alone. If your hardware dies, the words are what remain. If someone else gets them, they get the wallet.",
+          "objective": "After this screen you can restore a Bitcoin wallet from its twelve-word backup and know the process works.",
+          "whyItMatters": "You cannot honestly tell a board that your Bitcoin is safe unless you've restored it once yourself.",
+          "keyTerms": ["Seed phrase", "Restore", "Derivation"],
+          "misconception": "The hardware wallet is not the wallet. It's a signing device. The seed phrase is the wallet.",
+          "pocketCard": "Restore it once or it isn't a backup.",
+          "quickCheck": {
+            "question": "Where do you restore a wallet from?",
+            "options": [
+              "Any compatible wallet, using the twelve seed words",
+              "The original hardware device only",
+              "Your exchange account dashboard",
+              "A backup email from the wallet company"
+            ],
+            "answerIndex": 0,
+            "explanation": "The seed words regenerate the same keys in any compatible wallet."
+          }
+        },
+        {
+          "id": "btc-prove-explain",
+          "slug": "explain",
+          "title": "Explain it to your CFO",
+          "job": "Three sentences, no jargon",
+          "coachLine": "Your CFO asks: 'Why should we accept Bitcoin?' You have three sentences. No hype, no price, no investment talk. Why does this matter to the business?",
+          "button": "Make my case",
+          "action": { "type": "free-write-rubric" },
+          "cert": {
+            "certModuleLabel": "Bitcoin — First drive",
+            "certMilestoneLabel": "Can receive, verify, send, and prove Bitcoin (practice)"
+          },
+          "ideaTitle": "The three-sentence test",
+          "ideaBody": "If you can't explain Bitcoin to a non-technical executive in three sentences, you haven't learned it — you've memorised it. A defensible answer names what it is (settlement, not speculation), why it's scarce (fixed supply, published code), and how it's custodied (a decision you've made, not a default). Price and 'investment' have no place in an operational conversation.",
+          "objective": "After this screen you can defend Bitcoin adoption to a non-technical executive in three sentences.",
+          "whyItMatters": "This is the sentence your CFO repeats to the board. Write it carefully.",
+          "keyTerms": ["Scarcity", "Settlement", "Custody"],
+          "misconception": "Bitcoin is not a technology pitch. It's a policy decision — like accepting any other foreign currency.",
+          "pocketCard": "Scarcity. Settlement. Custody. Nothing else.",
+          "quickCheck": {
+            "question": "Which of these belongs in a three-sentence CFO answer?",
+            "options": [
+              "Price targets and expected returns",
+              "Scarcity, settlement, custody — not price or investment",
+              "Mining hardware recommendations",
+              "Trading strategies for volatility"
+            ],
+            "answerIndex": 1,
+            "explanation": "An operational answer covers scarcity, settlement, and custody — never price or investment."
+          }
         }
       ]
     }

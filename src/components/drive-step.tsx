@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  type ClipboardEvent,
   type ReactNode,
 } from "react";
 import Link from "next/link";
@@ -37,9 +38,16 @@ import { publish } from "@/components/journey/journey-bus";
 import { driveKey, JOURNEY_DRIVES } from "@/components/journey/registry";
 import { JOURNEY_3D_ENABLED } from "@/components/journey/enabled";
 import { useWebGLAvailable } from "@/components/journey/use-webgl";
-import type { IntroScene, Step } from "@/lib/content";
+import type { IntroScene, QuickCheck, Step } from "@/lib/content";
 import { PIZZA_EXPLORER } from "@/lib/explorer-lesson";
-import type { PracticeSet, StepAnswer } from "@/lib/practice-types";
+import {
+  CUSTODY_MODELS,
+  FEE_STRATEGY,
+  POLICY_THRESHOLDS,
+  gradeExplainText,
+  type PracticeSet,
+  type StepAnswer,
+} from "@/lib/practice-types";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -190,7 +198,7 @@ export function DriveStep({
             </span>
           </p>
           <h1 className="mt-3 font-[family-name:var(--font-display)] text-3xl text-[var(--paper)] sm:text-4xl">
-            {step.job}
+            {step.title ?? step.job}
           </h1>
           {driveSlug === "get-paid" ||
           driveSlug === "send" ||
@@ -256,7 +264,7 @@ export function DriveStep({
           ) : (
             <div className="max-w-xl space-y-4 rounded-2xl border border-[var(--lane)] bg-[var(--cabin)] p-5">
               <p className="text-[var(--fog)]">
-                You finished the road test. The verify link comes with{" "}
+                You finished the final drive. The verify link comes with{" "}
                 <span className="text-[var(--paper)]">Certified Practitioner</span>.
               </p>
               <p className="text-sm text-[var(--mute)]">
@@ -459,6 +467,23 @@ function Scene({
         onCommit={onCommit}
       />
     );
+  }
+  if (action.type === "policy-pick") {
+    return <PolicyScene step={step} review={review} busy={busy} onCommit={onCommit} />;
+  }
+  if (action.type === "model-compare") {
+    return <CompareScene step={step} review={review} busy={busy} onCommit={onCommit} />;
+  }
+  if (action.type === "fee-strategy") {
+    return <FeeStrategyScene step={step} review={review} busy={busy} onCommit={onCommit} />;
+  }
+  if (action.type === "seed-restore") {
+    return (
+      <RestoreScene step={step} practice={practice} review={review} busy={busy} onCommit={onCommit} />
+    );
+  }
+  if (action.type === "free-write-rubric") {
+    return <ExplainScene step={step} review={review} busy={busy} onCommit={onCommit} />;
   }
   return (
     <RoadScene
@@ -1796,6 +1821,703 @@ function SeedScene({
         </p>
       ) : null}
       {busy ? <p className="text-sm text-[var(--mute)]">Saving…</p> : null}
+    </Split>
+  );
+}
+
+function QuickCheckView({ check }: { check: QuickCheck }) {
+  const [picked, setPicked] = useState<number | null>(null);
+  return (
+    <Frame title="QUICK CHECK">
+      <p className="text-sm text-[var(--fog)]">{check.question}</p>
+      <div className="mt-3 space-y-2" role="radiogroup" aria-label={check.question}>
+        {check.options.map((opt, i) => (
+          <button
+            key={opt}
+            type="button"
+            role="radio"
+            aria-checked={picked === i}
+            onClick={() => setPicked(i)}
+            className={cn(
+              "w-full rounded-xl border px-3.5 py-2.5 text-left text-sm transition-colors",
+              picked === i && i === check.answerIndex &&
+                "border-[var(--go)]/60 bg-[var(--go)]/10 text-[var(--paper)]",
+              picked === i && i !== check.answerIndex &&
+                "border-[var(--danger)]/60 bg-[var(--danger)]/10 text-[var(--paper)]",
+              picked === null &&
+                "border-[var(--lane)] bg-[var(--cabin)] text-[var(--fog)] hover:border-[var(--amber)]/60",
+              picked !== null &&
+                picked !== i &&
+                "border-[var(--lane)] bg-[var(--cabin)] text-[var(--mute)]",
+            )}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+      {picked !== null ? (
+        <p
+          className={cn(
+            "mt-3 text-sm",
+            picked === check.answerIndex ? "text-[var(--go)]" : "text-[var(--danger)]",
+          )}
+        >
+          {picked === check.answerIndex ? "Correct. " : "Not quite. "}
+          <span className="text-[var(--fog)]">{check.explanation}</span>
+        </p>
+      ) : null}
+    </Frame>
+  );
+}
+
+const POLICY_SCENARIOS = [
+  { id: "coffee", label: "Coffee, $4, in person", detail: "Small amount, face to face." },
+  {
+    id: "laptop",
+    label: "Laptop, $1,800, shipped to a new customer",
+    detail: "Goods ship before any dispute.",
+  },
+  {
+    id: "house",
+    label: "House deposit, $200,000, wire replacement",
+    detail: "Irreversible, life-changing sum.",
+  },
+] as const;
+const POLICY_OPTIONS = [0, 1, 3, 6, 12] as const;
+
+type PolicyId = (typeof POLICY_SCENARIOS)[number]["id"];
+
+function PolicyScene({
+  step,
+  review,
+  busy,
+  onCommit,
+}: {
+  step: Step;
+  review: boolean;
+  busy: boolean;
+  onCommit: (answer?: StepAnswer) => void;
+}) {
+  const [picks, setPicks] = useState<Record<PolicyId, string>>({ coffee: "", laptop: "", house: "" });
+  const [custom, setCustom] = useState<Record<PolicyId, string>>({
+    coffee: "",
+    laptop: "",
+    house: "",
+  });
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  function threshold(id: PolicyId): number | null {
+    const raw = (picks[id] === "custom" ? custom[id] : picks[id]).trim();
+    if (raw === "") return null;
+    const n = Number(raw);
+    return Number.isInteger(n) && n >= 0 ? n : null;
+  }
+
+  function submit() {
+    const coffee = threshold("coffee");
+    const laptop = threshold("laptop");
+    const house = threshold("house");
+    if (coffee === null || coffee !== POLICY_THRESHOLDS.coffee) {
+      setLocalError("A $4 in-person coffee doesn't need confirmations. Zero is the professional call.");
+      return;
+    }
+    if (
+      laptop === null ||
+      laptop < POLICY_THRESHOLDS.laptopMin ||
+      laptop > POLICY_THRESHOLDS.laptopMax
+    ) {
+      setLocalError("A $1,800 shipped laptop to a new customer needs one to three confirmations.");
+      return;
+    }
+    if (house === null || house < POLICY_THRESHOLDS.houseMin) {
+      setLocalError("For a $200,000 irreversible payment, six confirmations is the floor. Try again.");
+      return;
+    }
+    setLocalError(null);
+    onCommit({ policyCoffee: coffee, policyLaptop: laptop, policyHouse: house });
+  }
+
+  useFootPrimary(
+    review ? null : (
+      <Button size="lg" disabled={busy} onClick={submit}>
+        {step.button}
+      </Button>
+    ),
+    [review, busy, step.button, picks, custom],
+  );
+
+  return (
+    <Split
+      coach={step.coachLine}
+      left={
+        <div className="toy-stage flex min-h-[16rem] flex-col justify-center gap-4 p-5">
+          <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
+            THREE PAYMENTS
+          </p>
+          <ul className="space-y-2 text-sm text-[var(--fog)]">
+            {POLICY_SCENARIOS.map((s) => (
+              <li key={s.id} className="flex items-baseline justify-between gap-3">
+                <span>{s.label}</span>
+                <span className="font-mono text-[var(--paper)]">
+                  {threshold(s.id) ?? "–"}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm text-[var(--mute)]">One dial per payment.</p>
+        </div>
+      }
+    >
+      <IdeaPanel step={step} />
+      <Frame title="YOUR POLICY">
+        {review ? (
+          <p className="text-sm text-[var(--go)]">Policy recorded: coffee 0 · laptop 1–3 · house 6+.</p>
+        ) : (
+          <div className="space-y-5">
+            {POLICY_SCENARIOS.map((s) => (
+              <fieldset key={s.id}>
+                <legend className="text-sm text-[var(--fog)]">
+                  {s.label} <span className="text-[var(--mute)]">— {s.detail}</span>
+                </legend>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {POLICY_OPTIONS.map((o) => (
+                    <label
+                      key={o}
+                      className="flex items-center gap-2 rounded-xl border border-[var(--lane)] px-3 py-2 text-sm text-[var(--paper)]"
+                    >
+                      <input
+                        type="radio"
+                        name={`policy-${s.id}`}
+                        aria-label={`${s.label}: ${o} confirmation${o === 1 ? "" : "s"}`}
+                        checked={picks[s.id] === String(o)}
+                        onChange={() => setPicks((p) => ({ ...p, [s.id]: String(o) }))}
+                      />
+                      {o}
+                    </label>
+                  ))}
+                  <label className="flex items-center gap-2 rounded-xl border border-[var(--lane)] px-3 py-2 text-sm text-[var(--paper)]">
+                    <input
+                      type="radio"
+                      name={`policy-${s.id}`}
+                      aria-label={`${s.label}: custom`}
+                      checked={picks[s.id] === "custom"}
+                      onChange={() => setPicks((p) => ({ ...p, [s.id]: "custom" }))}
+                    />
+                    Custom
+                  </label>
+                  {picks[s.id] === "custom" ? (
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      className="w-24"
+                      aria-label={`${s.label}: custom confirmations`}
+                      value={custom[s.id]}
+                      onChange={(e) => setCustom((c) => ({ ...c, [s.id]: e.target.value }))}
+                    />
+                  ) : null}
+                </div>
+              </fieldset>
+            ))}
+          </div>
+        )}
+      </Frame>
+      {localError ? (
+        <p className="text-sm text-[var(--danger)]" role="alert">
+          {localError}
+        </p>
+      ) : null}
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
+    </Split>
+  );
+}
+
+const CUSTODY_CARDS = [
+  {
+    id: "exchange",
+    name: "Exchange",
+    rows: [
+      ["Who can spend", "The exchange"],
+      ["Who can lose", "The exchange"],
+      ["Who can be subpoenaed", "The exchange"],
+      ["If a holder dies", "The account holder's estate needs a court order"],
+    ],
+  },
+  {
+    id: "self-custody",
+    name: "Self-custody",
+    rows: [
+      ["Who can spend", "Only you"],
+      ["Who can lose", "Only you"],
+      ["Who can be subpoenaed", "Nobody — nothing to subpoena"],
+      ["If a holder dies", "Seed phrase or coins gone"],
+    ],
+  },
+  {
+    id: "institutional",
+    name: "Institutional custodian",
+    rows: [
+      ["Who can spend", "The custodian, under contract"],
+      ["Who can lose", "The custodian (with insurance)"],
+      ["Who can be subpoenaed", "The custodian"],
+      ["If a holder dies", "The contract names a successor"],
+    ],
+  },
+  {
+    id: "multi-sig",
+    name: "Multi-sig",
+    rows: [
+      ["Who can spend", "M of N key holders"],
+      ["Who can lose", "No single key holder"],
+      ["Who can be subpoenaed", "Each key holder, individually"],
+      ["If a holder dies", "The remaining holders can still spend"],
+    ],
+  },
+] as const;
+
+function CompareScene({
+  step,
+  review,
+  busy,
+  onCommit,
+}: {
+  step: Step;
+  review: boolean;
+  busy: boolean;
+  onCommit: (answer?: StepAnswer) => void;
+}) {
+  const [expanded, setExpanded] = useState<string[]>(review ? [...CUSTODY_MODELS] : []);
+  const [pick, setPick] = useState(review ? "multi-sig" : "");
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  function toggle(id: string) {
+    setExpanded((e) => (e.includes(id) ? e.filter((x) => x !== id) : [...e, id]));
+  }
+
+  function submit() {
+    if (!CUSTODY_MODELS.every((m) => expanded.includes(m))) {
+      setLocalError("Expand all four models first.");
+      return;
+    }
+    if (pick !== "multi-sig") {
+      setLocalError("Multi-sig is the only model where no single person can lose the funds alone.");
+      return;
+    }
+    setLocalError(null);
+    onCommit({ comparedModels: [...expanded], modelPick: pick });
+  }
+
+  useFootPrimary(
+    review ? null : (
+      <Button size="lg" disabled={busy} onClick={submit}>
+        {step.button}
+      </Button>
+    ),
+    [review, busy, step.button, expanded, pick],
+  );
+
+  return (
+    <Split
+      coach={step.coachLine}
+      left={
+        <div className="toy-stage flex min-h-[16rem] flex-col justify-center gap-4 p-5">
+          <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
+            FOUR MODELS
+          </p>
+          <ul className="space-y-2 text-sm text-[var(--fog)]">
+            {CUSTODY_CARDS.map((m) => (
+              <li key={m.id} className="flex items-baseline justify-between gap-3">
+                <span>{m.name}</span>
+                <span className="text-[var(--mute)]">{expanded.includes(m.id) ? "open" : "—"}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm text-[var(--mute)]">{expanded.length} of 4 expanded.</p>
+        </div>
+      }
+    >
+      <IdeaPanel step={step} />
+      {review ? (
+        <Frame title="COMPARED">
+          <p className="text-sm text-[var(--go)]">
+            Compared all four. Multi-sig removes single-key-holder risk.
+          </p>
+        </Frame>
+      ) : (
+        <>
+          <div className="space-y-3">
+            {CUSTODY_CARDS.map((m) => (
+              <div
+                key={m.id}
+                className="rounded-2xl border border-[var(--lane)] bg-[var(--cabin)]"
+              >
+                <button
+                  type="button"
+                  aria-expanded={expanded.includes(m.id)}
+                  aria-controls={`custody-${m.id}`}
+                  onClick={() => toggle(m.id)}
+                  className="flex w-full items-center justify-between px-5 py-4 text-left text-sm text-[var(--paper)]"
+                >
+                  {m.name}
+                  <span aria-hidden="true" className="text-[var(--mute)]">
+                    {expanded.includes(m.id) ? "−" : "+"}
+                  </span>
+                </button>
+                {expanded.includes(m.id) ? (
+                  <dl id={`custody-${m.id}`} className="space-y-2 px-5 pb-4 text-sm">
+                    {m.rows.map(([k, v]) => (
+                      <div key={k} className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+                        <dt className="shrink-0 text-[var(--mute)] sm:w-40">{k}</dt>
+                        <dd className="text-[var(--fog)]">{v}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          <Frame title="ONE QUESTION">
+            <fieldset>
+              <legend className="text-sm text-[var(--fog)]">
+                Which model removes single-key-holder failure risk without a third party?
+              </legend>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {CUSTODY_CARDS.map((m) => (
+                  <label
+                    key={m.id}
+                    className="flex items-center gap-2 rounded-xl border border-[var(--lane)] px-3 py-2 text-sm text-[var(--paper)]"
+                  >
+                    <input
+                      type="radio"
+                      name="custody-pick"
+                      checked={pick === m.id}
+                      onChange={() => setPick(m.id)}
+                    />
+                    {m.name}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </Frame>
+        </>
+      )}
+      {localError ? (
+        <p className="text-sm text-[var(--danger)]" role="alert">
+          {localError}
+        </p>
+      ) : null}
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
+    </Split>
+  );
+}
+
+const FEE_SCENARIOS = [
+  { id: "payroll", label: "Payroll batch", detail: "40 recipients, run tonight, no deadline" },
+  { id: "supplier", label: "Single supplier payment", detail: "Must land within 1 hour" },
+] as const;
+const FEE_TIERS = [
+  { id: "economy", label: "Economy", detail: "Slow and cheap — batch it" },
+  { id: "standard", label: "Standard", detail: "Next few blocks" },
+  { id: "priority", label: "Priority", detail: "Next block, top bidder" },
+] as const;
+
+type FeeScenarioId = (typeof FEE_SCENARIOS)[number]["id"];
+
+function FeeStrategyScene({
+  step,
+  review,
+  busy,
+  onCommit,
+}: {
+  step: Step;
+  review: boolean;
+  busy: boolean;
+  onCommit: (answer?: StepAnswer) => void;
+}) {
+  const [picks, setPicks] = useState<Record<FeeScenarioId, string>>({ payroll: "", supplier: "" });
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  function submit() {
+    if (picks.payroll !== FEE_STRATEGY.payroll || picks.supplier !== FEE_STRATEGY.supplier) {
+      setLocalError(
+        "The supplier deadline justifies the priority fee. The payroll batch can wait for economy.",
+      );
+      return;
+    }
+    setLocalError(null);
+    onCommit({ feePayroll: picks.payroll, feeSupplier: picks.supplier });
+  }
+
+  useFootPrimary(
+    review ? null : (
+      <Button size="lg" disabled={busy} onClick={submit}>
+        {step.button}
+      </Button>
+    ),
+    [review, busy, step.button, picks],
+  );
+
+  return (
+    <Split
+      coach={step.coachLine}
+      left={
+        <div className="toy-stage flex min-h-[16rem] flex-col justify-center gap-4 p-5">
+          <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
+            TWO SENDS
+          </p>
+          <ul className="space-y-2 text-sm text-[var(--fog)]">
+            {FEE_SCENARIOS.map((s) => (
+              <li key={s.id} className="flex items-baseline justify-between gap-3">
+                <span>{s.label}</span>
+                <span className="text-[var(--paper)]">{picks[s.id] || "–"}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm text-[var(--mute)]">Match the fee to the clock.</p>
+        </div>
+      }
+    >
+      <IdeaPanel step={step} />
+      <Frame title="YOUR STRATEGY">
+        {review ? (
+          <p className="text-sm text-[var(--go)]">
+            Strategy recorded: payroll economy, supplier priority.
+          </p>
+        ) : (
+          <div className="space-y-5">
+            {FEE_SCENARIOS.map((s) => (
+              <fieldset key={s.id}>
+                <legend className="text-sm text-[var(--fog)]">
+                  {s.label} <span className="text-[var(--mute)]">— {s.detail}</span>
+                </legend>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {FEE_TIERS.map((t) => (
+                    <label
+                      key={t.id}
+                      className="flex items-center gap-2 rounded-xl border border-[var(--lane)] px-3 py-2 text-sm text-[var(--paper)]"
+                    >
+                      <input
+                        type="radio"
+                        name={`fee-${s.id}`}
+                        aria-label={`${s.label}: ${t.label}`}
+                        checked={picks[s.id] === t.id}
+                        onChange={() => setPicks((p) => ({ ...p, [s.id]: t.id }))}
+                      />
+                      {t.label}
+                      <span className="text-[var(--mute)]">— {t.detail}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            ))}
+          </div>
+        )}
+      </Frame>
+      {localError ? (
+        <p className="text-sm text-[var(--danger)]" role="alert">
+          {localError}
+        </p>
+      ) : null}
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
+    </Split>
+  );
+}
+
+function RestoreScene({
+  step,
+  practice,
+  review,
+  busy,
+  onCommit,
+}: {
+  step: Step;
+  practice: PracticeSet;
+  review: boolean;
+  busy: boolean;
+  onCommit: (answer?: StepAnswer) => void;
+}) {
+  const [words, setWords] = useState<string[]>(() => Array(12).fill(""));
+  const [localError, setLocalError] = useState<string | null>(null);
+  const filled = words.filter((w) => w.trim() !== "").length;
+
+  function setWord(i: number, value: string) {
+    setWords((w) => w.map((old, j) => (j === i ? value : old)));
+  }
+
+  function handlePaste(i: number, e: ClipboardEvent<HTMLInputElement>) {
+    const parts = e.clipboardData
+      .getData("text")
+      .split(/\s+/)
+      .map((w) => w.trim())
+      .filter(Boolean);
+    if (parts.length === 0) return;
+    e.preventDefault();
+    setWords((w) => {
+      const next = [...w];
+      if (parts.length >= 12) {
+        for (let j = 0; j < 12; j++) next[j] = parts[j] ?? "";
+      } else {
+        for (let j = 0; j < parts.length && i + j < 12; j++) next[i + j] = parts[j] ?? "";
+      }
+      return next;
+    });
+  }
+
+  function submit() {
+    const bad = words.findIndex(
+      (w, i) => w.trim().toLowerCase() !== practice.words[i],
+    );
+    if (bad >= 0) {
+      setLocalError(`Word ${bad + 1} is wrong. Check your written card.`);
+      return;
+    }
+    setLocalError(null);
+    onCommit({ restoreWords: words.map((w) => w.trim()) });
+  }
+
+  useFootPrimary(
+    review ? null : (
+      <Button size="lg" disabled={busy} onClick={submit}>
+        {step.button}
+      </Button>
+    ),
+    [review, busy, step.button, words],
+  );
+
+  return (
+    <Split
+      coach={step.coachLine}
+      left={
+        <div className="toy-stage flex min-h-[16rem] flex-col justify-center gap-4 p-5">
+          <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
+            FRESH WALLET
+          </p>
+          <p className="font-mono text-2xl text-[var(--paper)]">
+            {review ? practice.receivedLabel : "0.000 BTC"}
+          </p>
+          <p className="text-sm text-[var(--mute)]">
+            {review ? "Same words, same wallet." : `${filled} of 12 words entered.`}
+          </p>
+        </div>
+      }
+    >
+      <IdeaPanel step={step} />
+      <Frame title="TWELVE WORDS, IN ORDER">
+        {review ? (
+          <p className="text-sm text-[var(--go)]">
+            Wallet restored. Balance back: {practice.receivedLabel}.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {words.map((w, i) => (
+              <label key={i} className="block text-sm text-[var(--fog)]" htmlFor={`restore-word-${i}`}>
+                Word {i + 1}
+                <Input
+                  id={`restore-word-${i}`}
+                  value={w}
+                  onChange={(e) => setWord(i, e.target.value)}
+                  onPaste={(e) => handlePaste(i, e)}
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  className="mt-1 font-mono"
+                />
+              </label>
+            ))}
+          </div>
+        )}
+      </Frame>
+      {localError ? (
+        <p className="text-sm text-[var(--danger)]" role="alert">
+          {localError}
+        </p>
+      ) : null}
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
+    </Split>
+  );
+}
+
+function ExplainScene({
+  step,
+  review,
+  busy,
+  onCommit,
+}: {
+  step: Step;
+  review: boolean;
+  busy: boolean;
+  onCommit: (answer?: StepAnswer) => void;
+}) {
+  const [text, setText] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
+  const sentences = text
+    .split(/[.!?]+/)
+    .map((s) => s.trim())
+    .filter(Boolean).length;
+
+  function submit() {
+    const err = gradeExplainText(text);
+    if (err) {
+      setLocalError(err);
+      return;
+    }
+    setLocalError(null);
+    onCommit({ explainText: text.trim() });
+  }
+
+  useFootPrimary(
+    review ? null : (
+      <Button size="lg" disabled={busy} onClick={submit}>
+        {step.button}
+      </Button>
+    ),
+    [review, busy, step.button, text],
+  );
+
+  return (
+    <Split
+      coach={step.coachLine}
+      left={
+        <div className="toy-stage flex min-h-[16rem] flex-col justify-center gap-4 p-5">
+          <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
+            THREE SENTENCES
+          </p>
+          <p className="text-sm text-[var(--fog)]">Settlement · Scarcity · Custody</p>
+          <p className="text-sm text-[var(--mute)]">No price. No hype.</p>
+        </div>
+      }
+    >
+      <IdeaPanel step={step} />
+      <Frame title="YOUR ANSWER">
+        {review ? (
+          <p className="text-sm text-[var(--go)]">Case recorded.</p>
+        ) : (
+          <div>
+            <label className="block text-sm text-[var(--fog)]" htmlFor="explain-text">
+              Your three sentences
+              <textarea
+                id="explain-text"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                maxLength={500}
+                rows={5}
+                spellCheck={false}
+                className="mt-1 w-full rounded-md border border-[var(--lane)] bg-[var(--cabin)] px-3 py-2 text-sm text-[var(--paper)] placeholder:text-[var(--mute)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--asphalt)]"
+                placeholder="Why should the business accept Bitcoin?"
+              />
+            </label>
+            <p className="mt-2 text-xs text-[var(--mute)]">
+              {text.length} / 500 characters · {sentences} / 2 sentences minimum
+            </p>
+          </div>
+        )}
+      </Frame>
+      {localError ? (
+        <p className="text-sm text-[var(--danger)]" role="alert">
+          {localError}
+        </p>
+      ) : null}
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
     </Split>
   );
 }

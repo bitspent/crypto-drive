@@ -16,6 +16,7 @@ const {
   practiceFor,
   gradeStepAnswer,
   PIZZA_EXPLORER,
+  POLICY_THRESHOLDS,
 } = jiti(join(root, "src/lib/practice-samples.ts"));
 
 const bitcoin = JSON.parse(
@@ -100,14 +101,14 @@ describe("practice samples", () => {
 
 describe("bitcoin first drive", () => {
   it("opens with the protocol stop and ends on one certificate", () => {
-    assert.equal(bitcoin.drives.length, 5);
+    assert.equal(bitcoin.drives.length, 6);
     assert.equal(bitcoin.drives[0].slug, "what-is");
     const steps = bitcoin.drives.flatMap((drive) => drive.steps);
-    assert.equal(steps.length, 18);
+    assert.equal(steps.length, 24);
     const certs = steps.filter((step) => step.cert);
     assert.equal(certs.length, 1);
-    assert.equal(certs[0].id, "btc-test-mismatch");
-    assert.match(certs[0].cert.certMilestoneLabel, /receive, verify, and send/i);
+    assert.equal(certs[0].id, "btc-prove-explain");
+    assert.match(certs[0].cert.certMilestoneLabel, /receive, verify, send, and prove/i);
   });
 
   it("gives every what-is step unique instructional ideaBody", () => {
@@ -135,9 +136,9 @@ describe("bitcoin first drive", () => {
     assert.equal(new Set(bodies).size, bodies.length, "duplicate ideaBody in bitcoin.json");
   });
 
-  it("gives all 18 bitcoin steps the full idea panel", () => {
+  it("gives all 24 bitcoin steps the full idea panel", () => {
     const steps = bitcoin.drives.flatMap((d) => d.steps);
-    assert.equal(steps.length, 18);
+    assert.equal(steps.length, 24);
     for (const step of steps) {
       assert.ok(step.ideaTitle?.trim(), `${step.id} missing ideaTitle`);
       assert.ok(step.ideaBody?.trim(), `${step.id} missing ideaBody`);
@@ -146,6 +147,125 @@ describe("bitcoin first drive", () => {
       assert.ok(Array.isArray(step.keyTerms) && step.keyTerms.length >= 1, `${step.id} keyTerms`);
       assert.ok(step.misconception?.trim(), `${step.id} missing misconception`);
     }
+  });
+
+  it("shapes the prove-it capstone after road-test", () => {
+    assert.deepEqual(
+      bitcoin.drives.map((d) => d.slug),
+      ["what-is", "get-paid", "send", "guard", "road-test", "prove-it"],
+    );
+    const prove = bitcoin.drives.find((d) => d.slug === "prove-it");
+    assert.equal(
+      prove.steps.map((s) => s.slug).join(","),
+      "verify,finality,custody,fees,restore,explain",
+    );
+    const types = new Set([
+      "explorer-read",
+      "policy-pick",
+      "model-compare",
+      "fee-strategy",
+      "seed-restore",
+      "free-write-rubric",
+    ]);
+    for (const step of prove.steps) {
+      assert.ok(types.has(step.action.type), `${step.id} action ${step.action.type}`);
+      assert.ok(step.title?.trim(), `${step.id} missing title`);
+      const qc = step.quickCheck;
+      assert.ok(qc?.question?.trim(), `${step.id} quickCheck question`);
+      assert.ok(
+        Array.isArray(qc.options) && qc.options.length >= 3,
+        `${step.id} quickCheck options`,
+      );
+      assert.ok(
+        Number.isInteger(qc.answerIndex) && qc.options[qc.answerIndex],
+        `${step.id} quickCheck answerIndex`,
+      );
+      assert.ok(qc.explanation?.trim(), `${step.id} quickCheck explanation`);
+    }
+    const verify = prove.steps.find((s) => s.slug === "verify");
+    assert.equal(verify.action.txid, PIZZA_EXPLORER.txid);
+    assert.equal(verify.action.explorerUrl, PIZZA_EXPLORER.explorerUrl);
+  });
+
+  it("keeps policy-pick expected ranges non-overlapping", () => {
+    assert.equal(POLICY_THRESHOLDS.coffee, 0);
+    assert.ok(POLICY_THRESHOLDS.laptopMin > POLICY_THRESHOLDS.coffee);
+    assert.ok(POLICY_THRESHOLDS.houseMin > POLICY_THRESHOLDS.laptopMax);
+    const p = practiceFor(derivePracticeSeed("cap@example.com", "CD-DRIVE-STARTER"));
+    const grade = (a) => gradeStepAnswer("btc-prove-finality", "policy-pick", p, a);
+    assert.equal(grade({ policyCoffee: 0, policyLaptop: 3, policyHouse: 6 }), null);
+    assert.ok(grade({ policyCoffee: 1, policyLaptop: 3, policyHouse: 6 }));
+    assert.ok(grade({ policyCoffee: 0, policyLaptop: 6, policyHouse: 6 }));
+    assert.ok(grade({ policyCoffee: 0, policyLaptop: 3, policyHouse: 3 }));
+  });
+
+  it("grades the custody, fee, and restore capstone answers", () => {
+    const p = practiceFor(derivePracticeSeed("cap@example.com", "CD-DRIVE-STARTER"));
+    assert.equal(
+      gradeStepAnswer("btc-prove-custody", "model-compare", p, {
+        comparedModels: ["exchange", "self-custody", "institutional", "multi-sig"],
+        modelPick: "multi-sig",
+      }),
+      null,
+    );
+    assert.ok(
+      gradeStepAnswer("btc-prove-custody", "model-compare", p, {
+        comparedModels: ["exchange"],
+        modelPick: "multi-sig",
+      }),
+    );
+    assert.ok(
+      gradeStepAnswer("btc-prove-custody", "model-compare", p, {
+        comparedModels: ["exchange", "self-custody", "institutional", "multi-sig"],
+        modelPick: "exchange",
+      }),
+    );
+    assert.equal(
+      gradeStepAnswer("btc-prove-fees", "fee-strategy", p, {
+        feePayroll: "economy",
+        feeSupplier: "priority",
+      }),
+      null,
+    );
+    assert.ok(
+      gradeStepAnswer("btc-prove-fees", "fee-strategy", p, {
+        feePayroll: "priority",
+        feeSupplier: "priority",
+      }),
+    );
+    assert.equal(
+      gradeStepAnswer("btc-prove-restore", "seed-restore", p, { restoreWords: p.words }),
+      null,
+    );
+    const wrong = [...p.words];
+    wrong[4] = wrong[4] === "abandon" ? "zoo" : "abandon";
+    assert.match(
+      gradeStepAnswer("btc-prove-restore", "seed-restore", p, { restoreWords: wrong }) ?? "",
+      /Word 5 is wrong/,
+    );
+  });
+
+  it("grades the CFO free-write rubric", () => {
+    const p = practiceFor(derivePracticeSeed("cap@example.com", "CD-DRIVE-STARTER"));
+    const grade = (explainText) =>
+      gradeStepAnswer("btc-prove-explain", "free-write-rubric", p, { explainText });
+    assert.equal(
+      grade(
+        "Bitcoin settles payments with finality in about ten minutes. Supply is scarce with a fixed supply capped at 21 million coins. We hold the keys in multi-sig custody with a named custodian.",
+      ),
+      null,
+    );
+    assert.match(
+      grade(
+        "Bitcoin price will keep rising and investors will see great returns. You should invest now for guaranteed profit in the bull market.",
+      ) ?? "",
+      /Remove price language/,
+    );
+    assert.match(grade("Bitcoin is interesting technology.") ?? "", /two sentences/);
+    assert.match(
+      grade("Bitcoin is a new kind of money people talk about. Many firms are looking at it this year.") ?? "",
+      /Mention what it is/,
+    );
   });
 
   it("ships the verified pizza explorer lesson after the simulated receipt", () => {

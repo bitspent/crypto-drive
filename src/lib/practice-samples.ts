@@ -2,7 +2,14 @@ import { createHash, createHmac } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { PIZZA_EXPLORER } from "./explorer-lesson";
-import type { PracticeSet, StepAnswer } from "@/lib/practice-types";
+import {
+  CUSTODY_MODELS,
+  FEE_STRATEGY,
+  POLICY_THRESHOLDS,
+  gradeExplainText,
+  type PracticeSet,
+  type StepAnswer,
+} from "./practice-types";
 
 export type { PracticeSet, StepAnswer } from "@/lib/practice-types";
 export { PIZZA_EXPLORER } from "./explorer-lesson";
@@ -252,5 +259,70 @@ export function gradeStepAnswer(
     return null;
   }
 
+  if (actionType === "policy-pick") {
+    const coffee = Number(answer?.policyCoffee);
+    const laptop = Number(answer?.policyLaptop);
+    const house = Number(answer?.policyHouse);
+    if (!Number.isInteger(coffee) || coffee !== POLICY_THRESHOLDS.coffee) {
+      return "A $4 in-person coffee doesn't need confirmations. Zero is the professional call.";
+    }
+    if (
+      !Number.isInteger(laptop) ||
+      laptop < POLICY_THRESHOLDS.laptopMin ||
+      laptop > POLICY_THRESHOLDS.laptopMax
+    ) {
+      return "A $1,800 shipped laptop to a new customer needs one to three confirmations.";
+    }
+    if (!Number.isInteger(house) || house < POLICY_THRESHOLDS.houseMin) {
+      return "For a $200,000 irreversible payment, six confirmations is the floor. Try again.";
+    }
+    return null;
+  }
+
+  if (actionType === "model-compare") {
+    const compared = answer?.comparedModels ?? [];
+    if (CUSTODY_MODELS.some((m) => !compared.includes(m))) {
+      return "Expand all four models first.";
+    }
+    if (answer?.modelPick !== "multi-sig") {
+      return "Multi-sig is the only model where no single person can lose the funds alone.";
+    }
+    return null;
+  }
+
+  if (actionType === "fee-strategy") {
+    if (
+      answer?.feePayroll !== FEE_STRATEGY.payroll ||
+      answer?.feeSupplier !== FEE_STRATEGY.supplier
+    ) {
+      return "The supplier deadline justifies the priority fee. The payroll batch can wait for economy.";
+    }
+    return null;
+  }
+
+  if (actionType === "seed-restore") {
+    const got = (answer?.restoreWords ?? []).map((w) => w.trim().toLowerCase());
+    if (got.length !== 12) {
+      return "Enter all twelve words in order.";
+    }
+    const bad = got.findIndex((w, i) => w !== practice.words[i]);
+    if (bad >= 0) {
+      return `Word ${bad + 1} is wrong. Check your written card.`;
+    }
+    return null;
+  }
+
+  if (actionType === "free-write-rubric") {
+    return gradeExplainText(answer?.explainText ?? "");
+  }
+
   return null;
 }
+
+export {
+  CUSTODY_MODELS,
+  EXPLAIN_RUBRIC,
+  FEE_STRATEGY,
+  POLICY_THRESHOLDS,
+  gradeExplainText,
+} from "./practice-types";

@@ -97,22 +97,37 @@ export type StepAction =
   | { type: "send-confirm" }
   | { type: "key-contrast" }
   | { type: "seed-card" }
-  | { type: "scene"; scene: RoadScene };
+  | { type: "scene"; scene: RoadScene }
+  | { type: "policy-pick" }
+  | { type: "model-compare" }
+  | { type: "fee-strategy" }
+  | { type: "seed-restore" }
+  | { type: "free-write-rubric" };
 
 export type StepCert = {
   certModuleLabel: string;
   certMilestoneLabel: string;
 };
 
+export type QuickCheck = {
+  question: string;
+  options: string[];
+  answerIndex: number;
+  explanation: string;
+};
+
 export type Step = {
   id: string;
   slug: string;
+  /** Display headline; falls back to job when absent (all pre-capstone steps). */
+  title?: string;
   job: string;
   coachLine: string;
   button: string;
   action: StepAction;
   pocketCard?: string;
   cert?: StepCert;
+  quickCheck?: QuickCheck;
   ideaTitle?: string;
   ideaBody?: string;
   objective?: string;
