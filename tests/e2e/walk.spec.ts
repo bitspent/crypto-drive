@@ -2,7 +2,13 @@
 // Ported from the operator validate.mjs (screenshots dropped, explorer step added:
 // the operator script predates the get-paid/explorer lesson).
 import { expect, test, type Page } from "@playwright/test";
-import { assertNoPageErrors, collectPageErrors, uniqueEmail, unlock } from "./helpers";
+import {
+  assertNoPageErrors,
+  collectPageErrors,
+  expectLayoutContract,
+  uniqueEmail,
+  unlock,
+} from "./helpers";
 
 test.setTimeout(240_000);
 
@@ -22,7 +28,7 @@ async function commitAndContinue(page: Page, buttonName: string, urlPart: string
   }
 }
 
-test("walks unlock to verified certificate across all 18 steps", async ({ page }) => {
+test("walks unlock to verified certificate across all 24 steps", async ({ page }) => {
   const failures = collectPageErrors(page);
   await unlock(page, uniqueEmail("walk"));
   await page.getByRole("link", { name: /Continue Bitcoin|Bitcoin road/ }).click();
@@ -163,7 +169,67 @@ test("walks unlock to verified certificate across all 18 steps", async ({ page }
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL("**/road-test/mismatch");
 
+  // No cert on mismatch anymore: it auto-advances into the capstone.
   await page.getByRole("button", { name: "Stop the send" }).click();
+  await page.waitForURL("**/prove-it/verify");
+
+  // verify: same three checks as the explorer lesson, new commit button.
+  await expectLayoutContract(page, "prove-it/verify");
+  await page.getByRole("radio", { name: "Yes" }).check();
+  await page.fill("#explorer-confirms", "900000");
+  await page.fill("#explorer-fee", "4191");
+  await page.getByRole("button", { name: "I verified the payment" }).click();
+  await page.getByRole("link", { name: "Continue", exact: true }).click();
+  await page.waitForURL("**/prove-it/finality");
+
+  // finality: coffee 0, laptop 3, house 6.
+  await expectLayoutContract(page, "prove-it/finality");
+  await page.getByRole("radio", { name: "Coffee, $4, in person: 0 confirmations" }).check();
+  await page
+    .getByRole("radio", { name: "Laptop, $1,800, shipped to a new customer: 3 confirmations" })
+    .check();
+  await page
+    .getByRole("radio", { name: "House deposit, $200,000, wire replacement: 6 confirmations" })
+    .check();
+  await page.getByRole("button", { name: "Set my policy" }).click();
+  await page.getByRole("link", { name: "Continue", exact: true }).click();
+  await page.waitForURL("**/prove-it/custody");
+
+  // custody: expand all four, pick multi-sig.
+  await expectLayoutContract(page, "prove-it/custody");
+  for (const model of ["Exchange", "Self-custody", "Institutional custodian", "Multi-sig"]) {
+    await page.getByRole("button", { name: model }).click();
+  }
+  await page.getByRole("radio", { name: "Multi-sig", exact: true }).check();
+  await page.getByRole("button", { name: "I've compared the models" }).click();
+  await page.getByRole("link", { name: "Continue", exact: true }).click();
+  await page.waitForURL("**/prove-it/fees");
+
+  // fees: payroll economy, supplier priority.
+  await expectLayoutContract(page, "prove-it/fees");
+  await page.getByRole("radio", { name: "Payroll batch: Economy" }).check();
+  await page.getByRole("radio", { name: "Single supplier payment: Priority" }).check();
+  await page.getByRole("button", { name: "Set my fee strategy" }).click();
+  await page.getByRole("link", { name: "Continue", exact: true }).click();
+  await page.waitForURL("**/prove-it/restore");
+
+  // restore: the same 12 words captured at guard/words, in order.
+  await expectLayoutContract(page, "prove-it/restore");
+  expect(words).toHaveLength(12);
+  for (let i = 0; i < 12; i++) {
+    await page.getByLabel(`Word ${i + 1}`, { exact: true }).fill(words[i] ?? "");
+  }
+  await page.getByRole("button", { name: "Restore my wallet" }).click();
+  await page.getByRole("link", { name: "Continue", exact: true }).click();
+  await page.waitForURL("**/prove-it/explain");
+
+  // explain: a valid CFO answer, then the certificate issues here.
+  await expectLayoutContract(page, "prove-it/explain");
+  await page.fill(
+    "#explain-text",
+    "Bitcoin settles payments with finality in about ten minutes. Supply is scarce with a fixed supply capped at 21 million coins. We hold the keys in multi-sig custody with a named custodian.",
+  );
+  await page.getByRole("button", { name: "Make my case" }).click();
   await page.locator("#name").waitFor();
   await page.fill("#name", "Playwright Driver");
   await Promise.all([
@@ -171,9 +237,9 @@ test("walks unlock to verified certificate across all 18 steps", async ({ page }
     page.getByRole("button", { name: "Issue my certificate" }).click(),
   ]);
   await expect(page.getByRole("heading", { name: "Certificate ready, Playwright." })).toBeVisible();
-  const verify = page.locator('a[href^="/verify/"]').first();
-  await expect(verify).toHaveCount(1);
-  await verify.click();
+  const verifyLink = page.locator('a[href^="/verify/"]').first();
+  await expect(verifyLink).toHaveCount(1);
+  await verifyLink.click();
   await page.waitForURL("**/verify/**");
   await expect(page.getByRole("heading", { name: "Playwright Driver" })).toBeVisible();
 

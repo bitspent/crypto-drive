@@ -36,3 +36,25 @@ export function collectPageErrors(page: Page): string[] {
 export function assertNoPageErrors(failures: string[]): void {
   expect(failures, failures.join("\n")).toEqual([]);
 }
+
+/** Layout contract: left column and illustration stay within the drive head. */
+export async function expectLayoutContract(page: Page, tag: string): Promise<void> {
+  await page.waitForSelector(".toy-stage");
+  const m = await page.evaluate(() => {
+    const r = (el: Element | null) => {
+      const b = (el ?? document.body).getBoundingClientRect();
+      return { l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width) };
+    };
+    return {
+      head: r(document.querySelector(".drive-head")),
+      left: r(document.querySelector(".drive-split > :first-child")),
+      stage: r(document.querySelector(".toy-stage")),
+    };
+  });
+  expect(m.left.r, `${tag}: left.r=${m.left.r} head.r=${m.head.r}`).toBeLessThanOrEqual(
+    m.head.r + 1,
+  );
+  expect(m.stage.r, `${tag}: stage.r=${m.stage.r} head.r=${m.head.r}`).toBeLessThanOrEqual(
+    m.head.r + 1,
+  );
+}

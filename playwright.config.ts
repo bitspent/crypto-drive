@@ -31,7 +31,7 @@ export default defineConfig({
         isMobile: true,
         hasTouch: true,
       },
-      testMatch: ["**/layout.spec.ts", "**/mobile.spec.ts"],
+      testMatch: ["**/layout.spec.ts", "**/mobile.spec.ts", "**/walk.spec.ts"],
     },
   ],
   webServer: {

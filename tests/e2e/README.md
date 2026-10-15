@@ -8,7 +8,7 @@ compared; every spec asserts on DOM state, URLs, geometry, or computed style.
 
 | File | What it proves |
 | --- | --- |
-| `walk.spec.ts` | Unlock → all 18 steps → certificate issue → verify page, with zero console/page/network errors |
+| `walk.spec.ts` | Unlock → all 24 steps → certificate issue → verify page, with zero console/page/network errors, plus the layout contract on every prove-it step |
 | `layout.spec.ts` | Left column and illustration card stay within the drive-head width, desktop + mobile viewports, both themes |
 | `keyboard.spec.ts` | ArrowRight advances, ArrowLeft goes back, Up/Down rove focus, arrows never hijack typing |
 | `reduced-motion.spec.ts` | Under `prefers-reduced-motion`, no animation runs and end poses pin |
@@ -16,7 +16,8 @@ compared; every spec asserts on DOM state, URLs, geometry, or computed style.
 | `mobile.spec.ts` | A step renders the 2D illustration card on a mobile viewport |
 
 Projects: `chromium` (1440×900, everything except `mobile.spec.ts`) and `mobile`
-(390×844, `layout.spec.ts` + `mobile.spec.ts`). Runs are serial (`workers: 1`)
+(390×844, `layout.spec.ts` + `mobile.spec.ts` + `walk.spec.ts`, so the capstone
+layout contract is covered at both viewports). Runs are serial (`workers: 1`)
 because the app keeps sessions in a file-backed store.
 
 ## Run locally
