@@ -37,6 +37,7 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+next-env.d.ts
 
 # local runtime + e2e artifacts
 .data/

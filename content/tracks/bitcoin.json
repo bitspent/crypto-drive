@@ -483,7 +483,7 @@
           "action": { "type": "free-write-rubric" },
           "cert": {
             "certModuleLabel": "Bitcoin — First drive",
-            "certMilestoneLabel": "Can receive, verify, send, and prove Bitcoin (practice)"
+            "certMilestoneLabel": "Can receive, verify, send, and custody Bitcoin. Can explain Bitcoin's role to a non-technical stakeholder."
           },
           "ideaTitle": "The three-sentence test",
           "ideaBody": "If you can't explain Bitcoin to a non-technical executive in three sentences, you haven't learned it — you've memorised it. A defensible answer names what it is (settlement, not speculation), why it's scarce (fixed supply, published code), and how it's custodied (a decision you've made, not a default). Price and 'investment' have no place in an operational conversation.",

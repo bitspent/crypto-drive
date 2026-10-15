@@ -237,11 +237,21 @@ test("walks unlock to verified certificate across all 24 steps", async ({ page }
     page.getByRole("button", { name: "Issue my certificate" }).click(),
   ]);
   await expect(page.getByRole("heading", { name: "Certificate ready, Playwright." })).toBeVisible();
+  await expect(
+    page.getByText(
+      "Can receive, verify, send, and custody Bitcoin. Can explain Bitcoin's role to a non-technical stakeholder.",
+    ),
+  ).toBeVisible();
   const verifyLink = page.locator('a[href^="/verify/"]').first();
   await expect(verifyLink).toHaveCount(1);
   await verifyLink.click();
   await page.waitForURL("**/verify/**");
   await expect(page.getByRole("heading", { name: "Playwright Driver" })).toBeVisible();
+  await expect(
+    page.getByText(
+      "Can receive, verify, send, and custody Bitcoin. Can explain Bitcoin's role to a non-technical stakeholder.",
+    ),
+  ).toBeVisible();
 
   assertNoPageErrors(failures);
 });

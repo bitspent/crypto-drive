@@ -108,7 +108,10 @@ describe("bitcoin first drive", () => {
     const certs = steps.filter((step) => step.cert);
     assert.equal(certs.length, 1);
     assert.equal(certs[0].id, "btc-prove-explain");
-    assert.match(certs[0].cert.certMilestoneLabel, /receive, verify, send, and prove/i);
+    assert.match(
+      certs[0].cert.certMilestoneLabel,
+      /receive, verify, send, and custody Bitcoin\. Can explain Bitcoin's role to a non-technical stakeholder\./,
+    );
   });
 
   it("gives every what-is step unique instructional ideaBody", () => {
