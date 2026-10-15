@@ -268,6 +268,46 @@ describe("bitcoin first drive", () => {
     );
   });
 
+  it("matches rubric stems without substring false positives", () => {
+    const p = practiceFor(derivePracticeSeed("cap@example.com", "CD-DRIVE-STARTER"));
+    const grade = (explainText) =>
+      gradeStepAnswer("btc-prove-explain", "free-write-rubric", p, { explainText });
+    // Each brief case, kept at the standing two-sentence minimum.
+    assert.equal(
+      grade("Bitcoin has scarcity. Settlement reaches finality in minutes."),
+      null,
+    );
+    assert.equal(
+      grade("Bitcoin has scarcity and settles with finality. We'll see this again next quarter."),
+      null,
+    );
+    assert.match(
+      grade("It will gain value over time. Returns look strong this year.") ?? "",
+      /Remove price language/,
+    );
+    assert.match(
+      grade("It's revolutionary technology for money. Everyone will switch to it soon.") ?? "",
+      /Remove price language/,
+    );
+    assert.equal(
+      grade("It settles instantly. The supply is capped at 21 million."),
+      null,
+    );
+    assert.match(
+      grade("Price will moon this year. Gains are guaranteed for investors.") ?? "",
+      /Remove price language/,
+    );
+    // Boundary pair: "gain" as a word fails, "again" never triggers.
+    assert.match(
+      grade("The gain from adoption is unclear. Settlement still takes ten minutes.") ?? "",
+      /Remove price language/,
+    );
+    assert.equal(
+      grade("Bitcoin has scarcity and settles with finality. We'll never see that again."),
+      null,
+    );
+  });
+
   it("ships the verified pizza explorer lesson after the simulated receipt", () => {
     const paid = bitcoin.drives.find((d) => d.slug === "get-paid");
     assert.ok(paid);

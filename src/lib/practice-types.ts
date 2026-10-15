@@ -62,29 +62,49 @@ export const CUSTODY_MODELS = ["exchange", "self-custody", "institutional", "mul
 export const FEE_STRATEGY = { payroll: "economy", supplier: "priority" } as const;
 
 /**
- * Capstone free-write rubric. Matching is a case-insensitive substring search
- * over the whole answer — one deterministic rule for categories and
- * disqualifiers alike.
+ * Capstone free-write rubric. Matching is case-insensitive with a leading
+ * word boundary only: a keyword matches at the start of a word, so "settles"
+ * hits "settle" and "gains" hits "gain", while "again" never hits "gain".
+ * One deterministic rule for categories and disqualifiers alike.
  */
 export const EXPLAIN_RUBRIC = {
   categories: {
-    scarcity: ["scarce", "21 million", "fixed supply", "capped"],
-    settlement: ["settle", "settlement", "finality", "confirmed", "irreversible", "borderless"],
-    custody: ["custody", "custod", "keys", "hold", "self-custody", "custodian"],
+    scarcity: ["scarce", "scarcity", "21 million", "fixed supply", "capped", "hard cap"],
+    settlement: [
+      "settle",
+      "settlement",
+      "final",
+      "finality",
+      "confirmed",
+      "confirmation",
+      "irreversible",
+      "borderless",
+    ],
+    custody: ["custody", "custodial", "custodian", "self-custody", "keys", "hold your own", "cold storage"],
   },
   disqualifiers: [
     "price",
     "invest",
+    "investment",
     "return",
+    "returns",
     "profit",
     "gain",
+    "gains",
     "moon",
     "bull",
+    "bullish",
     "revolutionary",
     "the future",
     "guaranteed",
+    "to the moon",
   ],
 } as const;
+
+function keywordHit(text: string, keyword: string): boolean {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${escaped}`, "i").test(text);
+}
 
 /** Grade a CFO answer: ≥2 sentences, ≥2 of 3 categories, zero disqualifiers. */
 export function gradeExplainText(text: string): string | null {
@@ -99,12 +119,11 @@ export function gradeExplainText(text: string): string | null {
   if (sentences.length < 2) {
     return "Write at least two sentences.";
   }
-  const lower = clean.toLowerCase();
-  if (EXPLAIN_RUBRIC.disqualifiers.some((k) => lower.includes(k))) {
+  if (EXPLAIN_RUBRIC.disqualifiers.some((k) => keywordHit(clean, k))) {
     return "Remove price language. This is an operational answer, not an investment pitch.";
   }
   const hit = Object.values(EXPLAIN_RUBRIC.categories).filter((keys) =>
-    keys.some((k) => lower.includes(k)),
+    keys.some((k) => keywordHit(clean, k)),
   ).length;
   if (hit < 2) {
     return "Mention what it is (settlement), why it's scarce (fixed supply), and how it's custodied. You can skip one.";
