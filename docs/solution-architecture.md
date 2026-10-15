@@ -1,6 +1,6 @@
 # Crypto Drive — Solution Architecture
 
-Whole-system map for the licensed learner loop: ads → Gumroad → unlock → Module 1 milestone → cert → verify → share. Aligned with locked brand, Gumroad-only commerce, pro “learn to drive” positioning, **simulated milestones**, and **off-chain certs**.
+Whole-system map for the licensed learner loop: ads → Gumroad → unlock → six drives → capstone cert → verify → share. Aligned with locked brand, Gumroad-only commerce, pro “learn to drive” positioning, **simulated milestones**, and **off-chain certs**.
 
 ---
 
@@ -24,7 +24,7 @@ flowchart TB
 
   subgraph Browser["Learner browser"]
     Landing["Landing / unlock UI"]
-    Course["Module + milestone UI"]
+    Course["Drive + step UI"]
     CertView["Cert + share CTAs"]
     VerifyPub["Public /verify page"]
   end
@@ -32,8 +32,8 @@ flowchart TB
   subgraph AppHost["Vercel — Crypto Drive app"]
     Next["Next.js App Router"]
     OG["@vercel/og cert image"]
-    API["Unlock / webhook / verify APIs"]
-    DemoStore["Demo store<br/>(in-memory / JSON)"]
+    API["Unlock / progress / cert APIs"]
+    DemoStore["Demo store<br/>(.data/store.json)"]
   end
 
   subgraph DataLater["Supabase — later"]
@@ -80,15 +80,15 @@ flowchart TB
 | Gumroad license keys | Unique buyer access credential | Gumroad | **Mock** now; live keys later |
 | Gumroad webhooks / License API | Sync sale → student record; verify key | Gumroad → app | **Later** |
 | Landing page | Pitch + “Get course” + “I have a license” | Vercel (Next.js) | **Now** |
-| Unlock / access gate | Accept email + license; grant Module 1 | Vercel app | **Now** (mock key / env) |
-| Module 1 + milestone UI | Coach cues + one simulated wallet checkpoint | Vercel app (in-app content) | **Now** |
-| Modules 2–4 | Full curriculum | Vercel app | **Later** |
+| Unlock / access gate | Accept email + license; grant tier path | Vercel app | **Now** (demo keys; Gumroad verify later) |
+| Drive + step UI (Bitcoin: 6 drives, 24 steps) | Coach cues + graded drills + capstone | Vercel app (in-app content) | **Now** |
+| Tracks ETH / USDT / Tron / Solana | Later tracks | Vercel app | **Scaffold** (`status: "coming"`) |
 | Cert generator | Name, date, unique id/hash → PNG | Vercel (`@vercel/og` / satori) | **Now** |
 | `/verify/[certId]` | Public attestation page | Vercel (public route) | **Now** |
 | Share CTAs | Intent / copy links to X, LinkedIn, Instagram | Learner browser → social apps | **Now** |
 | Demo persistence | Students, milestone pass, cert id | In-app memory / JSON | **Now**; Supabase later |
 | Supabase DB + auth | Persist students/milestones; sessions | Supabase | **Later** (with live Gumroad) |
-| Tier packaging (Starter / Certified / VIP) | SKU → access level | Gumroad products + app | **Later** (one path now) |
+| Tier packaging (Starter / Certified / VIP) | SKU → access level | App (`content/tiers/`) + Gumroad later | **Now** (cert gated by `certificate` + `verifyLink`) |
 | VIP fulfillment | Scheduling / private channel | TBD tooling | **Later** |
 | On-chain NFT / real tx milestones | Harder attestation / real funds practice | Chain / wallets | **Out of default**; optional later |
 
@@ -114,7 +114,7 @@ sequenceDiagram
   Grad->>App: Email + license unlock
   App->>GR: Verify license (API) / or trust DB after webhook
   App->>Store: Upsert student, grant access
-  Grad->>App: Module 1 → simulated milestone
+  Grad->>App: Bitcoin drive → 24 graded steps
   App->>Store: Record pass + certId / hash
   App->>Grad: Cert image + /verify/[certId]
   Grad->>App: Open public verify page
@@ -122,7 +122,7 @@ sequenceDiagram
   Social-->>Ad: New attention → Gumroad buyers
 ```
 
-**Slice 1 shortcut:** demo key (env/hardcoded) → unlock → milestone → cert → verify → share. No live Gumroad or Supabase.
+**Current shortcut:** demo key (`CD-DRIVE-*`) → unlock → 24 steps → capstone cert → verify → share. No live Gumroad or Supabase.
 
 ---
 
@@ -134,7 +134,7 @@ sequenceDiagram
 - Full lesson body (Gumroad may host a thin welcome PDF only)
 
 ### Stays in-app (Vercel)
-- Landing, unlock UI, Module shells, milestone challenges  
+- Landing, unlock UI, drive/step player (6 drives, 24 steps), graded drills  
 - Cert OG image + `/verify/[id]`  
 - Share CTAs and coach-toned copy  
 
@@ -142,16 +142,16 @@ sequenceDiagram
 - Product listing, payment, license key issuance  
 - (Later) sale webhooks feeding the app  
 
-### Mock in slice 1
-- License unlock (no webhook / License API)  
-- Persistence (local/demo, not Supabase)  
+### Mock / local now
+- License unlock (demo keys, no webhook / License API)  
+- Persistence (`.data/store.json`, not Supabase)  
 - Gumroad CTA URL (placeholder)  
-- Single path (no tier SKUs)  
+- Tier content ships in-app; Gumroad products mirror it later  
 
 ### Explicitly deferred / out of default
 - Live ads, slogan, ad video  
 - Real on-chain txs and NFT badges  
-- Modules 2–4, VIP tooling  
+- Tracks ETH / USDT / Tron / Solana, VIP scheduling  
 - Banking keynote as product scope  
 
 ---
@@ -165,6 +165,7 @@ sequenceDiagram
 | Pros + “learn to drive” | Copy/UI = coach, not classroom |
 | Ads → Gumroad | Acquisition lands on Gumroad; app is post-purchase |
 | **Simulated** milestones | No real funds / wallet-sign liability in v1 |
+| Capstone proves ops skill | Cert issues at `prove-it/explain`, not at the scam drills |
 | **Off-chain** cert | Hash + public verify page; no NFT required |
 | Content **in-app** | Gumroad = buy + license; course lives on Vercel |
 
@@ -193,7 +194,7 @@ the master switch `JOURNEY_3D_ENABLED=false`
 realistic bar, so the CSS toy scenes in `src/components/drive-toys.tsx` are
 the current experience — not the fallback.
 
-**2D layout contract (enforced by `layout.mjs` in the Playwright harness):**
+**2D layout contract (enforced by `tests/e2e/layout.spec.ts` plus walk assertions, via `npx playwright test`):**
 the left illustration card never exceeds the drive-head width
 (`leftCard.right ≤ head.right`) at 1440×900 and 390×844, in both themes.
 The `.drive-split` grid is symmetric at ≥900px (equal 1fr/1fr stretch columns;
@@ -242,15 +243,47 @@ render calls < 450, triangles < 400000, textures < 90, geometries < 200 per
 stop. Typical stop: ~50–100 calls, ~40k triangles. One transmission surface
 max (traveler orb); no postprocessing; no shadow maps.
 
-**Validation notes (Playwright, committed scripts):**
+**Validation notes (Playwright, `tests/e2e/`, `npx playwright test`):**
 
-- Full walk + reduced-motion + mobile + no-WebGL on the 2D path: all green,
-  0 failures. The harness asserts the 2D illustration card mounts and no
-  `.journey-stage` exists; element-level tease/win captures cover all 7
-  what-is toys in both themes.
+- Full 24-step walk on desktop + mobile, layout contract both viewports in
+  both themes, keyboard drive, reduced-motion, no-WebGL: all green. The
+  harness asserts the 2D illustration card mounts and no `.journey-stage`
+  exists.
 - Recall-loop harness lesson: after the final recall tap the app keeps
   showing `WORD 9` (by design) while the Continue link appears — so the loop
   must wait for *either* a new title *or* Continue, never a title change
   alone. A lonely title-watch is a race that fails ~40% of runs under load.
-- Framing is judged on settled screenshots (≥2.8s after arrival); earlier
-  shots catch the camera mid-flight.
+- No screenshot diffs: every check asserts on DOM, URLs, geometry, or
+  computed style. Traces are kept only for failed tests.
+
+---
+
+## 8. Curriculum map (as of HEAD)
+
+Bitcoin is content-complete. All other tracks are scaffolds (`status:
+"coming"`, `lessons: []`).
+
+| Drive | Title | Steps |
+| --- | --- | --- |
+| `what-is` | What Bitcoin is | 7 — satoshi, scarce, block, halving, sats, cheques, change |
+| `get-paid` | Get paid | 3 — address, receipt, explorer |
+| `send` | Send a little | 3 — swapped, toll, no-undo |
+| `guard` | Guard the car | 2 — key, words |
+| `road-test` | Road test | 3 — support, network, mismatch |
+| `prove-it` | Prove you can drive | 6 — verify, finality, custody, fees, restore, explain |
+
+24 steps total. Every step carries the six idea-panel fields. The certificate
+issues on `prove-it/explain` (the final step); all tiers walk every step, and
+only the certificate is tier-gated.
+
+---
+
+## 9. Test surface
+
+| Suite | Command | Covers |
+| --- | --- | --- |
+| Unit | `node --test tests/` | Practice determinism + grading (incl. capstone rubric), content shape (24 steps, idea panels, cert target), tier flags, module redirects, `CERT_HASH_SECRET` production gate |
+| E2E | `npm run build` then `npx playwright test` (once: `npx playwright install chromium`) | Full 24-step walk on desktop + mobile viewports, layout contract, keyboard drive, reduced-motion, no-WebGL, mobile smoke. Config: `playwright.config.ts`; specs: `tests/e2e/` |
+
+Both suites must pass before any charge-readiness review. Pre-launch
+blockers live in `docs/charge-ready-checklist.md`.

@@ -1,6 +1,6 @@
 # Bitcoin first drive — build plan
 
-**Status:** Built. This is the shape that ships. `bitcoin.md` describes how to demo it.
+**Status:** Shipped (5 drives pre-capstone + 1 capstone drive, 24 steps). Retained as design history. `bitcoin.md` describes how to demo it.
 
 **Audience:** Someone who has never held crypto. Coach tone. Play money only.
 
@@ -122,7 +122,7 @@ The current `/track/bitcoin/[lesson]` page is replaced for Bitcoin by the step p
 
 Passing a step writes `student.modulesPassed[stepId]`. A drive unlocks when the previous drive’s last step is passed. Inside a drive, the next step unlocks when this step’s action succeeds.
 
-Starter completes every step. `certificate` + `verifyLink` gate the certificate form on the road test. `issueCertificate` rejects tiers without those flags. The other four stops do not offer a cert.
+Starter completes every step. `certificate` + `verifyLink` gate the certificate form on the road test. `issueCertificate` rejects tiers without those flags. The other four stops do not offer a cert. (Pre-capstone: the cert now issues at `prove-it/explain`; see `solution-architecture.md` §8.)
 
 Old demo passes (`btc-explorer`, `btc-deposit`, and the rest) are left in the store and ignored by the new road. Already issued certificates keep resolving.
 
@@ -151,7 +151,7 @@ New interactions: clipboard swap, fee control, key-contrast animation, three roa
 1. Types and `bitcoin.json` for the five drives. Track page renders the road and the locks.
 2. Step route and the screen shell: coach line, live picture, one button, pocket card after success.
 3. Stop 1 (taps only), then Get paid, then Send, then Guard, then Road test.
-4. Point the certificate at the road test. Starter finishes the drive without one.
+4. Point the certificate at the road test. Starter finishes the drive without one. (Done, then superseded: the cert moved to the capstone in the prove-it drive.)
 5. Rewrite `bitcoin.md`, README, and landing / course copy. Run `node --test tests/` and walk Certified and Starter in the browser.
 
 ---

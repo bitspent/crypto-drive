@@ -1,6 +1,6 @@
 # Crypto Drive — Course agenda (v2)
 
-**Status:** Current in-app lessons are **scaffolding only** — not fair to charge for yet. This agenda is the real curriculum to build before Gumroad goes live.
+**Status:** The Bitcoin track is **content-complete** (6 drives, 24 steps, capstone included). Ethereum, USDT/Tron, and Solana remain scaffolds. Charge-readiness requires the checklist in `docs/charge-ready-checklist.md` — this agenda stays the qualitative bar below it.
 
 **Audience:** Non-tech professionals. Coach tone (learn to drive), never academic.
 
@@ -95,12 +95,12 @@ Phishing, fake apps, seed screenshots, “connect wallet” traps, test-send sma
 
 ## Build order (replace scaffolding)
 
-1. Rewrite **Track A (Bitcoin)** fully in app + Context guides — first thing worth demoing  
+1. ~~Rewrite **Track A (Bitcoin)** fully in app + Context guides~~ — done (6 drives, 24 steps, capstone cert)  
 2. Track B (Ethereum)  
 3. Track C (USDT + Tron)  
 4. Track D (Solana)  
 5. Polish hygiene + Certified certs per major milestone  
-6. Only then: live Gumroad  
+6. Only then: live Gumroad — gated by `docs/charge-ready-checklist.md`  
 
 ---
 

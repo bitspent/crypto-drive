@@ -7,6 +7,8 @@
 > in `solution-architecture.md` §7), verified tease/win in both themes plus
 > reduced-motion, mobile, and no-WebGL passes.
 
+Retained as design reference. The 3D stack is not mounted and ships no bytes. Do not modify.
+
 Execution artifact for the R3F journey build, kept for a future realistic-3D
 asset pipeline. The CSS v2 toy scenes were the fallback layer and the visual
 baseline for these boards.
