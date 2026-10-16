@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "src/app/api/og/route.tsx": { "runtime": "nodejs20.x" }
+  },
+  "redirects": [
+    {
+      "source": "/module",
+      "destination": "/course",
+      "permanent": false
+    },
+    {
+      "source": "/module/:path*",
+      "destination": "/course",
+      "permanent": false
+    }
+  ]
+}

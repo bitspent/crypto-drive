@@ -21,6 +21,7 @@ import {
   type StepAnswer,
 } from "./practice-samples";
 import { createWalletState, type WalletState } from "./wallet";
+import { resolveLicenseKind } from "./license";
 import { getBitcoinProvider } from "./bitcoin/index";
 import { getDb, hasDatabase, warnFileFallbackOnce } from "./db/client";
 import { certificates, sessions, students, webhookEvents } from "./db/schema";
@@ -128,6 +129,10 @@ export function getDemoLicenseKey(): string {
 }
 
 export async function isValidLicense(key: string): Promise<boolean> {
+  // Central demo gate: demo keys are dead in real production no matter which
+  // unlock path asks (form action or JSON route). Test harnesses set
+  // ALLOW_DEMO_LICENSES=1; see resolveLicenseKind.
+  if (resolveLicenseKind(key) === "demo-blocked") return false;
   const index = await getTierIndex();
   if (isValidDemoLicense(key, index)) return true;
   const envKey = getDemoLicenseKey();
