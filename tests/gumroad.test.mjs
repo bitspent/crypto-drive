@@ -182,9 +182,24 @@ describe("gumroad license API client (stubbed fetch)", () => {
       throw new Error("down");
     };
     assert.deepEqual(await gumroad.verifyGumroadLicense("prod_cert", "CD-X"), { ok: false });
+  });
 
+  it("still calls the API without a token, minus the header", async () => {
     delete process.env.GUMROAD_ACCESS_TOKEN;
-    assert.deepEqual(await gumroad.verifyGumroadLicense("prod_cert", "CD-X"), { ok: false });
+    let seen;
+    global.fetch = async (url, init) => {
+      seen = init.headers;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, purchase: { email: "e@x.co" } }),
+      };
+    };
+    assert.deepEqual(await gumroad.verifyGumroadLicense("prod_cert", "CD-X"), {
+      ok: true,
+      email: "e@x.co",
+    });
+    assert.equal(seen.Authorization, undefined);
   });
 });
 

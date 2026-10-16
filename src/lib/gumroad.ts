@@ -11,15 +11,17 @@ export async function verifyGumroadLicense(
   productId: string,
   licenseKey: string,
 ): Promise<LicenseCheck> {
+  // The endpoint answers cleanly without auth (verified by probe), so the
+  // token rides along only when configured — a missing token must not turn
+  // verifiable licenses into rejections.
   const token = process.env.GUMROAD_ACCESS_TOKEN?.trim();
-  if (!token) return { ok: false };
   try {
     const body = new URLSearchParams({ product_id: productId, license_key: licenseKey });
     const res = await fetch(VERIFY_URL, {
       method: "POST",
       headers: {
         "content-type": "application/x-www-form-urlencoded",
-        Authorization: `Bearer ${token}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: body.toString(),
       signal: AbortSignal.timeout(5000),
