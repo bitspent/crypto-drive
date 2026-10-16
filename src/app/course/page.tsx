@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 import { Button } from "@/components/ui/button";
 import { TrackSymbol } from "@/components/crypto-marks";
 import { getTracksForTier, getTier } from "@/lib/content";
@@ -196,6 +197,7 @@ export default async function CoursePage() {
           })}
         </ul>
       </main>
+      <SiteFooter />
     </div>
   );
 }

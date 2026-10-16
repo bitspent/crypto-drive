@@ -33,6 +33,7 @@ export default defineConfig({
       },
       testMatch: [
         "**/layout.spec.ts",
+        "**/legal.spec.ts",
         "**/mobile.spec.ts",
         "**/walk.spec.ts",
         "**/wallet-*.spec.ts",

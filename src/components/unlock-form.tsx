@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +54,21 @@ export function UnlockForm() {
       </Button>
       <p className="text-xs text-[var(--mute)]">
         Use the license key from your Gumroad receipt to unlock your tier.
+      </p>
+      <p className="text-xs text-[var(--mute)]">
+        By unlocking, you agree to the{" "}
+        <Link href="/terms" className="text-[var(--amber)] hover:underline">
+          Terms
+        </Link>
+        {", "}
+        <Link href="/privacy" className="text-[var(--amber)] hover:underline">
+          Privacy Policy
+        </Link>
+        {", and "}
+        <Link href="/refund" className="text-[var(--amber)] hover:underline">
+          Refund Policy
+        </Link>
+        .
       </p>
     </form>
   );

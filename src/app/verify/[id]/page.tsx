@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 import { getAppUrl } from "@/lib/share";
 import { getCertificate } from "@/lib/store";
 
@@ -96,6 +97,7 @@ export default async function VerifyPage({ params }: Props) {
           — learn wallet skills like learning to drive.
         </p>
       </main>
+      <SiteFooter />
     </div>
   );
 }

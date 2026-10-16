@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ShareButtons } from "@/components/share-buttons";
 import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 import { getAppUrl } from "@/lib/share";
 import { getCertificate } from "@/lib/store";
 
@@ -90,6 +91,7 @@ export default async function CertPage({ params }: Props) {
           </Link>
         </div>
       </main>
+      <SiteFooter />
     </div>
   );
 }

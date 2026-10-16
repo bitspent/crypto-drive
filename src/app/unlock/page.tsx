@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 import { UnlockForm } from "@/components/unlock-form";
 
 export const metadata: Metadata = {
@@ -44,6 +45,7 @@ export default function UnlockPage() {
           </Link>
         </p>
       </main>
+      <SiteFooter />
     </div>
   );
 }
