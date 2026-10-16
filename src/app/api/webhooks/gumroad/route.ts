@@ -4,6 +4,12 @@ import {
   processGumroadSale,
   verifyWebhookSecret,
 } from "@/lib/gumroad-webhook";
+import {
+  checkRateLimit,
+  clientIp,
+  isAdminBypass,
+  rateLimitedResponse,
+} from "@/lib/rate-limit";
 
 /**
  * Gumroad Ping receiver. Register with the secret in the URL:
@@ -13,6 +19,12 @@ import {
  */
 export async function POST(request: Request) {
   try {
+    // Limit before auth: the check is cheap and unauthenticated floods are
+    // the threat. Gumroad retries real deliveries, so a 429 never loses a sale.
+    if (!isAdminBypass(request)) {
+      const verdict = checkRateLimit("webhook", clientIp(request));
+      if (!verdict.ok) return rateLimitedResponse(verdict.retryAfter);
+    }
     const url = new URL(request.url);
     const authed = verifyWebhookSecret({
       querySecret: url.searchParams.get("secret"),

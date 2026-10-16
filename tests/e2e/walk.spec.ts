@@ -30,6 +30,11 @@ async function commitAndContinue(page: Page, buttonName: string, urlPart: string
 
 test("walks unlock to verified certificate across all 24 steps", async ({ page }) => {
   const failures = collectPageErrors(page);
+  // A legitimate full walk must never trip rate limits.
+  const throttled: string[] = [];
+  page.on("response", (res) => {
+    if (res.status() === 429) throttled.push(res.url());
+  });
   await unlock(page, uniqueEmail("walk"));
   await page.getByRole("link", { name: /Continue Bitcoin|Bitcoin road/ }).click();
   await page.waitForURL("**/what-is/satoshi");
@@ -254,4 +259,5 @@ test("walks unlock to verified certificate across all 24 steps", async ({ page }
   ).toBeVisible();
 
   assertNoPageErrors(failures);
+  expect(throttled, throttled.join("\n")).toEqual([]);
 });

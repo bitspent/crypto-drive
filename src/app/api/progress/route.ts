@@ -3,11 +3,21 @@ import { cookies } from "next/headers";
 import type { StepAnswer } from "@/lib/practice-types";
 import { SESSION_COOKIE } from "@/lib/session";
 import { passStep } from "@/lib/store";
+import {
+  checkRateLimit,
+  clientIp,
+  isAdminBypass,
+  rateLimitedResponse,
+} from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   try {
     const jar = await cookies();
     const sessionId = jar.get(SESSION_COOKIE)?.value;
+    if (!isAdminBypass(request)) {
+      const verdict = checkRateLimit("progress", sessionId ?? clientIp(request));
+      if (!verdict.ok) return rateLimitedResponse(verdict.retryAfter);
+    }
     if (!sessionId) {
       return NextResponse.json(
         { error: "Unlock with your license before you continue." },

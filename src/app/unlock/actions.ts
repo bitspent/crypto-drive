@@ -1,9 +1,15 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SESSION_COOKIE } from "@/lib/session";
 import { isValidLicense, unlockStudent } from "@/lib/store";
+import { resolveLicenseKind } from "@/lib/license";
+import {
+  checkRateLimit,
+  ipFromHeaders,
+  isAdminToken,
+} from "@/lib/rate-limit";
 
 export type UnlockState = {
   error: string | null;
@@ -15,6 +21,24 @@ export async function unlockAction(
 ): Promise<UnlockState> {
   const email = String(formData.get("email") ?? "").trim();
   const license = String(formData.get("license") ?? "").trim();
+
+  // Same 10-per-5-min budget as POST /api/unlock: the form is the unlock path
+  // every learner actually uses. Demo keys (dev/test only) are exempt.
+  const kind = resolveLicenseKind(license);
+  const headerList = await headers();
+  if (
+    kind !== "demo" &&
+    !isAdminToken(headerList.get("x-admin-token")) &&
+    !checkRateLimit(
+      "unlock",
+      ipFromHeaders(
+        headerList.get("x-forwarded-for"),
+        headerList.get("x-real-ip"),
+      ),
+    ).ok
+  ) {
+    return { error: "Too many unlock attempts. Try again in a few minutes." };
+  }
 
   if (!email || !email.includes("@")) {
     return { error: "Enter a valid email address." };

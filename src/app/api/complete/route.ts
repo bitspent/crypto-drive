@@ -2,11 +2,21 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE } from "@/lib/session";
 import { issueCertificate } from "@/lib/store";
+import {
+  checkRateLimit,
+  clientIp,
+  isAdminBypass,
+  rateLimitedResponse,
+} from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   try {
     const jar = await cookies();
     const sessionId = jar.get(SESSION_COOKIE)?.value;
+    if (!isAdminBypass(request)) {
+      const verdict = checkRateLimit("complete", sessionId ?? clientIp(request));
+      if (!verdict.ok) return rateLimitedResponse(verdict.retryAfter);
+    }
     if (!sessionId) {
       return NextResponse.json(
         { error: "Unlock with your license before certifying." },

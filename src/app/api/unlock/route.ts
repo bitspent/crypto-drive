@@ -10,6 +10,12 @@ import {
 } from "@/lib/store";
 import { resolveLicenseKind, tierFromLicenseKey } from "@/lib/license";
 import { verifyGumroadLicense } from "@/lib/gumroad";
+import {
+  checkRateLimit,
+  clientIp,
+  isAdminBypass,
+  rateLimitedResponse,
+} from "@/lib/rate-limit";
 
 function productIdForTier(tier: "starter" | "certified" | "vip"): string | null {
   const table = {
@@ -49,6 +55,13 @@ export async function POST(request: Request) {
     }
 
     const kind = resolveLicenseKind(license);
+
+    // Demo keys are exempt (they only exist in dev and test harnesses), as
+    // are admin-token requests. Everything else counts, valid or not.
+    if (kind !== "demo" && !isAdminBypass(request)) {
+      const verdict = checkRateLimit("unlock", clientIp(request));
+      if (!verdict.ok) return rateLimitedResponse(verdict.retryAfter);
+    }
 
     if (kind === "demo-blocked") {
       return NextResponse.json(
