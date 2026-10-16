@@ -76,3 +76,4 @@ first charge.
 - **Unit suite committed** (`node --test tests/`): practice determinism + grading, content shape, tier flags, redirects, secret gate.
 - **Tier flags trimmed** to the three the runtime enforces (`certificate`, `verifyLink`, `liveCall`).
 - **Production secret gate**: builds and servers refuse to boot without `CERT_HASH_SECRET`.
+- **Wallet sandbox ships fully simulated** (`/wallet`): deterministic practice-seed balances, txids, and confirmations; no chain calls, no private-key handling, play-money disclosure on every screen. No new P0/P1 — covered by the same hosting, persistence, and secret items above.

@@ -216,3 +216,34 @@ export function restoreMatches(expected: string[], entered: string[]): boolean {
   if (entered.length !== 12 || expected.length !== 12) return false;
   return entered.every((w, i) => w.trim().toLowerCase() === expected[i]?.trim().toLowerCase());
 }
+
+/**
+ * Paste-all distribution for the 12 restore slots: if `text` holds several
+ * whitespace-separated words, spread them across slots starting at `at`
+ * (clamped to 12); otherwise set the single slot.
+ */
+export function distributeRestoreWords(slots: string[], at: number, text: string): string[] {
+  const next = [...slots];
+  while (next.length < 12) next.push("");
+  const tokens = text.split(/\s+/).filter(Boolean);
+  if (tokens.length > 1) {
+    tokens.slice(0, 12 - at).forEach((t, k) => {
+      next[at + k] = t;
+    });
+    return next;
+  }
+  next[at] = text;
+  return next;
+}
+
+/** "just now" / "N minutes ago" / … for the settings "Last backed up" line. */
+export function formatRelativeTime(iso: string, nowMs: number = Date.now()): string {
+  const diffMs = Math.max(0, nowMs - Date.parse(iso));
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}

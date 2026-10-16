@@ -282,8 +282,36 @@ only the certificate is tier-gated.
 
 | Suite | Command | Covers |
 | --- | --- | --- |
-| Unit | `node --test tests/` | Practice determinism + grading (incl. capstone rubric), content shape (24 steps, idea panels, cert target), tier flags, module redirects, `CERT_HASH_SECRET` production gate |
-| E2E | `npm run build` then `npx playwright test` (once: `npx playwright install chromium`) | Full 24-step walk on desktop + mobile viewports, layout contract, keyboard drive, reduced-motion, no-WebGL, mobile smoke. Config: `playwright.config.ts`; specs: `tests/e2e/` |
+| Unit | `node --test tests/` | Practice determinism + grading (incl. capstone rubric), content shape (24 steps, idea panels, cert target), tier flags, module redirects, `CERT_HASH_SECRET` production gate, wallet lib (formatting, send/deposit/restore, fee tiers) |
+| E2E | `npm run build` then `npx playwright test` (once: `npx playwright install chromium`) | Full 24-step walk on desktop + mobile viewports, layout contract, keyboard drive, reduced-motion, no-WebGL, mobile smoke, wallet sandbox flows (setup, deposit, send, backup/restore/reset). Config: `playwright.config.ts`; specs: `tests/e2e/` |
 
 Both suites must pass before any charge-readiness review. Pre-launch
 blockers live in `docs/charge-ready-checklist.md`.
+
+---
+
+## 10. Wallet sandbox (as of HEAD)
+
+A persistent simulated Bitcoin wallet at `/wallet`, tiled on `/course` as
+"Your practice wallet". Available to all tiers after unlock; not a drive, and
+it keeps its own quiet 2D visual language (no 3D, no WebGL).
+
+Route + state: `src/app/wallet/page.tsx` renders `WalletApp`
+(`src/components/wallet-app.tsx`, `w-`-prefixed styles in `globals.css`).
+State lives at `student.wallet` in the file store (`src/lib/store.ts`):
+`{ exists, seedWords, address, balance, history, confirmedThreshold,
+backupAt }`. The address and 12 words ARE the drive practice seed
+(`practiceFor(seed)`), so the sandbox and `get-paid/address` agree.
+
+Flows: setup (empty → create → 12-word reveal with 5s auto-mask → 3/7/11
+confirm → ready), deposit (receive sheet with real QR → +0.005 BTC pending →
+0/3–3/3 ticks → confirmed), withdrawal (send form with BTC amount + fee tiers
+140/700/2100 sats → review sheet with last-6 checkbox → sign shimmer →
+pending → confirmed), backup + restore (settings gear → backup reveal +
+recall stamps `backupAt`; restore compares 12 words without mutating; reset
+requires typed `RESET`).
+
+All simulated: every balance, txid, counterparty, and confirmation is
+deterministic practice-seed data. No chain calls, no private keys (the seed
+appears only in setup and backup), and a play-money disclosure strip sits on
+every wallet screen.

@@ -217,6 +217,16 @@ export async function saveWalletForSession(
   await saveStore(data);
 }
 
+/** Reset the practice wallet: clear state so setup can run again. */
+export async function clearWalletForSession(sessionId: string | undefined): Promise<void> {
+  const data = await ensureStore();
+  const studentId = sessionId ? data.sessions[sessionId] : undefined;
+  const student = studentId ? data.students[studentId] : undefined;
+  if (!student) throw new Error("Unlock with your license before you continue.");
+  student.wallet = null;
+  await saveStore(data);
+}
+
 export async function issueCertificate(input: {
   sessionId: string;
   studentName: string;

@@ -4505,3 +4505,145 @@ body {
     display: none;
   }
 }
+
+/* ── Wallet sandbox: flow 4 (settings, backup, restore, reset) ── */
+
+.w-gear-btn {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  color: var(--mute);
+}
+
+.w-gear-btn:hover {
+  color: var(--paper);
+}
+
+.w-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(8, 10, 16, 0.45);
+}
+
+.w-menu {
+  position: absolute;
+  top: 64px;
+  right: max(12px, calc(50% - 228px));
+  width: 264px;
+  border-radius: 16px;
+  padding: 8px;
+  background: var(--w-card);
+  border: 1px solid var(--w-hairline);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.w-menu-item {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  text-align: left;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--paper);
+}
+
+.w-menu-item:hover {
+  background: rgba(128, 128, 128, 0.12);
+}
+
+.w-menu-danger {
+  color: var(--amber);
+  border: 1.5px solid var(--amber);
+  margin-top: 4px;
+}
+
+.w-menu-meta {
+  margin: 0;
+  padding: 8px 12px 4px;
+  font-size: 0.75rem;
+  color: var(--mute);
+}
+
+.w-warn-text {
+  margin: 0 0 16px;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.w-restore-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+
+.w-restore-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.w-restore-num {
+  flex: none;
+  width: 20px;
+  text-align: right;
+  font-size: 0.75rem;
+  color: var(--mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.w-restore-input {
+  min-height: 44px;
+  font-size: 0.85rem;
+}
+
+.w-restore-ok {
+  margin: 8px 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--w-in-ink);
+}
+
+.w-danger-btn {
+  height: 56px;
+  border-radius: 14px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  border: 1.5px solid var(--amber);
+  color: var(--amber);
+}
+
+.w-danger-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.w-done-card {
+  margin: 32px 0 8px;
+  padding: 32px 20px;
+  border-radius: 16px;
+  text-align: center;
+  background: var(--w-card);
+  border: 1px solid var(--w-hairline);
+  box-shadow: var(--w-shadow);
+}
+
+.w-done-check {
+  margin: 0 0 8px;
+  font-size: 2rem;
+  color: var(--w-in-ink);
+}
+
+.w-done-text {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}

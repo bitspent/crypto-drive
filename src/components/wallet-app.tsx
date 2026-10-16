@@ -12,9 +12,11 @@ import QRCode from "qrcode";
 import {
   FEE_TIERS,
   SEED_CONFIRM_POSITIONS,
+  distributeRestoreWords,
   feeSatsForTier,
   formatBtcGrouped,
   formatBtcTrim,
+  formatRelativeTime,
   isValidBtcAddress,
   parseBtcToSats,
   truncateMiddle,
@@ -601,11 +603,47 @@ function ReviewSheet({
 
 const REVEAL_MASK_MS = 5000;
 
-function WalletTop() {
+function GearIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="6.2" strokeWidth="3.4" strokeDasharray="2.9 2.35" />
+      <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function WalletTop({
+  onOpenSettings,
+  gearRef,
+}: {
+  onOpenSettings?: () => void;
+  gearRef?: RefObject<HTMLButtonElement | null>;
+}) {
   return (
     <>
       <div className="w-topbar">
         <span>Practice wallet</span>
+        {onOpenSettings ? (
+          <button
+            ref={gearRef}
+            type="button"
+            className="w-gear-btn"
+            aria-label="Settings"
+            aria-haspopup="menu"
+            onClick={onOpenSettings}
+          >
+            <GearIcon />
+          </button>
+        ) : null}
       </div>
       <p className="w-disclosure">Practice wallet · Play money · No real Bitcoin</p>
     </>
@@ -645,7 +683,15 @@ export function SeedGrid({ words, masked }: { words: string[]; masked: boolean }
   );
 }
 
-function SeedReveal({ words, onDone }: { words: string[]; onDone: () => void }) {
+function SeedReveal({
+  words,
+  onDone,
+  onCancel,
+}: {
+  words: string[];
+  onDone: () => void;
+  onCancel?: () => void;
+}) {
   // showing → masked (once, 5s in) → reshown (stays; writing takes a while).
   const [maskState, setMaskState] = useState<"showing" | "masked" | "reshown">("showing");
   useEffect(() => {
@@ -682,6 +728,15 @@ function SeedReveal({ words, onDone }: { words: string[]; onDone: () => void }) 
             Show them again
           </button>
         ) : null}
+        {onCancel ? (
+          <button
+            type="button"
+            className="w-secondary-btn w-block-btn"
+            onClick={onCancel}
+          >
+            Back to wallet
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -698,7 +753,15 @@ function shuffledIndices(n: number): number[] {
   return order;
 }
 
-function SeedConfirm({ words, onDone }: { words: string[]; onDone: () => void }) {
+function SeedConfirm({
+  words,
+  onDone,
+  onCancel,
+}: {
+  words: string[];
+  onDone: () => void;
+  onCancel?: () => void;
+}) {
   const [round, setRound] = useState(0);
   const [doneIdx, setDoneIdx] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -756,6 +819,342 @@ function SeedConfirm({ words, onDone }: { words: string[]; onDone: () => void })
           {error}
         </p>
       ) : null}
+      {onCancel ? (
+        <div className="w-button-stack">
+          <button
+            type="button"
+            className="w-secondary-btn w-block-btn"
+            onClick={onCancel}
+          >
+            Back to wallet
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SettingsMenu({
+  backupAt,
+  onClose,
+  onBackup,
+  onRestore,
+  onReset,
+}: {
+  backupAt: string | null;
+  onClose: () => void;
+  onBackup: () => void;
+  onRestore: () => void;
+  onReset: () => void;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const firstRef = useRef<HTMLButtonElement>(null);
+  useDialogKeys(panelRef, onClose);
+
+  useEffect(() => {
+    firstRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="w-menu-overlay" onClick={onClose}>
+      <div
+        ref={panelRef}
+        role="menu"
+        aria-label="Wallet settings"
+        className="w-menu"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          ref={firstRef}
+          type="button"
+          role="menuitem"
+          className="w-menu-item"
+          onClick={onBackup}
+        >
+          Back up your wallet
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          className="w-menu-item"
+          onClick={onRestore}
+        >
+          Restore a wallet
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          className="w-menu-item w-menu-danger"
+          onClick={onReset}
+        >
+          Reset wallet
+        </button>
+        {backupAt ? (
+          <p className="w-menu-meta">Last backed up: {formatRelativeTime(backupAt)}</p>
+        ) : null}
+        <p className="w-menu-meta">Practice wallet · Play money · No real Bitcoin</p>
+      </div>
+    </div>
+  );
+}
+
+function BackupDone({ backupAt, onBack }: { backupAt: string; onBack: () => void }) {
+  const date = new Date(backupAt).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  return (
+    <div className="w-shell">
+      <WalletTop />
+      <div className="w-done-card" role="status">
+        <p className="w-done-check" aria-hidden="true">
+          ✓
+        </p>
+        <p className="w-done-text">Backed up on {date}.</p>
+      </div>
+      <div className="w-button-stack">
+        <button type="button" className="w-primary-btn w-block-btn" onClick={onBack}>
+          Back to wallet
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RestoreSheet({ onClose }: { onClose: () => void }) {
+  const [step, setStep] = useState<"warn" | "form">("warn");
+  const [slots, setSlots] = useState<string[]>(() => Array<string>(12).fill(""));
+  const [result, setResult] = useState<null | { match: boolean }>(null);
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useDialogKeys(panelRef, onClose);
+
+  useEffect(() => {
+    cancelRef.current?.focus();
+  }, []);
+
+  function setSlot(i: number, text: string) {
+    setSlots((s) => distributeRestoreWords(s, i, text));
+    setResult(null);
+    setError(null);
+  }
+
+  async function check() {
+    if (slots.some((s) => !s.trim())) {
+      setError("Enter all 12 words.");
+      return;
+    }
+    setChecking(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/wallet/restore", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ words: slots }),
+      });
+      const data = (await res.json()) as { match?: boolean; error?: string };
+      if (!res.ok || typeof data.match !== "boolean") {
+        throw new Error(data.error || "Could not check words.");
+      }
+      setResult({ match: data.match });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not check words.");
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  return (
+    <div className="w-overlay" onClick={onClose}>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Restore a wallet"
+        className="w-sheet"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-sheet-head">
+          <h2>Restore a wallet</h2>
+          <button
+            ref={cancelRef}
+            type="button"
+            className="w-icon-btn"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+        {step === "warn" ? (
+          <>
+            <p className="w-warn-text">
+              This replaces your current wallet. You&apos;ll lose the practice balance if
+              you don&apos;t have the words. Continue?
+            </p>
+            <div className="w-review-actions">
+              <button
+                type="button"
+                className="w-send-btn w-full"
+                onClick={() => setStep("form")}
+              >
+                Continue
+              </button>
+              <button
+                type="button"
+                className="w-receive-btn w-full"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="w-caption">Enter your 12 words in order.</p>
+            <div className="w-restore-grid">
+              {slots.map((value, i) => (
+                <label key={i} className="w-restore-slot">
+                  <span className="w-restore-num">{i + 1}</span>
+                  <input
+                    type="text"
+                    className="w-input w-mono w-restore-input"
+                    aria-label={`Word ${i + 1}`}
+                    value={value}
+                    onChange={(e) => setSlot(i, e.target.value)}
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                  />
+                </label>
+              ))}
+            </div>
+            {error ? (
+              <p className="w-field-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+            {result?.match ? (
+              <p className="w-restore-ok" role="status">
+                Same wallet. Same address. Same balance.
+              </p>
+            ) : null}
+            {result && !result.match ? (
+              <p className="w-field-error" role="alert">
+                Those don&apos;t match your saved words. Nothing changed.
+              </p>
+            ) : null}
+            <div className="w-review-actions">
+              <button
+                type="button"
+                className="w-send-btn w-full"
+                disabled={checking}
+                onClick={check}
+              >
+                {checking ? "Checking…" : "Check words"}
+              </button>
+              <button
+                type="button"
+                className="w-receive-btn w-full"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ResetSheet({ onClose, onReset }: { onClose: () => void; onReset: () => void }) {
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useDialogKeys(panelRef, onClose);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  async function reset() {
+    if (value !== "RESET" || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/wallet/reset", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ confirm: value }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) throw new Error(data.error || "Could not reset.");
+      onReset();
+    } catch (err) {
+      setBusy(false);
+      setError(err instanceof Error ? err.message : "Could not reset.");
+    }
+  }
+
+  return (
+    <div className="w-overlay" onClick={onClose}>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Reset wallet"
+        className="w-sheet"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-sheet-head">
+          <h2>Reset wallet</h2>
+          <button
+            type="button"
+            className="w-icon-btn"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+        <p className="w-warn-text">Type RESET to confirm.</p>
+        <label className="w-field">
+          <span className="w-sr-only">Type RESET to confirm</span>
+          <input
+            ref={inputRef}
+            type="text"
+            className="w-input w-mono"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </label>
+        {error ? (
+          <p className="w-field-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <div className="w-review-actions">
+          <button
+            type="button"
+            className="w-danger-btn w-full"
+            disabled={value !== "RESET" || busy}
+            onClick={reset}
+          >
+            {busy ? "Resetting…" : "Reset wallet"}
+          </button>
+          <button type="button" className="w-receive-btn w-full" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -877,12 +1276,17 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
   const [phase, setPhase] = useState<"home" | "reveal" | "confirm">("home");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<null | "receive" | "send" | "review">(null);
+  const [sheet, setSheet] = useState<
+    null | "receive" | "send" | "review" | "restore" | "reset"
+  >(null);
   const [draft, setDraft] = useState<SendDraft | null>(null);
+  const [menu, setMenu] = useState(false);
+  const [backup, setBackup] = useState<null | "reveal" | "confirm" | "done">(null);
   const [arrivingId, setArrivingId] = useState<string | null>(null);
   const reduced = useReducedMotion();
   const receiveRef = useRef<HTMLButtonElement>(null);
   const sendRef = useRef<HTMLButtonElement>(null);
+  const gearRef = useRef<HTMLButtonElement>(null);
   const walletRef = useRef(wallet);
   const tickingRef = useRef(false);
   const timerRef = useRef(0);
@@ -967,6 +1371,29 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
     }, DEPOSIT_DELAY_MS);
   }
 
+  function exitBackup() {
+    setBackup(null);
+    window.setTimeout(() => gearRef.current?.focus(), 0);
+  }
+
+  async function completeBackup() {
+    try {
+      const res = await fetch("/api/wallet/backup", { method: "POST" });
+      const data = (await res.json()) as { wallet?: WalletState; error?: string };
+      if (!res.ok || !data.wallet) throw new Error(data.error || "Could not record backup.");
+      walletRef.current = data.wallet;
+      setWallet(data.wallet);
+      setBackup("done");
+    } catch {
+      exitBackup();
+    }
+  }
+
+  function closeMenu() {
+    setMenu(false);
+    gearRef.current?.focus();
+  }
+
   if (!wallet) {
     return <EmptyState onCreate={create} creating={creating} error={error} />;
   }
@@ -976,6 +1403,23 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
   if (phase === "confirm") {
     return <SeedConfirm words={wallet.seedWords} onDone={() => setPhase("home")} />;
   }
+  if (backup === "reveal") {
+    return (
+      <SeedReveal
+        words={wallet.seedWords}
+        onDone={() => setBackup("confirm")}
+        onCancel={exitBackup}
+      />
+    );
+  }
+  if (backup === "confirm") {
+    return (
+      <SeedConfirm words={wallet.seedWords} onDone={completeBackup} onCancel={exitBackup} />
+    );
+  }
+  if (backup === "done" && wallet.backupAt) {
+    return <BackupDone backupAt={wallet.backupAt} onBack={exitBackup} />;
+  }
 
   const incoming = wallet.history.filter((t) => t.direction === "in");
   const sawFirstConfirmation = incoming.some((t) => t.confirmations >= 1);
@@ -983,7 +1427,7 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
 
   return (
     <div className="w-shell">
-      <WalletTop />
+      <WalletTop onOpenSettings={() => setMenu(true)} gearRef={gearRef} />
 
       <div className="w-balance-block">
         <AnimatedBalance sats={wallet.balance} reduced={reduced} />
@@ -1047,6 +1491,47 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
           onReview={(d) => {
             setDraft(d);
             setSheet("review");
+          }}
+        />
+      ) : null}
+      {menu ? (
+        <SettingsMenu
+          backupAt={wallet.backupAt}
+          onClose={closeMenu}
+          onBackup={() => {
+            setMenu(false);
+            setBackup("reveal");
+          }}
+          onRestore={() => {
+            setMenu(false);
+            setSheet("restore");
+          }}
+          onReset={() => {
+            setMenu(false);
+            setSheet("reset");
+          }}
+        />
+      ) : null}
+      {sheet === "restore" ? (
+        <RestoreSheet
+          onClose={() => {
+            setSheet(null);
+            gearRef.current?.focus();
+          }}
+        />
+      ) : null}
+      {sheet === "reset" ? (
+        <ResetSheet
+          onClose={() => {
+            setSheet(null);
+            gearRef.current?.focus();
+          }}
+          onReset={() => {
+            setWallet(null);
+            setSheet(null);
+            setBackup(null);
+            setMenu(false);
+            setPhase("home");
           }}
         />
       ) : null}

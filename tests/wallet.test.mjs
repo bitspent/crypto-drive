@@ -208,4 +208,24 @@ describe("wallet restore", () => {
     assert.equal(wallet.restoreMatches(WORDS, wrong), false);
     assert.equal(wallet.restoreMatches(WORDS, WORDS.slice(0, 11)), false);
   });
+
+  it("spreads a pasted phrase across slots, clamps at 12", () => {
+    const empty = Array(12).fill("");
+    const full = wallet.distributeRestoreWords(empty, 0, WORDS.join(" "));
+    assert.deepEqual(full, WORDS);
+    const single = wallet.distributeRestoreWords(empty, 3, "apple");
+    assert.equal(single[3], "apple");
+    assert.equal(single[4], "");
+    const tail = wallet.distributeRestoreWords(empty, 10, "one two three four");
+    assert.deepEqual(tail.slice(10), ["one", "two"]);
+  });
+
+  it("formats backup age as relative time", () => {
+    const now = Date.parse("2026-10-16T12:00:00.000Z");
+    assert.equal(wallet.formatRelativeTime("2026-10-16T11:59:30.000Z", now), "just now");
+    assert.equal(wallet.formatRelativeTime("2026-10-16T11:59:00.000Z", now), "1 minute ago");
+    assert.equal(wallet.formatRelativeTime("2026-10-16T11:30:00.000Z", now), "30 minutes ago");
+    assert.equal(wallet.formatRelativeTime("2026-10-16T10:00:00.000Z", now), "2 hours ago");
+    assert.equal(wallet.formatRelativeTime("2026-10-14T12:00:00.000Z", now), "2 days ago");
+  });
 });
