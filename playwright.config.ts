@@ -47,6 +47,12 @@ export default defineConfig({
     timeout: 180_000,
     // `next start` boots with NODE_ENV=production, which requires a signing
     // secret. This test-only value signs disposable e2e practice data.
-    env: { CERT_HASH_SECRET: "e2e-test-secret-not-for-production" },
+    // Set E2E_DATABASE_URL to run the app (and suite) against Postgres.
+    env: {
+      CERT_HASH_SECRET: "e2e-test-secret-not-for-production",
+      ...(process.env.E2E_DATABASE_URL
+        ? { DATABASE_URL: process.env.E2E_DATABASE_URL }
+        : {}),
+    },
   },
 });

@@ -1,0 +1,57 @@
+import { index, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import type { WalletState } from "../wallet";
+
+/** Mirrors db/migrations/0001_init.sql. That file is the reviewed source. */
+export const students = pgTable(
+  "students",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull().unique(),
+    name: text("name"),
+    licenseKey: text("license_key"),
+    tier: text("tier").notNull(),
+    practiceSeed: text("practice_seed"),
+    modulesPassed: jsonb("modules_passed")
+      .$type<Record<string, string>>()
+      .notNull()
+      .default({}),
+    wallet: jsonb("wallet").$type<WalletState | null>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("students_email_idx").on(t.email)],
+);
+
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("sessions_student_idx").on(t.studentId)],
+);
+
+export const certificates = pgTable(
+  "certificates",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    trackSlug: text("track_slug").notNull(),
+    moduleSlug: text("module_slug").notNull(),
+    moduleLabel: text("module_label").notNull(),
+    milestone: text("milestone").notNull(),
+    hash: text("hash").notNull(),
+    studentName: text("student_name").notNull(),
+    email: text("email").notNull(),
+    tier: text("tier").notNull(),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [index("certificates_student_idx").on(t.studentId)],
+);

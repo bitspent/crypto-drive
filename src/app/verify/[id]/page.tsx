@@ -33,8 +33,6 @@ export default async function VerifyPage({ params }: Props) {
   const cert = await getCertificate(id);
   if (!cert) notFound();
 
-  const appUrl = getAppUrl();
-  const ogUrl = `${appUrl}/api/og?id=${encodeURIComponent(cert.id)}`;
   const issued = new Date(cert.issuedAt).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
@@ -81,7 +79,7 @@ export default async function VerifyPage({ params }: Props) {
 
         <div className="mt-8 overflow-hidden rounded-xl border border-[var(--lane)]">
           <Image
-            src={ogUrl}
+            src={`/api/og?id=${encodeURIComponent(cert.id)}`}
             alt={`Certificate for ${cert.studentName}`}
             width={1200}
             height={630}

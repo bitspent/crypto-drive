@@ -1,6 +1,7 @@
 import { createHmac, randomBytes } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
+import { and, eq, gt, sql } from "drizzle-orm";
 import {
   getAllTracks,
   getCertTarget,
@@ -21,6 +22,8 @@ import {
 } from "./practice-samples";
 import { createWalletState, type WalletState } from "./wallet";
 import { getBitcoinProvider } from "./bitcoin/index";
+import { getDb, hasDatabase, warnFileFallbackOnce } from "./db/client";
+import { certificates, sessions, students } from "./db/schema";
 
 assertCertHashSecret();
 
@@ -64,6 +67,16 @@ type StoreData = {
 const DATA_DIR = path.join(process.cwd(), ".data");
 const STORE_PATH = path.join(DATA_DIR, "store.json");
 
+/** Sessions live 30 days in Postgres. The file fallback never expires. */
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Postgres when configured, else the legacy file store (warned, dev only). */
+function shouldUsePostgres(): boolean {
+  if (hasDatabase()) return true;
+  warnFileFallbackOnce();
+  return false;
+}
+
 const emptyStore = (): StoreData => ({
   students: {},
   certificates: {},
@@ -91,7 +104,7 @@ function newId(prefix: string): string {
   return `${prefix}_${randomBytes(6).toString("hex")}`;
 }
 
-function normalizeStudent(raw: Student): Student {
+export function normalizeStudent(raw: Student): Student {
   const modulesPassed = { ...(raw.modulesPassed ?? {}) };
   if (raw.module1PassedAt && !modulesPassed["btc-explorer"]) {
     // Legacy Module 1 pass → count as first Bitcoin milestone for demos
@@ -119,6 +132,54 @@ export async function isValidLicense(key: string): Promise<boolean> {
   return key.trim().toUpperCase() === envKey.toUpperCase();
 }
 
+type StudentRow = typeof students.$inferSelect;
+type CertificateRow = typeof certificates.$inferSelect;
+
+function studentFromRow(row: StudentRow): Student {
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    tier: row.tier as TierId,
+    unlockedAt: row.createdAt.toISOString(),
+    practiceSeed: row.practiceSeed ?? undefined,
+    modulesPassed: { ...((row.modulesPassed as Record<string, string> | null) ?? {}) },
+    wallet: (row.wallet as WalletState | null | undefined) ?? undefined,
+  };
+}
+
+function certificateFromRow(row: CertificateRow): Certificate {
+  return {
+    id: row.id,
+    hash: row.hash,
+    studentId: row.studentId,
+    studentName: row.studentName,
+    email: row.email,
+    tier: row.tier as TierId,
+    trackSlug: row.trackSlug,
+    moduleSlug: row.moduleSlug,
+    module: row.moduleLabel,
+    milestone: row.milestone,
+    issuedAt: row.issuedAt.toISOString(),
+  };
+}
+
+function isUniqueViolation(e: unknown): boolean {
+  return (e as { code?: string })?.code === "23505";
+}
+
+/** Live session's student row, or null when unknown or expired. */
+async function pgStudentBySession(sessionId: string): Promise<StudentRow | null> {
+  const db = getDb();
+  const rows = await db
+    .select({ student: students })
+    .from(sessions)
+    .innerJoin(students, eq(students.id, sessions.studentId))
+    .where(and(eq(sessions.id, sessionId), gt(sessions.expiresAt, sql`now()`)))
+    .limit(1);
+  return rows[0]?.student ?? null;
+}
+
 export async function unlockStudent(
   email: string,
   license: string,
@@ -127,6 +188,7 @@ export async function unlockStudent(
   sessionId: string;
   tier: TierId;
 }> {
+  if (shouldUsePostgres()) return pgUnlockStudent(email, license);
   const data = await ensureStore();
   const normalized = email.trim().toLowerCase();
 
@@ -163,10 +225,72 @@ export async function unlockStudent(
   return { student, sessionId, tier };
 }
 
+async function pgUnlockStudent(
+  email: string,
+  license: string,
+): Promise<{ student: Student; sessionId: string; tier: TierId }> {
+  const db = getDb();
+  const normalized = email.trim().toLowerCase();
+  let tier = await resolveTierFromLicense(license);
+  if (!tier) tier = "certified";
+  const practiceSeed = derivePracticeSeed(normalized, license);
+
+  let row =
+    (await db.select().from(students).where(eq(students.email, normalized)).limit(1))[0] ??
+    null;
+  if (!row) {
+    try {
+      const inserted = await db
+        .insert(students)
+        .values({
+          id: newId("stu"),
+          email: normalized,
+          name: null,
+          tier,
+          practiceSeed,
+          modulesPassed: {},
+        })
+        .returning();
+      row = inserted[0] ?? null;
+    } catch (e) {
+      // Lost an insert race: fall through to the winner's row.
+      if (!isUniqueViolation(e)) throw e;
+      row =
+        (await db.select().from(students).where(eq(students.email, normalized)).limit(1))[0] ??
+        null;
+    }
+  }
+  if (!row) throw new Error("Unlock with your license before you continue.");
+  await db
+    .update(students)
+    .set({
+      tier,
+      ...(row.practiceSeed ? {} : { practiceSeed }),
+      updatedAt: new Date(),
+    })
+    .where(eq(students.id, row.id));
+
+  const sessionId = newId("ses");
+  await db.insert(sessions).values({
+    id: sessionId,
+    studentId: row.id,
+    expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+  });
+  const student = normalizeStudent(
+    studentFromRow({ ...row, tier, practiceSeed: row.practiceSeed ?? practiceSeed }),
+  );
+  return { student, sessionId, tier };
+}
+
 export async function getStudentBySession(
   sessionId: string | undefined,
 ): Promise<Student | null> {
   if (!sessionId) return null;
+  if (shouldUsePostgres()) {
+    const row = await pgStudentBySession(sessionId);
+    if (!row) return null;
+    return normalizeStudent(studentFromRow(row));
+  }
   const data = await ensureStore();
   const studentId = data.sessions[sessionId];
   if (!studentId) return null;
@@ -200,6 +324,14 @@ export async function createWalletForSession(sessionId: string | undefined): Pro
   // address as the drives). Drive practice values always stay simulated.
   const address = getBitcoinProvider().getAddressForSeed(student.practiceSeed);
   const wallet = createWalletState({ seedWords: practice.words, address });
+  if (shouldUsePostgres()) {
+    // Deterministic wallet: concurrent creates write the same value.
+    await getDb()
+      .update(students)
+      .set({ wallet, updatedAt: new Date() })
+      .where(eq(students.id, student.id));
+    return wallet;
+  }
   const data = await ensureStore();
   const stored = data.students[student.id];
   if (!stored) throw new Error("Unlock with your license before you continue.");
@@ -213,21 +345,37 @@ export async function saveWalletForSession(
   sessionId: string | undefined,
   wallet: WalletState,
 ): Promise<void> {
-  const data = await ensureStore();
-  const studentId = sessionId ? data.sessions[sessionId] : undefined;
-  const student = studentId ? data.students[studentId] : undefined;
+  const student = await getStudentBySession(sessionId);
   if (!student) throw new Error("Unlock with your license before you continue.");
-  student.wallet = wallet;
+  if (shouldUsePostgres()) {
+    await getDb()
+      .update(students)
+      .set({ wallet, updatedAt: new Date() })
+      .where(eq(students.id, student.id));
+    return;
+  }
+  const data = await ensureStore();
+  const stored = data.students[student.id];
+  if (!stored) throw new Error("Unlock with your license before you continue.");
+  stored.wallet = wallet;
   await saveStore(data);
 }
 
 /** Reset the practice wallet: clear state so setup can run again. */
 export async function clearWalletForSession(sessionId: string | undefined): Promise<void> {
-  const data = await ensureStore();
-  const studentId = sessionId ? data.sessions[sessionId] : undefined;
-  const student = studentId ? data.students[studentId] : undefined;
+  const student = await getStudentBySession(sessionId);
   if (!student) throw new Error("Unlock with your license before you continue.");
-  student.wallet = null;
+  if (shouldUsePostgres()) {
+    await getDb()
+      .update(students)
+      .set({ wallet: null, updatedAt: new Date() })
+      .where(eq(students.id, student.id));
+    return;
+  }
+  const data = await ensureStore();
+  const stored = data.students[student.id];
+  if (!stored) throw new Error("Unlock with your license before you continue.");
+  stored.wallet = null;
   await saveStore(data);
 }
 
@@ -236,6 +384,7 @@ export async function issueCertificate(input: {
   studentName: string;
   moduleSlug: string;
 }): Promise<Certificate> {
+  if (shouldUsePostgres()) return pgIssueCertificate(input);
   const data = await ensureStore();
   const studentId = data.sessions[input.sessionId];
   if (!studentId) {
@@ -312,18 +461,121 @@ export async function issueCertificate(input: {
   return certificate;
 }
 
+async function pgIssueCertificate(input: {
+  sessionId: string;
+  studentName: string;
+  moduleSlug: string;
+}): Promise<Certificate> {
+  const db = getDb();
+  const student = await getStudentBySession(input.sessionId);
+  if (!student) {
+    throw new Error("Session expired. Unlock again with your license.");
+  }
+
+  const name = input.studentName.trim();
+  if (name.length < 2) {
+    throw new Error("Enter the name you want on your certificate.");
+  }
+
+  const resolved = await getCertTarget(input.moduleSlug);
+  if (!resolved) {
+    throw new Error("Unknown milestone.");
+  }
+
+  const tier = await getTier(student.tier);
+  if (!tier.features.certificate || !tier.features.verifyLink) {
+    throw new Error(
+      "Starter can practice the whole drive. Upgrade to Certified to earn the verify link.",
+    );
+  }
+
+  const rows = await db
+    .select()
+    .from(certificates)
+    .where(eq(certificates.studentId, student.id));
+  const existing = findTrackCertificate(
+    Object.fromEntries(rows.map((r) => [r.id, certificateFromRow(r)])),
+    student.id,
+    resolved.trackSlug,
+    input.moduleSlug,
+  );
+  const now = new Date();
+  if (existing) {
+    await db
+      .update(students)
+      .set({
+        ...(student.name == null ? { name } : {}),
+        ...(student.modulesPassed[input.moduleSlug]
+          ? {}
+          : {
+              modulesPassed: sql`${students.modulesPassed} || ${JSON.stringify({
+                [input.moduleSlug]: now.toISOString(),
+              })}::jsonb`,
+            }),
+        updatedAt: now,
+      })
+      .where(eq(students.id, student.id));
+    return existing;
+  }
+
+  const id = newId("cert");
+  const issuedAt = now.toISOString();
+  const secret = certHashSecret();
+  const hash = createHmac("sha256", secret)
+    .update(
+      `${id}|${name}|${student.email}|${issuedAt}|${input.moduleSlug}|${student.tier}`,
+    )
+    .digest("hex")
+    .slice(0, 24);
+
+  await db.insert(certificates).values({
+    id,
+    hash,
+    studentId: student.id,
+    studentName: name,
+    email: student.email,
+    tier: student.tier,
+    trackSlug: resolved.trackSlug,
+    moduleSlug: input.moduleSlug,
+    moduleLabel: resolved.certModuleLabel,
+    milestone: resolved.certMilestoneLabel,
+    issuedAt: now,
+  });
+  await db
+    .update(students)
+    .set({
+      name,
+      modulesPassed: sql`${students.modulesPassed} || ${JSON.stringify({
+        [input.moduleSlug]: issuedAt,
+      })}::jsonb`,
+      updatedAt: now,
+    })
+    .where(eq(students.id, student.id));
+
+  return {
+    id,
+    hash,
+    studentId: student.id,
+    studentName: name,
+    email: student.email,
+    tier: student.tier,
+    trackSlug: resolved.trackSlug,
+    moduleSlug: input.moduleSlug,
+    module: resolved.certModuleLabel,
+    milestone: resolved.certMilestoneLabel,
+    issuedAt,
+  };
+}
+
 export async function passStep(
   sessionId: string,
   stepId: string,
   answer?: StepAnswer,
 ): Promise<void> {
-  const data = await ensureStore();
-  const studentId = data.sessions[sessionId];
-  if (!studentId || !data.students[studentId]) {
+  const student = await getStudentBySession(sessionId);
+  if (!student) {
     throw new Error("Unlock with your license before you continue.");
   }
-
-  const student = normalizeStudent(data.students[studentId]);
   if (!student.practiceSeed) {
     throw new Error("Unlock again with your license to start practice.");
   }
@@ -350,8 +602,25 @@ export async function passStep(
   if (gradeError) throw new Error(gradeError);
 
   if (!student.modulesPassed[stepId]) {
-    student.modulesPassed[stepId] = new Date().toISOString();
-    data.students[student.id] = student;
+    const stamp = new Date().toISOString();
+    if (shouldUsePostgres()) {
+      // Atomic jsonb merge: concurrent passes on different steps can't clobber.
+      await getDb()
+        .update(students)
+        .set({
+          modulesPassed: sql`${students.modulesPassed} || ${JSON.stringify({
+            [stepId]: stamp,
+          })}::jsonb`,
+          updatedAt: new Date(),
+        })
+        .where(eq(students.id, student.id));
+      return;
+    }
+    const data = await ensureStore();
+    const stored = data.students[student.id];
+    if (!stored) throw new Error("Unlock with your license before you continue.");
+    stored.modulesPassed[stepId] = stored.modulesPassed[stepId] ?? stamp;
+    data.students[student.id] = stored;
     await saveStore(data);
   }
 }
@@ -370,6 +639,18 @@ export async function getTrackCertificate(
   trackSlug: string,
   preferredModuleSlug?: string,
 ): Promise<Certificate | null> {
+  if (shouldUsePostgres()) {
+    const rows = await getDb()
+      .select()
+      .from(certificates)
+      .where(eq(certificates.studentId, studentId));
+    return findTrackCertificate(
+      Object.fromEntries(rows.map((r) => [r.id, certificateFromRow(r)])),
+      studentId,
+      trackSlug,
+      preferredModuleSlug,
+    );
+  }
   const data = await ensureStore();
   return findTrackCertificate(
     data.certificates,
@@ -397,7 +678,7 @@ function findTrackCertificate(
   return preferred ?? matches[0] ?? null;
 }
 
-function certificateTrack(cert: Certificate): string | null {
+export function certificateTrack(cert: Certificate): string | null {
   if (cert.trackSlug) return cert.trackSlug;
   const slug = cert.moduleSlug ?? "";
   const moduleName = cert.module ?? "";
@@ -416,6 +697,21 @@ function certificateTrack(cert: Certificate): string | null {
 }
 
 export async function getCertificate(id: string): Promise<Certificate | null> {
+  if (shouldUsePostgres()) {
+    const rows = await getDb()
+      .select()
+      .from(certificates)
+      .where(eq(certificates.id, id))
+      .limit(1);
+    const row = rows[0];
+    if (!row) return null;
+    const cert = certificateFromRow(row);
+    return {
+      ...cert,
+      tier: cert.tier ?? "certified",
+      moduleSlug: cert.moduleSlug ?? "btc-explorer",
+    };
+  }
   const data = await ensureStore();
   const cert = data.certificates[id];
   if (!cert) return null;
