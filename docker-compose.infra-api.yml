@@ -1,0 +1,21 @@
+# Local regtest dev: runs ONLY the infra-api service, pointed at Nigiri's
+# ports on the host. Do not hand-write the Bitcoin layer here — Nigiri owns
+# bitcoind, electrs, Esplora, and chopsticks (`nigiri start` first).
+# Dev-only values below (secret "dev", plain HTTP). Production wraps the
+# same service in Caddy + TLS per docs/infra-contract.md.
+services:
+  infra-api:
+    build: ./api
+    ports:
+      - "8081:8081"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      BITCOIN_RPC_URL: http://host.docker.internal:18443
+      BITCOIN_RPC_USER: admin1
+      BITCOIN_RPC_PASSWORD: "123"
+      ELECTRS_HTTP_URL: http://host.docker.internal:30000
+      CHOPSTICKS_URL: http://host.docker.internal:3000
+      ESPLORA_URL: http://host.docker.internal:5000
+      INFRA_SHARED_SECRET: dev
+      ADMIN_MINE_TOKEN: dev

@@ -23,6 +23,25 @@ npm run dev
 
 Open [http://127.0.0.1:43127](http://127.0.0.1:43127).
 
+## Bitcoin modes in dev
+
+| Command | Backend | Needs |
+| --- | --- | --- |
+| `npm run dev` | Simulated (play money) | Nothing — no infra, no internet |
+| `npm run dev:signet` | Signet (live fees + lookups) | Internet |
+| `npm run dev:regtest` | Local regtest via Nigiri | Nigiri + infra-api (below) |
+
+Setup for regtest dev:
+
+```bash
+curl https://getnigiri.vulpem.com | bash
+nigiri start
+docker compose -f docker-compose.infra-api.yml up -d
+npm run dev:regtest
+```
+
+See `docs/deployment-modes.md` for when to use each mode.
+
 ## Demo licenses → tiers
 
 | Key | Tier |

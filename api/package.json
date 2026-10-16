@@ -1,0 +1,14 @@
+{
+  "name": "infra-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted Bitcoin regtest API implementing docs/infra-contract.md (dev: behind Nigiri; prod: behind Caddy + TLS).",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "hono": "^4.6.0"
+  }
+}
