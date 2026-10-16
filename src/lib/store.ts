@@ -19,6 +19,7 @@ import {
   practiceFor,
   type StepAnswer,
 } from "./practice-samples";
+import { createWalletState, type WalletState } from "./wallet";
 
 assertCertHashSecret();
 
@@ -32,6 +33,8 @@ export type Student = {
   practiceSeed?: string;
   /** ISO timestamps keyed by milestone id (e.g. btc-explorer) */
   modulesPassed: Record<string, string>;
+  /** Practice wallet sandbox state. Absent until the learner creates one. */
+  wallet?: WalletState | null;
   /** @deprecated Slice 1 field — kept for old store files */
   module1PassedAt?: string | null;
 };
@@ -169,6 +172,49 @@ export async function getStudentBySession(
   const student = data.students[studentId];
   if (!student) return null;
   return normalizeStudent(student);
+}
+
+/** The learner's practice wallet, or null when none exists yet. */
+export async function getWalletForSession(
+  sessionId: string | undefined,
+): Promise<WalletState | null> {
+  const student = await getStudentBySession(sessionId);
+  if (!student?.wallet?.exists) return null;
+  return student.wallet;
+}
+
+/**
+ * Create the practice wallet from the learner's practice seed — the SAME
+ * address and words as the drives. Idempotent: returns the existing wallet.
+ */
+export async function createWalletForSession(sessionId: string | undefined): Promise<WalletState> {
+  const student = await getStudentBySession(sessionId);
+  if (!student) throw new Error("Unlock with your license before you continue.");
+  if (student.wallet?.exists) return student.wallet;
+  if (!student.practiceSeed) {
+    throw new Error("Unlock again with your license to start practice.");
+  }
+  const practice = practiceFor(student.practiceSeed);
+  const wallet = createWalletState({ seedWords: practice.words, address: practice.address });
+  const data = await ensureStore();
+  const stored = data.students[student.id];
+  if (!stored) throw new Error("Unlock with your license before you continue.");
+  stored.wallet = wallet;
+  await saveStore(data);
+  return wallet;
+}
+
+/** Persist wallet state after a flow mutates it. */
+export async function saveWalletForSession(
+  sessionId: string | undefined,
+  wallet: WalletState,
+): Promise<void> {
+  const data = await ensureStore();
+  const studentId = sessionId ? data.sessions[sessionId] : undefined;
+  const student = studentId ? data.students[studentId] : undefined;
+  if (!student) throw new Error("Unlock with your license before you continue.");
+  student.wallet = wallet;
+  await saveStore(data);
 }
 
 export async function issueCertificate(input: {

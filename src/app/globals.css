@@ -3576,3 +3576,350 @@ body {
     0 0 18px color-mix(in oklab, var(--amber) 30%, transparent);
   animation: sat2-breathe 3.4s ease-in-out infinite;
 }
+
+/* —— Practice wallet sandbox (2D; own quiet visual language) —— */
+
+.w-shell {
+  --w-card: #fffdf8;
+  --w-hairline: rgba(0, 0, 0, 0.06);
+  --w-shadow: 0 1px 2px rgba(20, 16, 8, 0.05);
+  --w-in: #0d9488;
+  --w-in-ink: #0b6e63;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 4px 0 32px;
+  color: var(--paper);
+}
+
+.dark .w-shell {
+  --w-card: #151a26;
+  --w-hairline: rgba(255, 255, 255, 0.06);
+  --w-shadow: none;
+  --w-in: #5eead4;
+  --w-in-ink: #5eead4;
+}
+
+.w-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 2px;
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.w-disclosure {
+  margin: 0;
+  padding: 8px 4px;
+  border-top: 1px solid var(--w-hairline);
+  border-bottom: 1px solid var(--w-hairline);
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--mute);
+}
+
+.w-balance-block {
+  text-align: center;
+  padding: 28px 0 8px;
+}
+
+.w-balance {
+  margin: 0;
+  font-family: var(--font-display), serif;
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--paper);
+}
+
+.w-balance-unit {
+  margin: 2px 0 0;
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--mute);
+}
+
+.w-balance-sub {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--mute);
+}
+
+.w-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.w-receive-btn,
+.w-send-btn {
+  flex: 1;
+  height: 56px;
+  border-radius: 14px;
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    opacity 150ms ease-out,
+    background-color 150ms ease-out;
+}
+
+.w-receive-btn {
+  background: transparent;
+  border: 1.5px solid var(--lane);
+  color: var(--paper);
+}
+
+.w-receive-btn:hover {
+  border-color: var(--amber);
+}
+
+.w-send-btn {
+  background: var(--amber);
+  border: 1.5px solid var(--amber);
+  color: #fff;
+}
+
+.w-send-btn:hover {
+  opacity: 0.92;
+}
+
+.w-section-label {
+  margin: 28px 0 0;
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.w-history {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--w-hairline);
+}
+
+.w-history-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 2px;
+  border-bottom: 1px solid var(--w-hairline);
+  min-height: 44px;
+}
+
+.w-dir-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.w-dir-in {
+  background: color-mix(in oklab, var(--w-in) 14%, transparent);
+  color: var(--w-in-ink);
+}
+
+.w-dir-out {
+  background: color-mix(in oklab, var(--amber) 14%, transparent);
+  color: var(--amber);
+}
+
+.w-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.w-row-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--paper);
+}
+
+.w-row-sub {
+  margin: 2px 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  color: var(--mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.w-row-side {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.w-row-amount {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.w-amount-in {
+  color: var(--w-in-ink);
+}
+
+.w-amount-out {
+  color: var(--paper);
+}
+
+.w-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.w-badge-pending {
+  background: color-mix(in oklab, var(--amber) 14%, transparent);
+  color: var(--amber);
+}
+
+.w-badge-confirmed {
+  background: color-mix(in oklab, var(--w-in) 14%, transparent);
+  color: var(--w-in-ink);
+}
+
+.w-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.w-empty-history {
+  margin: 0;
+  padding: 20px 2px;
+  border-bottom: 1px solid var(--w-hairline);
+  color: var(--mute);
+  font-size: 0.9rem;
+}
+
+.w-coach-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--w-hairline);
+  border-radius: 16px;
+  background: var(--w-card);
+  box-shadow: var(--w-shadow);
+  font-size: 0.85rem;
+  color: var(--fog);
+}
+
+.w-coach-note p {
+  margin: 0;
+  flex: 1;
+}
+
+.w-coach-dismiss {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  margin: -10px -10px -10px 0;
+  border: 0;
+  background: transparent;
+  color: var(--mute);
+  font-size: 1.1rem;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.w-card {
+  background: var(--w-card);
+  border: 1px solid var(--w-hairline);
+  border-radius: 16px;
+  box-shadow: var(--w-shadow);
+  padding: 20px;
+}
+
+.w-empty-state {
+  text-align: center;
+  padding: 40px 24px;
+  margin-top: 24px;
+}
+
+.w-empty-icon {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.w-empty-state h2 {
+  margin: 16px 0 0;
+  font-family: var(--font-display), serif;
+  font-size: 1.4rem;
+  color: var(--paper);
+}
+
+.w-empty-state p {
+  margin: 8px 0 0;
+  color: var(--fog);
+  font-size: 0.95rem;
+}
+
+.w-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 24px;
+  margin-top: 20px;
+  border-radius: 14px;
+  border: 1.5px solid var(--amber);
+  background: var(--amber);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.w-primary-btn:hover {
+  opacity: 0.92;
+}
+
+.w-primary-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.w-error {
+  margin-top: 12px;
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .w-receive-btn,
+  .w-send-btn,
+  .w-primary-btn,
+  .w-coach-dismiss {
+    transition: none;
+  }
+}

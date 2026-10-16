@@ -87,6 +87,16 @@ function hexTxid(seed: string): string {
   return createHash("sha256").update(`txid:${seed}`).digest("hex");
 }
 
+/** Deterministic simulated counterparty address for the wallet's nth tx. */
+export function walletCounterparty(seed: string, n: number): string {
+  return p2wpkhAddress(seedBytes(seed, `wallet-peer:${n}`, 20));
+}
+
+/** Deterministic simulated txid for the wallet's nth tx. */
+export function walletTxid(seed: string, n: number): string {
+  return hexTxid(`${seed}:wallet-tx:${n}`);
+}
+
 function pickWords(seed: string): string[] {
   const list = bip39Words();
   const used = new Set<number>();

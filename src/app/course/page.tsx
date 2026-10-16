@@ -115,6 +115,26 @@ export default async function CoursePage() {
             : `You can practice every stop. The verify link is Certified. ${tier.upgradeHint ?? ""}`}
         </p>
 
+        <Link
+          href="/wallet"
+          className="group mb-10 flex items-center justify-between gap-4 rounded-2xl border border-[var(--lane)] bg-[var(--cabin)] p-5 transition-colors hover:border-[var(--amber)]/50"
+        >
+          <div>
+            <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.18em] text-[var(--amber)]">
+              SANDBOX · PLAY MONEY
+            </p>
+            <h2 className="mt-2 font-[family-name:var(--font-display)] text-xl text-[var(--paper)] group-hover:text-[var(--amber)]">
+              Your practice wallet
+            </h2>
+            <p className="mt-1 max-w-xl text-sm text-[var(--fog)]">
+              Receive, send, back up, and restore simulated Bitcoin. Same address as your drives.
+            </p>
+          </div>
+          <span aria-hidden="true" className="shrink-0 text-xl text-[var(--mute)] group-hover:text-[var(--amber)]">
+            →
+          </span>
+        </Link>
+
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-[family-name:var(--font-display)] text-sm tracking-[0.16em] text-[var(--amber)]">
             YOUR PATH
