@@ -283,7 +283,7 @@ describe("webhook processing (needs DB)", { skip: !HAS_DB }, () => {
     const after = await store.getStudentBySession(demo.sessionId);
     assert.equal(after?.id, before?.id);
     assert.equal(after?.tier, "vip");
-    assert.ok(after?.licenseKey?.startsWith("CD-VIP-"));
+    assert.equal(after?.licenseKeyHash, license.hashLicenseKey(outcome.licenseKey));
     assert.equal(after?.practiceSeed, before?.practiceSeed);
     assert.ok(after?.modulesPassed["btc-intro-satoshi"]);
   });

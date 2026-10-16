@@ -142,7 +142,7 @@ person with keys, a card, or a calendar — no agent can close it.
   full 24-step walk on desktop + mobile, layout contract, keyboard,
   reduced-motion, no-WebGL, wallet flows, legal pages, health. 66 specs,
   green in file and Postgres modes.
-- **Unit suite committed** (`node --test tests/`): practice determinism +
+- **Unit suite committed** (`node --test --test-concurrency=1 tests/`, serial — file-store writers race across files): practice determinism +
   grading, content shape, tier flags, redirects, secret gate, wallet math,
   providers, commerce, legal content, rate limits, health, demo gate.
 - **Tier flags trimmed** to the three the runtime enforces (`certificate`,

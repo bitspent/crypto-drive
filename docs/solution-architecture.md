@@ -282,7 +282,7 @@ only the certificate is tier-gated.
 
 | Suite | Command | Covers |
 | --- | --- | --- |
-| Unit | `node --test tests/` | Practice determinism + grading (incl. capstone rubric), content shape (24 steps, idea panels, cert target), tier flags, module redirects, `CERT_HASH_SECRET` production gate, wallet lib (formatting, send/deposit/restore, fee tiers) |
+| Unit | `node --test --test-concurrency=1 tests/` | Practice determinism + grading (incl. capstone rubric), content shape (24 steps, idea panels, cert target), tier flags, module redirects, `CERT_HASH_SECRET` production gate, wallet lib (formatting, send/deposit/restore, fee tiers), commerce + revocation + hashing (serial: file-store writers race across files) |
 | E2E | `npm run build` then `npx playwright test` (once: `npx playwright install chromium`) | Full 24-step walk on desktop + mobile viewports, layout contract, keyboard drive, reduced-motion, no-WebGL, mobile smoke, wallet sandbox flows (setup, deposit, send, backup/restore/reset). Config: `playwright.config.ts`; specs: `tests/e2e/` |
 
 Both suites must pass before any charge-readiness review. Pre-launch

@@ -21,7 +21,7 @@ import {
   type StepAnswer,
 } from "./practice-samples";
 import { createWalletState, type WalletState } from "./wallet";
-import { resolveLicenseKind } from "./license";
+import { hashLicenseKey, resolveLicenseKind } from "./license";
 import { getBitcoinProvider } from "./bitcoin/index";
 import { getDb, hasDatabase, warnFileFallbackOnce } from "./db/client";
 import { certificates, sessions, students, webhookEvents } from "./db/schema";
@@ -32,8 +32,8 @@ export type Student = {
   id: string;
   email: string;
   name: string | null;
-  /** Generated purchase key (CD-<TIER>-<8>). NULL for demo students. */
-  licenseKey?: string | null;
+  /** sha256(CD-<TIER>-<8> + pepper). Raw keys are never stored. NULL for demo. */
+  licenseKeyHash?: string | null;
   tier: TierId;
   unlockedAt: string;
   /** Stable hash from email + license. Drives unique practice values. */
@@ -153,7 +153,7 @@ function studentFromRow(row: StudentRow): Student {
     id: row.id,
     email: row.email,
     name: row.name,
-    licenseKey: row.licenseKey ?? undefined,
+    licenseKeyHash: row.licenseKeyHash ?? undefined,
     tier: row.tier as TierId,
     unlockedAt: row.createdAt.toISOString(),
     practiceSeed: row.practiceSeed ?? undefined,
@@ -807,18 +807,19 @@ export function certificateTrack(cert: Certificate): string | null {
 export async function findStudentByLicenseKey(key: string): Promise<Student | null> {
   const trimmed = key.trim();
   if (!trimmed) return null;
+  const hash = hashLicenseKey(trimmed);
   if (shouldUsePostgres()) {
     const rows = await getDb()
       .select()
       .from(students)
-      .where(eq(students.licenseKey, trimmed))
+      .where(eq(students.licenseKeyHash, hash))
       .limit(1);
     const row = rows[0];
     if (!row) return null;
     return normalizeStudent(studentFromRow(row));
   }
   const data = await ensureStore();
-  const found = Object.values(data.students).find((s) => s.licenseKey === trimmed);
+  const found = Object.values(data.students).find((s) => s.licenseKeyHash === hash);
   if (!found) return null;
   return normalizeStudent(found);
 }
@@ -853,6 +854,9 @@ export async function provisionLicensedStudent(
   licenseKey: string,
 ): Promise<Student> {
   const normalized = email.trim().toLowerCase();
+  // The raw key derives the practice seed (stable per email+key) but only
+  // its hash is stored.
+  const licenseKeyHash = hashLicenseKey(licenseKey);
   if (shouldUsePostgres()) {
     const db = getDb();
     const existing = (
@@ -864,7 +868,7 @@ export async function provisionLicensedStudent(
       await db
         .update(students)
         .set({
-          licenseKey,
+          licenseKeyHash,
           tier,
           revokedAt: null,
           revocationReason: null,
@@ -874,7 +878,7 @@ export async function provisionLicensedStudent(
       return normalizeStudent(
         studentFromRow({
           ...existing,
-          licenseKey,
+          licenseKeyHash,
           tier,
           revokedAt: null,
           revocationReason: null,
@@ -888,7 +892,7 @@ export async function provisionLicensedStudent(
         id: newId("stu"),
         email: normalized,
         name: null,
-        licenseKey,
+        licenseKeyHash,
         tier,
         practiceSeed,
         modulesPassed: {},
@@ -901,7 +905,7 @@ export async function provisionLicensedStudent(
   const data = await ensureStore();
   const existing = Object.values(data.students).find((s) => s.email === normalized);
   if (existing) {
-    existing.licenseKey = licenseKey;
+    existing.licenseKeyHash = licenseKeyHash;
     existing.tier = tier;
     delete existing.revokedAt;
     delete existing.revocationReason;
@@ -913,7 +917,7 @@ export async function provisionLicensedStudent(
     id: newId("stu"),
     email: normalized,
     name: null,
-    licenseKey,
+    licenseKeyHash,
     tier,
     unlockedAt: new Date().toISOString(),
     practiceSeed: derivePracticeSeed(normalized, licenseKey),

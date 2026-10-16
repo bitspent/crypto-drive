@@ -78,7 +78,7 @@ NEXT_PUBLIC_VIP_QA_URL=#
 | `npm run build` | Production build |
 | `npm start` | Production server on **43127** |
 | `npm run lint` | ESLint |
-| `node --test tests/` | Unit tests |
+| `node --test --test-concurrency=1 tests/` | Unit tests (serial: file-store writers race across files) |
 | `npm run test:e2e` | Playwright suite (build first; `test:e2e:ui` for interactive) |
 
 ## Loop

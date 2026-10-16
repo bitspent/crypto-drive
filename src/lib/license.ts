@@ -1,4 +1,4 @@
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 
 export type LicenseTier = "starter" | "certified" | "vip";
 
@@ -20,6 +20,36 @@ export function generateLicenseKey(tier: LicenseTier): string {
 
 export function validateLicenseFormat(key: string): boolean {
   return LICENSE_RE.test(key.trim());
+}
+
+let warnedPepper = false;
+
+/**
+ * Pepper for license hashing. Required in production (the hash must be
+ * stable across deploys); dev and test fall back with a one-time warning.
+ */
+export function licensePepper(): string {
+  const pepper = process.env.LICENSE_PEPPER?.trim();
+  if (pepper) return pepper;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("LICENSE_PEPPER must be set in production. See .env.example.");
+  }
+  if (!warnedPepper) {
+    warnedPepper = true;
+    console.warn(
+      "[crypto-drive] LICENSE_PEPPER not set. Using dev fallback. Do not deploy like this.",
+    );
+  }
+  return "crypto-drive-dev-pepper";
+}
+
+/**
+ * What the database stores: sha256 of the trimmed key plus the pepper.
+ * Raw keys exist only in memory (provisioning, unlock lookup, the welcome
+ * email) — never at rest, never in logs.
+ */
+export function hashLicenseKey(key: string): string {
+  return createHash("sha256").update(key.trim() + licensePepper()).digest("hex");
 }
 
 /** Tier encoded in a well-formed key, or null when the format is wrong. */

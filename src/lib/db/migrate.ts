@@ -39,7 +39,7 @@ export async function migrateFromFile(
     const values = {
       email: s.email,
       name: s.name ?? null,
-      licenseKey: null as string | null,
+      licenseKeyHash: null as string | null,
       tier: s.tier,
       practiceSeed: s.practiceSeed ?? null,
       modulesPassed: s.modulesPassed,

@@ -8,7 +8,7 @@ export const students = pgTable(
     id: text("id").primaryKey(),
     email: text("email").notNull().unique(),
     name: text("name"),
-    licenseKey: text("license_key"),
+    licenseKeyHash: text("license_key_hash"),
     tier: text("tier").notNull(),
     practiceSeed: text("practice_seed"),
     modulesPassed: jsonb("modules_passed")
