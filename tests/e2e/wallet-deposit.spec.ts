@@ -31,9 +31,22 @@ test("receive sheet shows QR, full address, and a working copy chip", async ({
 
   const qr = dialog.getByAltText(/QR code for /);
   await expect(qr).toBeVisible();
-  const box = await qr.boundingBox();
-  expect(box?.width).toBe(240);
-  expect(box?.height).toBe(240);
+  // Layout pixels are fractional while the sheet entrance settles, so the
+  // box check is tolerant; the intrinsic bitmap size is exact.
+  const size = await qr.evaluate((el) => {
+    const img = el as HTMLImageElement;
+    const box = img.getBoundingClientRect();
+    return {
+      naturalWidth: img.naturalWidth,
+      naturalHeight: img.naturalHeight,
+      width: box.width,
+      height: box.height,
+    };
+  });
+  expect(size.naturalWidth).toBe(240);
+  expect(size.naturalHeight).toBe(240);
+  expect(size.width).toBeCloseTo(240, 0);
+  expect(size.height).toBeCloseTo(240, 0);
 
   // Focus lands on Close when the sheet opens.
   await expect(page.getByRole("button", { name: "Close" })).toBeFocused();
