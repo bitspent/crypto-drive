@@ -1,12 +1,174 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  SEED_CONFIRM_POSITIONS,
   formatBtcGrouped,
   truncateMiddle,
   type TxRecord,
   type WalletState,
 } from "@/lib/wallet";
+
+const REVEAL_MASK_MS = 5000;
+
+function WalletTop() {
+  return (
+    <>
+      <div className="w-topbar">
+        <span>Practice wallet</span>
+      </div>
+      <p className="w-disclosure">Practice wallet · Play money · No real Bitcoin</p>
+    </>
+  );
+}
+
+function CoachNote({ text }: { text: string }) {
+  const [visible, setVisible] = useState(true);
+  if (!visible) return null;
+  return (
+    <div className="w-coach-note">
+      <p>{text}</p>
+      <button
+        type="button"
+        className="w-coach-dismiss"
+        aria-label="Dismiss"
+        onClick={() => setVisible(false)}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+export function SeedGrid({ words, masked }: { words: string[]; masked: boolean }) {
+  return (
+    <ol className="w-seed-grid" aria-label={masked ? "Seed words hidden" : "Seed words"}>
+      {words.map((word, i) => (
+        <li key={i} className="w-seed-cell">
+          <span className="w-seed-num">{i + 1}</span>
+          <span className={`w-seed-word${masked ? " w-seed-masked" : ""}`}>
+            {masked ? "••••••" : word}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function SeedReveal({ words, onDone }: { words: string[]; onDone: () => void }) {
+  // showing → masked (once, 5s in) → reshown (stays; writing takes a while).
+  const [maskState, setMaskState] = useState<"showing" | "masked" | "reshown">("showing");
+  useEffect(() => {
+    if (maskState !== "showing") return;
+    const timer = window.setTimeout(() => setMaskState("masked"), REVEAL_MASK_MS);
+    return () => window.clearTimeout(timer);
+  }, [maskState]);
+  const revealed = maskState !== "showing";
+
+  return (
+    <div className="w-shell">
+      <WalletTop />
+      <h2 className="w-flow-title">Your 12 words</h2>
+      <p className="w-flow-sub">
+        Write them down on paper. In order. Never photograph them. Never share them.
+      </p>
+      <SeedGrid words={words} masked={maskState === "masked"} />
+      <CoachNote text="These words ARE your wallet. Lose them, lose the coins." />
+      <div className="w-button-stack">
+        <button
+          type="button"
+          className="w-primary-btn w-block-btn"
+          disabled={!revealed}
+          onClick={onDone}
+        >
+          I&apos;ve written them down
+        </button>
+        {maskState === "masked" ? (
+          <button
+            type="button"
+            className="w-secondary-btn w-block-btn"
+            onClick={() => setMaskState("reshown")}
+          >
+            Show them again
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function shuffledIndices(n: number): number[] {
+  const order = Array.from({ length: n }, (_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const a = order[i] as number;
+    order[i] = order[j] as number;
+    order[j] = a;
+  }
+  return order;
+}
+
+function SeedConfirm({ words, onDone }: { words: string[]; onDone: () => void }) {
+  const [round, setRound] = useState(0);
+  const [doneIdx, setDoneIdx] = useState<number[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const order = useMemo(() => shuffledIndices(words.length), [words.length]);
+  const wantPos = SEED_CONFIRM_POSITIONS[round] as number;
+
+  function tap(i: number) {
+    if (doneIdx.includes(i)) return;
+    if (i === wantPos - 1) {
+      setDoneIdx((done) => [...done, i]);
+      setError(null);
+      if (round === SEED_CONFIRM_POSITIONS.length - 1) onDone();
+      else setRound(round + 1);
+    } else {
+      setError(`That's not word ${wantPos}.`);
+      const grid = gridRef.current;
+      if (grid) {
+        grid.classList.remove("w-shake");
+        void grid.offsetWidth;
+        grid.classList.add("w-shake");
+      }
+    }
+  }
+
+  return (
+    <div className="w-shell">
+      <WalletTop />
+      <h2 className="w-flow-title">Prove it</h2>
+      <p className="w-flow-sub">Tap the words we ask for.</p>
+      <p className="w-confirm-prompt" aria-live="polite">
+        Tap word {wantPos}
+      </p>
+      <p className="w-confirm-progress">
+        Word {round + 1} of {SEED_CONFIRM_POSITIONS.length}
+      </p>
+      <div ref={gridRef} className="w-confirm-grid" role="group" aria-label="Word choices">
+        {order.map((i) => {
+          const spent = doneIdx.includes(i);
+          return (
+            <button
+              key={i}
+              type="button"
+              disabled={spent}
+              onClick={() => tap(i)}
+              className={`w-confirm-word${spent ? " w-confirm-spent" : ""}`}
+            >
+              {words[i]}
+            </button>
+          );
+        })}
+      </div>
+      {error ? (
+        <p className="w-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 function DirectionIcon({ direction }: { direction: TxRecord["direction"] }) {
   return (
@@ -90,10 +252,7 @@ function EmptyState({
 }) {
   return (
     <div className="w-shell">
-      <div className="w-topbar">
-        <span>Practice wallet</span>
-      </div>
-      <p className="w-disclosure">Practice wallet · Play money · No real Bitcoin</p>
+      <WalletTop />
       <div className="w-card w-empty-state">
         <WalletIcon />
         <h2>You don&apos;t have a wallet yet.</h2>
@@ -113,9 +272,9 @@ function EmptyState({
 
 export function WalletApp({ initial }: { initial: WalletState | null }) {
   const [wallet, setWallet] = useState<WalletState | null>(initial);
+  const [phase, setPhase] = useState<"home" | "reveal" | "confirm">("home");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [coachVisible, setCoachVisible] = useState(true);
 
   async function create() {
     setCreating(true);
@@ -125,6 +284,7 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
       const data = (await res.json()) as { wallet?: WalletState; error?: string };
       if (!res.ok || !data.wallet) throw new Error(data.error || "Could not create wallet.");
       setWallet(data.wallet);
+      setPhase("reveal");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create wallet.");
     } finally {
@@ -135,13 +295,16 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
   if (!wallet) {
     return <EmptyState onCreate={create} creating={creating} error={error} />;
   }
+  if (phase === "reveal") {
+    return <SeedReveal words={wallet.seedWords} onDone={() => setPhase("confirm")} />;
+  }
+  if (phase === "confirm") {
+    return <SeedConfirm words={wallet.seedWords} onDone={() => setPhase("home")} />;
+  }
 
   return (
     <div className="w-shell">
-      <div className="w-topbar">
-        <span>Practice wallet</span>
-      </div>
-      <p className="w-disclosure">Practice wallet · Play money · No real Bitcoin</p>
+      <WalletTop />
 
       <div className="w-balance-block">
         <p className="w-balance" aria-live="polite" aria-label={`${wallet.balance} satoshis`}>
@@ -171,19 +334,7 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
         </ul>
       )}
 
-      {coachVisible ? (
-        <div className="w-coach-note">
-          <p>Receive first. That&apos;s how wallets get money.</p>
-          <button
-            type="button"
-            className="w-coach-dismiss"
-            aria-label="Dismiss"
-            onClick={() => setCoachVisible(false)}
-          >
-            ×
-          </button>
-        </div>
-      ) : null}
+      <CoachNote text="Receive first. That's how wallets get money." />
     </div>
   );
 }

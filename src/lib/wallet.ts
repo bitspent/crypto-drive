@@ -44,6 +44,9 @@ export const WALLET_TX_VBYTES = 140;
 /** Typed confirmation word that authorizes a wallet reset. */
 export const WALLET_RESET_WORD = "RESET";
 
+/** 1-based seed positions the setup/backup confirm prompts ask for. */
+export const SEED_CONFIRM_POSITIONS = [3, 7, 11] as const;
+
 export type FeeTierId = "economy" | "standard" | "priority";
 
 export const FEE_TIERS: ReadonlyArray<{

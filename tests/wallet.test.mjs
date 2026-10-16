@@ -152,6 +152,12 @@ describe("wallet send", () => {
   });
 });
 
+describe("wallet setup positions", () => {
+  it("asks for seed words 3, 7, and 11", () => {
+    assert.deepEqual([...wallet.SEED_CONFIRM_POSITIONS], [3, 7, 11]);
+  });
+});
+
 describe("wallet restore", () => {
   it("matches the saved seed case-insensitively, rejects the rest", () => {
     assert.equal(wallet.restoreMatches(WORDS, WORDS.map((w) => w.toUpperCase())), true);
