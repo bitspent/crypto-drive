@@ -5,6 +5,7 @@ import {
   findStudentByLicenseKey,
   isValidLicense,
   provisionLicensedStudent,
+  REVOKED_ERROR,
   unlockStudent,
   type Student,
 } from "@/lib/store";
@@ -77,6 +78,9 @@ export async function POST(request: Request) {
       }
       const known: Student | null = await findStudentByLicenseKey(license);
       if (known) {
+        if (known.revokedAt) {
+          return NextResponse.json({ error: REVOKED_ERROR }, { status: 401 });
+        }
         const sessionId = await createSessionForStudent(known.id);
         return sessioned(known.tier, sessionId);
       }
@@ -103,8 +107,15 @@ export async function POST(request: Request) {
           { status: 401 },
         );
       }
-      const { sessionId, tier } = await unlockStudent(email, license);
-      return sessioned(tier, sessionId);
+      try {
+        const { sessionId, tier } = await unlockStudent(email, license);
+        return sessioned(tier, sessionId);
+      } catch (e) {
+        if (e instanceof Error && e.message === REVOKED_ERROR) {
+          return NextResponse.json({ error: REVOKED_ERROR }, { status: 401 });
+        }
+        throw e;
+      }
     }
 
     return NextResponse.json(

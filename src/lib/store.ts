@@ -42,9 +42,15 @@ export type Student = {
   modulesPassed: Record<string, string>;
   /** Practice wallet sandbox state. Absent until the learner creates one. */
   wallet?: WalletState | null;
+  /** Set by refund/dispute/cancellation webhooks. Revoked students unlock nothing. */
+  revokedAt?: string | null;
+  revocationReason?: string | null;
   /** @deprecated Slice 1 field — kept for old store files */
   module1PassedAt?: string | null;
 };
+
+/** Thrown and surfaced verbatim when a revoked license tries to unlock. */
+export const REVOKED_ERROR = "This license has been revoked.";
 
 export type Certificate = {
   id: string;
@@ -153,6 +159,8 @@ function studentFromRow(row: StudentRow): Student {
     practiceSeed: row.practiceSeed ?? undefined,
     modulesPassed: { ...((row.modulesPassed as Record<string, string> | null) ?? {}) },
     wallet: (row.wallet as WalletState | null | undefined) ?? undefined,
+    revokedAt: row.revokedAt?.toISOString() ?? undefined,
+    revocationReason: row.revocationReason ?? undefined,
   };
 }
 
@@ -222,6 +230,7 @@ export async function unlockStudent(
     data.students[student.id] = student;
   } else {
     student = normalizeStudent(student);
+    if (student.revokedAt) throw new Error(REVOKED_ERROR);
     student.tier = tier;
     if (!student.practiceSeed) student.practiceSeed = practiceSeed;
     data.students[student.id] = student;
@@ -269,6 +278,7 @@ async function pgUnlockStudent(
     }
   }
   if (!row) throw new Error("Unlock with your license before you continue.");
+  if (row.revokedAt) throw new Error(REVOKED_ERROR);
   await db
     .update(students)
     .set({
@@ -305,6 +315,95 @@ export async function getStudentBySession(
   const student = data.students[studentId];
   if (!student) return null;
   return normalizeStudent(student);
+}
+
+export type SessionAccess =
+  | { status: "active"; student: Student }
+  | { status: "revoked" }
+  | { status: "none" };
+
+/**
+ * Session gate for every student API: active students pass, unknown sessions
+ * 401, and revoked students 403 with their session deleted — the next request
+ * after a mid-session revocation fails, and the one after that is anonymous.
+ */
+export async function getSessionAccess(
+  sessionId: string | undefined,
+): Promise<SessionAccess> {
+  if (!sessionId) return { status: "none" };
+  if (shouldUsePostgres()) {
+    const db = getDb();
+    const row = await pgStudentBySession(sessionId);
+    if (!row) return { status: "none" };
+    if (row.revokedAt) {
+      await db.delete(sessions).where(eq(sessions.id, sessionId));
+      return { status: "revoked" };
+    }
+    return { status: "active", student: normalizeStudent(studentFromRow(row)) };
+  }
+  const data = await ensureStore();
+  const studentId = data.sessions[sessionId];
+  const student = studentId ? data.students[studentId] : undefined;
+  if (!studentId || !student) return { status: "none" };
+  if (student.revokedAt) {
+    delete data.sessions[sessionId];
+    await saveStore(data);
+    return { status: "revoked" };
+  }
+  return { status: "active", student: normalizeStudent(student) };
+}
+
+/** Find a student by email (webhook revocation looks up the sale email). */
+export async function findStudentByEmail(email: string): Promise<Student | null> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+  if (shouldUsePostgres()) {
+    const rows = await getDb()
+      .select()
+      .from(students)
+      .where(eq(students.email, normalized))
+      .limit(1);
+    const row = rows[0];
+    if (!row) return null;
+    return normalizeStudent(studentFromRow(row));
+  }
+  const data = await ensureStore();
+  const found = Object.values(data.students).find((s) => s.email === normalized);
+  if (!found) return null;
+  return normalizeStudent(found);
+}
+
+/**
+ * Revoke a student's access (refund, dispute, cancellation). Idempotent:
+ * re-revoking updates the timestamp and reason. Returns null when the email
+ * has no student (sale predates the webhook, or test noise).
+ */
+export async function revokeStudentByEmail(
+  email: string,
+  reason: string,
+): Promise<Student | null> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+  const at = new Date().toISOString();
+  if (shouldUsePostgres()) {
+    const db = getDb();
+    const updated = await db
+      .update(students)
+      .set({ revokedAt: new Date(at), revocationReason: reason, updatedAt: new Date() })
+      .where(eq(students.email, normalized))
+      .returning();
+    const row = updated[0];
+    if (!row) return null;
+    return normalizeStudent(studentFromRow(row));
+  }
+  const data = await ensureStore();
+  const found = Object.values(data.students).find((s) => s.email === normalized);
+  if (!found) return null;
+  found.revokedAt = at;
+  found.revocationReason = reason;
+  data.students[found.id] = found;
+  await saveStore(data);
+  return normalizeStudent(found);
 }
 
 /** The learner's practice wallet, or null when none exists yet. */
@@ -760,11 +859,27 @@ export async function provisionLicensedStudent(
       await db.select().from(students).where(eq(students.email, normalized)).limit(1)
     )[0];
     if (existing) {
+      // A successful sale (or a Gumroad re-verification) is positive
+      // entitlement evidence: it clears any earlier revocation.
       await db
         .update(students)
-        .set({ licenseKey, tier, updatedAt: new Date() })
+        .set({
+          licenseKey,
+          tier,
+          revokedAt: null,
+          revocationReason: null,
+          updatedAt: new Date(),
+        })
         .where(eq(students.id, existing.id));
-      return normalizeStudent(studentFromRow({ ...existing, licenseKey, tier }));
+      return normalizeStudent(
+        studentFromRow({
+          ...existing,
+          licenseKey,
+          tier,
+          revokedAt: null,
+          revocationReason: null,
+        }),
+      );
     }
     const practiceSeed = derivePracticeSeed(normalized, licenseKey);
     const inserted = await db
@@ -788,6 +903,8 @@ export async function provisionLicensedStudent(
   if (existing) {
     existing.licenseKey = licenseKey;
     existing.tier = tier;
+    delete existing.revokedAt;
+    delete existing.revocationReason;
     data.students[existing.id] = existing;
     await saveStore(data);
     return normalizeStudent(existing);
@@ -807,8 +924,8 @@ export async function provisionLicensedStudent(
   return normalizeStudent(student);
 }
 
-/** Process-wide fallback idempotency for dev file mode (production uses Postgres). */
-const fallbackWebhookEvents = new Set<string>();
+/** Process-wide fallback store for dev file mode (production uses Postgres). */
+const fallbackWebhookEvents = new Map<string, Record<string, unknown>>();
 
 /**
  * Record a webhook delivery. Returns true when this id was already seen —
@@ -829,8 +946,28 @@ export async function recordWebhookEvent(
   }
   const key = `${source}:${id}`;
   if (fallbackWebhookEvents.has(key)) return true;
-  fallbackWebhookEvents.add(key);
+  fallbackWebhookEvents.set(key, payload);
   return false;
+}
+
+/** Fetch a recorded delivery (refund handling reads the original sale). */
+export async function getWebhookEvent(
+  source: string,
+  id: string,
+): Promise<{ payload: Record<string, unknown> } | null> {
+  if (shouldUsePostgres()) {
+    const rows = await getDb()
+      .select({ payload: webhookEvents.payload })
+      .from(webhookEvents)
+      .where(and(eq(webhookEvents.source, source), eq(webhookEvents.id, id)))
+      .limit(1);
+    const row = rows[0];
+    if (!row) return null;
+    return { payload: (row.payload as Record<string, unknown>) ?? {} };
+  }
+  const payload = fallbackWebhookEvents.get(`${source}:${id}`);
+  if (!payload) return null;
+  return { payload };
 }
 
 export async function getCertificate(id: string): Promise<Certificate | null> {

@@ -3,7 +3,7 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SESSION_COOKIE } from "@/lib/session";
-import { isValidLicense, unlockStudent } from "@/lib/store";
+import { isValidLicense, REVOKED_ERROR, unlockStudent } from "@/lib/store";
 import { resolveLicenseKind } from "@/lib/license";
 import {
   checkRateLimit,
@@ -60,7 +60,10 @@ export async function unlockAction(
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
     });
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && e.message === REVOKED_ERROR) {
+      return { error: REVOKED_ERROR };
+    }
     return { error: "Unlock failed. Try again in a moment." };
   }
 

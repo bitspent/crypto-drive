@@ -16,9 +16,14 @@ export const students = pgTable(
       .notNull()
       .default({}),
     wallet: jsonb("wallet").$type<WalletState | null>(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revocationReason: text("revocation_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
+  // Note: students_revoked_idx is a partial index (WHERE revoked_at IS NOT
+  // NULL) declared in 0003_revocation.sql only — drizzle index() cannot
+  // express the predicate, and the SQL files are the reviewed source.
   (t) => [index("students_email_idx").on(t.email)],
 );
 

@@ -2,7 +2,12 @@ import { timingSafeEqual } from "crypto";
 import type { TierId } from "./content";
 import { sendLicenseEmail } from "./email";
 import { generateLicenseKey, type LicenseTier } from "./license";
-import { provisionLicensedStudent, recordWebhookEvent } from "./store";
+import {
+  getWebhookEvent,
+  provisionLicensedStudent,
+  recordWebhookEvent,
+  revokeStudentByEmail,
+} from "./store";
 
 export type PingSale = {
   saleId: string;
@@ -59,6 +64,93 @@ export function parsePingForm(form: URLSearchParams): PingSale | null {
     price: form.get("price") ?? undefined,
     currency: form.get("currency") ?? undefined,
   };
+}
+
+export type RevocationReason =
+  | "refund"
+  | "dispute"
+  | "cancellation"
+  | "subscription_cancelled";
+
+export type PingRefund = {
+  saleId: string;
+  event: RevocationReason;
+  email?: string;
+};
+
+/**
+ * Parse a refund/dispute/cancellation ping. Returns null when the ping isn't
+ * a revocation. Markers are read defensively (resource_name, action, event,
+ * or the refunded flag) because Gumroad's refund payload shape is documented
+ * loosely — the sale_id join is what makes revocation safe, not the marker.
+ */
+export function parsePingRefund(form: URLSearchParams): PingRefund | null {
+  const marker = [
+    form.get("resource_name"),
+    form.get("action"),
+    form.get("event"),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  let event: RevocationReason | null = null;
+  if (marker.includes("subscription_cancelled")) event = "subscription_cancelled";
+  else if (marker.includes("cancell")) event = "cancellation";
+  else if (marker.includes("refund")) event = "refund";
+  else if (marker.includes("dispute") || marker.includes("chargeback")) event = "dispute";
+  if (!event && form.get("refunded") === "true") event = "refund";
+  if (!event) return null;
+  const saleId =
+    form.get("sale_id") ?? form.get("original_sale_id") ?? form.get("id") ?? "";
+  if (!saleId.trim()) return null;
+  const email = form.get("email") ?? "";
+  return {
+    saleId: saleId.trim(),
+    event,
+    ...(email.includes("@") ? { email: email.trim().toLowerCase() } : {}),
+  };
+}
+
+/**
+ * Process one authenticated revocation ping: idempotent student revocation.
+ * The student is found through the original sale event (payload email), with
+ * the ping's own email as fallback. Unknown sales ack quietly — a refund for
+ * a sale that predates the webhook is not an error.
+ */
+export async function processGumroadRefund(ping: PingRefund): Promise<{
+  handled: boolean;
+  revoked: boolean;
+  duplicate: boolean;
+}> {
+  const duplicate = await recordWebhookEvent(
+    "gumroad",
+    `${ping.saleId}:${ping.event}`,
+    { saleId: ping.saleId, event: ping.event, email: ping.email },
+  );
+  if (duplicate) {
+    logWebhook("webhook.duplicate", { saleId: ping.saleId, event: ping.event });
+    return { handled: true, revoked: false, duplicate: true };
+  }
+  let email = ping.email;
+  if (!email) {
+    const original = await getWebhookEvent("gumroad", ping.saleId);
+    const payloadEmail = (original?.payload as Record<string, unknown> | undefined)
+      ?.email;
+    if (typeof payloadEmail === "string" && payloadEmail.includes("@")) {
+      email = payloadEmail.trim().toLowerCase();
+    }
+  }
+  if (!email) {
+    logWebhook("webhook.revoke_unmatched", { saleId: ping.saleId, event: ping.event });
+    return { handled: true, revoked: false, duplicate: false };
+  }
+  const revoked = await revokeStudentByEmail(email, ping.event);
+  if (!revoked) {
+    logWebhook("webhook.revoke_unmatched", { saleId: ping.saleId, event: ping.event });
+    return { handled: true, revoked: false, duplicate: false };
+  }
+  logWebhook("webhook.revoked", { saleId: ping.saleId, event: ping.event });
+  return { handled: true, revoked: true, duplicate: false };
 }
 
 /** Env product IDs (or permalinks) → tier. Unknown refs return null. */

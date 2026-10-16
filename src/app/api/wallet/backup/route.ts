@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { SESSION_COOKIE } from "@/lib/session";
-import { getStudentBySession, saveWalletForSession } from "@/lib/store";
+import { clearSessionId, SESSION_COOKIE } from "@/lib/session";
+import { getSessionAccess, saveWalletForSession } from "@/lib/store";
 
 function err(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
@@ -12,8 +12,13 @@ export async function POST() {
   try {
     const jar = await cookies();
     const sessionId = jar.get(SESSION_COOKIE)?.value;
-    const student = await getStudentBySession(sessionId ?? undefined);
-    if (!student) return err("Unlock with your license before you continue.", 401);
+    const access = await getSessionAccess(sessionId ?? undefined);
+    if (access.status === "revoked") {
+      await clearSessionId();
+      return err("Access revoked.", 403);
+    }
+    if (access.status === "none") return err("Unlock with your license before you continue.", 401);
+    const student = access.student;
     const wallet = student.wallet?.exists ? student.wallet : null;
     if (!wallet) return err("Create your wallet first.", 400);
     const next = { ...wallet, backupAt: new Date().toISOString() };

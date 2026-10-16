@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import {
   parsePingForm,
+  parsePingRefund,
+  processGumroadRefund,
   processGumroadSale,
   verifyWebhookSecret,
 } from "@/lib/gumroad-webhook";
@@ -35,7 +37,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "forbidden" }, { status: 401 });
     }
     const raw = await request.text();
-    const sale = parsePingForm(new URLSearchParams(raw));
+    const form = new URLSearchParams(raw);
+    // Revocation first: a refunded sale still carries sale fields, so the
+    // sale parser would ack it as a duplicate without revoking anyone.
+    const refund = parsePingRefund(form);
+    if (refund) {
+      await processGumroadRefund(refund);
+      return NextResponse.json({ ok: true });
+    }
+    const sale = parsePingForm(form);
     if (!sale) {
       console.log(JSON.stringify({ event: "webhook.ignored", source: "gumroad" }));
       return NextResponse.json({ ok: true });

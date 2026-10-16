@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import type { StepAnswer } from "@/lib/practice-types";
-import { SESSION_COOKIE } from "@/lib/session";
-import { passStep } from "@/lib/store";
+import { clearSessionId, SESSION_COOKIE } from "@/lib/session";
+import { getSessionAccess, passStep } from "@/lib/store";
 import {
   checkRateLimit,
   clientIp,
@@ -19,6 +19,17 @@ export async function POST(request: Request) {
       if (!verdict.ok) return rateLimitedResponse(verdict.retryAfter);
     }
     if (!sessionId) {
+      return NextResponse.json(
+        { error: "Unlock with your license before you continue." },
+        { status: 401 },
+      );
+    }
+    const access = await getSessionAccess(sessionId);
+    if (access.status === "revoked") {
+      await clearSessionId();
+      return NextResponse.json({ error: "Access revoked." }, { status: 403 });
+    }
+    if (access.status === "none") {
       return NextResponse.json(
         { error: "Unlock with your license before you continue." },
         { status: 401 },
