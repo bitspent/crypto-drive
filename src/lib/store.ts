@@ -23,7 +23,7 @@ import {
 import { createWalletState, type WalletState } from "./wallet";
 import { getBitcoinProvider } from "./bitcoin/index";
 import { getDb, hasDatabase, warnFileFallbackOnce } from "./db/client";
-import { certificates, sessions, students } from "./db/schema";
+import { certificates, sessions, students, webhookEvents } from "./db/schema";
 
 assertCertHashSecret();
 
@@ -31,6 +31,8 @@ export type Student = {
   id: string;
   email: string;
   name: string | null;
+  /** Generated purchase key (CD-<TIER>-<8>). NULL for demo students. */
+  licenseKey?: string | null;
   tier: TierId;
   unlockedAt: string;
   /** Stable hash from email + license. Drives unique practice values. */
@@ -140,6 +142,7 @@ function studentFromRow(row: StudentRow): Student {
     id: row.id,
     email: row.email,
     name: row.name,
+    licenseKey: row.licenseKey ?? undefined,
     tier: row.tier as TierId,
     unlockedAt: row.createdAt.toISOString(),
     practiceSeed: row.practiceSeed ?? undefined,
@@ -694,6 +697,135 @@ export function certificateTrack(cert: Certificate): string | null {
   if (slug.startsWith("trx-") || moduleName.startsWith("Tron")) return "tron";
   if (slug.startsWith("sol-") || moduleName.startsWith("Solana")) return "solana";
   return null;
+}
+
+/** Find a student by purchased license key, or null. Demo keys never match. */
+export async function findStudentByLicenseKey(key: string): Promise<Student | null> {
+  const trimmed = key.trim();
+  if (!trimmed) return null;
+  if (shouldUsePostgres()) {
+    const rows = await getDb()
+      .select()
+      .from(students)
+      .where(eq(students.licenseKey, trimmed))
+      .limit(1);
+    const row = rows[0];
+    if (!row) return null;
+    return normalizeStudent(studentFromRow(row));
+  }
+  const data = await ensureStore();
+  const found = Object.values(data.students).find((s) => s.licenseKey === trimmed);
+  if (!found) return null;
+  return normalizeStudent(found);
+}
+
+/** Mint a session for an already-resolved student (license unlock path). */
+export async function createSessionForStudent(studentId: string): Promise<string> {
+  const sessionId = newId("ses");
+  if (shouldUsePostgres()) {
+    await getDb().insert(sessions).values({
+      id: sessionId,
+      studentId,
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+    });
+    return sessionId;
+  }
+  const data = await ensureStore();
+  if (!data.students[studentId]) {
+    throw new Error("Unlock with your license before you continue.");
+  }
+  data.sessions[sessionId] = studentId;
+  await saveStore(data);
+  return sessionId;
+}
+
+/**
+ * Provision a purchased license: upgrade the demo student on the same email
+ * (key + tier; seed and progress stay put) or create a fresh student.
+ */
+export async function provisionLicensedStudent(
+  email: string,
+  tier: TierId,
+  licenseKey: string,
+): Promise<Student> {
+  const normalized = email.trim().toLowerCase();
+  if (shouldUsePostgres()) {
+    const db = getDb();
+    const existing = (
+      await db.select().from(students).where(eq(students.email, normalized)).limit(1)
+    )[0];
+    if (existing) {
+      await db
+        .update(students)
+        .set({ licenseKey, tier, updatedAt: new Date() })
+        .where(eq(students.id, existing.id));
+      return normalizeStudent(studentFromRow({ ...existing, licenseKey, tier }));
+    }
+    const practiceSeed = derivePracticeSeed(normalized, licenseKey);
+    const inserted = await db
+      .insert(students)
+      .values({
+        id: newId("stu"),
+        email: normalized,
+        name: null,
+        licenseKey,
+        tier,
+        practiceSeed,
+        modulesPassed: {},
+      })
+      .returning();
+    const row = inserted[0];
+    if (!row) throw new Error("Could not create student.");
+    return normalizeStudent(studentFromRow(row));
+  }
+  const data = await ensureStore();
+  const existing = Object.values(data.students).find((s) => s.email === normalized);
+  if (existing) {
+    existing.licenseKey = licenseKey;
+    existing.tier = tier;
+    data.students[existing.id] = existing;
+    await saveStore(data);
+    return normalizeStudent(existing);
+  }
+  const student: Student = {
+    id: newId("stu"),
+    email: normalized,
+    name: null,
+    licenseKey,
+    tier,
+    unlockedAt: new Date().toISOString(),
+    practiceSeed: derivePracticeSeed(normalized, licenseKey),
+    modulesPassed: {},
+  };
+  data.students[student.id] = student;
+  await saveStore(data);
+  return normalizeStudent(student);
+}
+
+/** Process-wide fallback idempotency for dev file mode (production uses Postgres). */
+const fallbackWebhookEvents = new Set<string>();
+
+/**
+ * Record a webhook delivery. Returns true when this id was already seen —
+ * callers ack the duplicate without re-provisioning or re-emailing.
+ */
+export async function recordWebhookEvent(
+  source: string,
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<boolean> {
+  if (shouldUsePostgres()) {
+    const inserted = await getDb()
+      .insert(webhookEvents)
+      .values({ id, source, payload })
+      .onConflictDoNothing()
+      .returning({ id: webhookEvents.id });
+    return inserted.length === 0;
+  }
+  const key = `${source}:${id}`;
+  if (fallbackWebhookEvents.has(key)) return true;
+  fallbackWebhookEvents.add(key);
+  return false;
 }
 
 export async function getCertificate(id: string): Promise<Certificate | null> {

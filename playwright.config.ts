@@ -48,8 +48,12 @@ export default defineConfig({
     // `next start` boots with NODE_ENV=production, which requires a signing
     // secret. This test-only value signs disposable e2e practice data.
     // Set E2E_DATABASE_URL to run the app (and suite) against Postgres.
+    // ALLOW_DEMO_LICENSES keeps the demo-key walk green: the e2e server
+    // boots `next start` (production mode), where demo keys are otherwise
+    // rejected. Never set outside the test harness.
     env: {
       CERT_HASH_SECRET: "e2e-test-secret-not-for-production",
+      ALLOW_DEMO_LICENSES: "1",
       ...(process.env.E2E_DATABASE_URL
         ? { DATABASE_URL: process.env.E2E_DATABASE_URL }
         : {}),

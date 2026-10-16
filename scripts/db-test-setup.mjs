@@ -12,19 +12,25 @@ export async function setupTestDb() {
   if (!url) throw new Error("DATABASE_URL must be set for Postgres tests.");
   const sql = postgres(url, { prepare: false, max: 1, onnotice: () => {} });
   try {
-    const ddl = await readFile(join(root, "db/migrations/0001_init.sql"), "utf8");
-    // Our DDL has no semicolons inside statements; strip full-line comments.
-    const statements = ddl
-      .split("\n")
-      .filter((line) => !line.trimStart().startsWith("--"))
-      .join("\n")
-      .split(";")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    for (const stmt of statements) {
-      await sql.unsafe(stmt);
+    const { readdirSync } = await import("node:fs");
+    const files = readdirSync(join(root, "db/migrations"))
+      .filter((f) => f.endsWith(".sql"))
+      .sort();
+    for (const file of files) {
+      const ddl = await readFile(join(root, "db/migrations", file), "utf8");
+      // Our DDL has no semicolons inside statements; strip full-line comments.
+      const statements = ddl
+        .split("\n")
+        .filter((line) => !line.trimStart().startsWith("--"))
+        .join("\n")
+        .split(";")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      for (const stmt of statements) {
+        await sql.unsafe(stmt);
+      }
     }
-    await sql`TRUNCATE students, sessions, certificates CASCADE`;
+    await sql`TRUNCATE students, sessions, certificates, webhook_events CASCADE`;
   } finally {
     await sql.end();
   }

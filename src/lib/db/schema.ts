@@ -1,7 +1,7 @@
 import { index, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import type { WalletState } from "../wallet";
 
-/** Mirrors db/migrations/0001_init.sql. That file is the reviewed source. */
+/** Mirrors db/migrations/*.sql. Those files are the reviewed source. */
 export const students = pgTable(
   "students",
   {
@@ -33,6 +33,17 @@ export const sessions = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
   (t) => [index("sessions_student_idx").on(t.studentId)],
+);
+
+export const webhookEvents = pgTable(
+  "webhook_events",
+  {
+    id: text("id").primaryKey(),
+    source: text("source").notNull().default("gumroad"),
+    payload: jsonb("payload").notNull(),
+    processedAt: timestamp("processed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("webhook_events_source_idx").on(t.source, t.id)],
 );
 
 export const certificates = pgTable(
