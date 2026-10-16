@@ -1,11 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import QRCode from "qrcode";
 import {
+  FEE_TIERS,
   SEED_CONFIRM_POSITIONS,
+  feeSatsForTier,
   formatBtcGrouped,
+  formatBtcTrim,
+  isValidBtcAddress,
+  parseBtcToSats,
   truncateMiddle,
+  type FeeTierId,
   type TxRecord,
   type WalletState,
 } from "@/lib/wallet";
@@ -185,6 +198,402 @@ function ReceiveSheet({ address, onClose }: { address: string; onClose: () => vo
         ) : null}
         <p className="w-caption">Bitcoin only. Not for any other coin.</p>
         <CoachNote text="Your address is safe to share. That's the point." />
+      </div>
+    </div>
+  );
+}
+
+function useDialogKeys(
+  panelRef: RefObject<HTMLDivElement | null>,
+  onClose: () => void,
+) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !panelRef.current) return;
+      const els = [
+        ...panelRef.current.querySelectorAll<HTMLElement>(
+          "button, input, textarea, select",
+        ),
+      ].filter(
+        (el) =>
+          !el.hasAttribute("disabled") &&
+          el.getAttribute("aria-hidden") !== "true" &&
+          el.tabIndex >= 0,
+      );
+      if (els.length === 0) return;
+      const first = els[0] as HTMLElement;
+      const last = els[els.length - 1] as HTMLElement;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [panelRef, onClose]);
+}
+
+export type SendDraft = {
+  to: string;
+  amountSats: number;
+  feeTier: FeeTierId;
+  memo: string;
+};
+
+const ADDRESS_ERROR = "That doesn't look like a Bitcoin address. It should start with bc1.";
+const AMOUNT_ERROR = "Enter an amount.";
+const FUNDS_ERROR = "Not enough. Don't forget the fee.";
+
+function SendSheet({
+  balance,
+  onClose,
+  onReview,
+}: {
+  balance: number;
+  onClose: () => void;
+  onReview: (draft: SendDraft) => void;
+}) {
+  const [to, setTo] = useState("");
+  const [amount, setAmount] = useState("");
+  const [memo, setMemo] = useState("");
+  const [feeTier, setFeeTier] = useState<FeeTierId>("standard");
+  const [toError, setToError] = useState<string | null>(null);
+  const [amountError, setAmountError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const firstRef = useRef<HTMLInputElement>(null);
+  useDialogKeys(panelRef, onClose);
+
+  useEffect(() => {
+    firstRef.current?.focus();
+  }, []);
+
+  const amountSats = parseBtcToSats(amount.trim());
+  const feeSats = feeSatsForTier(feeTier);
+
+  function checkAddress(value: string): string | null {
+    return value.trim() && !isValidBtcAddress(value.trim()) ? ADDRESS_ERROR : null;
+  }
+
+  function checkAmount(sats: number | null): string | null {
+    if (sats === null || sats <= 0) return AMOUNT_ERROR;
+    if (sats + feeSats > balance) return FUNDS_ERROR;
+    return null;
+  }
+
+  async function paste() {
+    try {
+      const text = await navigator.clipboard.readText();
+      setTo(text.trim());
+      setToError(checkAddress(text));
+    } catch {
+      // Clipboard unavailable: leave the field for typing.
+    }
+  }
+
+  function review() {
+    const tErr = to.trim() ? checkAddress(to) : ADDRESS_ERROR;
+    const aErr = checkAmount(amountSats);
+    setToError(tErr);
+    setAmountError(aErr);
+    if (tErr || aErr || amountSats === null) return;
+    onReview({ to: to.trim(), amountSats, feeTier, memo: memo.trim() });
+  }
+
+  return (
+    <div className="w-overlay" onClick={onClose}>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Send bitcoin"
+        className="w-sheet"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-sheet-head">
+          <h2>Send</h2>
+          <button
+            type="button"
+            className="w-icon-btn"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="w-field">
+          <label className="w-field-label" htmlFor="w-send-to">
+            Recipient address
+          </label>
+          <span className="w-input-row">
+            <input
+              ref={firstRef}
+              id="w-send-to"
+              type="text"
+              className="w-input w-mono"
+              value={to}
+              onChange={(e) => {
+                setTo(e.target.value);
+                if (toError) setToError(checkAddress(e.target.value));
+              }}
+              onBlur={() => setToError(checkAddress(to))}
+              aria-invalid={toError ? true : undefined}
+              aria-describedby={toError ? "w-send-to-error" : undefined}
+              placeholder="bc1q…"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <button type="button" className="w-paste-btn" onClick={paste}>
+              Paste
+            </button>
+          </span>
+        </div>
+        {toError ? (
+          <p id="w-send-to-error" className="w-field-error" role="alert">
+            {toError}
+          </p>
+        ) : null}
+
+        <label className="w-field">
+          <span className="w-field-label">Amount (BTC)</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            className="w-input w-amount-input"
+            value={amount}
+            onChange={(e) => {
+              setAmount(e.target.value);
+              if (amountError) setAmountError(checkAmount(parseBtcToSats(e.target.value.trim())));
+            }}
+            onBlur={() => {
+              if (amount.trim()) setAmountError(checkAmount(amountSats));
+            }}
+            aria-invalid={amountError ? true : undefined}
+            aria-describedby={amountError ? "w-send-amount-error" : "w-send-sats"}
+            placeholder="0.001"
+            autoComplete="off"
+          />
+        </label>
+        {amountSats !== null && amountSats > 0 ? (
+          <p id="w-send-sats" className="w-sats-equiv">
+            ≈ {amountSats.toLocaleString("en-US")} sats
+          </p>
+        ) : (
+          <p id="w-send-sats" className="w-sats-equiv w-sats-empty" aria-hidden="true">
+            &nbsp;
+          </p>
+        )}
+        {amountError ? (
+          <p id="w-send-amount-error" className="w-field-error" role="alert">
+            {amountError}
+          </p>
+        ) : null}
+
+        <label className="w-field">
+          <span className="w-field-label">Memo (optional)</span>
+          <input
+            type="text"
+            className="w-input"
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            placeholder="Only you will see this"
+            autoComplete="off"
+            maxLength={120}
+          />
+        </label>
+
+        <fieldset className="w-fee-field">
+          <legend className="w-field-label">Fee</legend>
+          <div className="w-fee-pills">
+            {FEE_TIERS.map((tier) => (
+              <label
+                key={tier.id}
+                className={`w-fee-pill${feeTier === tier.id ? " w-fee-pill-on" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name="w-fee-tier"
+                  value={tier.id}
+                  checked={feeTier === tier.id}
+                  onChange={() => {
+                    setFeeTier(tier.id);
+                    if (amountError) {
+                      setAmountError(checkAmount(amountSats));
+                    }
+                  }}
+                  className="w-sr-only"
+                />
+                <span className="w-fee-name">{tier.label}</span>
+                <span className="w-fee-sub">
+                  {feeSatsForTier(tier.id).toLocaleString("en-US")} sats · {tier.etaLabel}
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <CoachNote text="Small test first. Send a little before you send a lot." />
+        <CoachNote text="The fee comes out of the same balance." />
+
+        <button type="button" className="w-send-btn w-full" onClick={review}>
+          Review
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ReviewSheet({
+  balance,
+  draft,
+  reduced,
+  onCancel,
+  onSent,
+}: {
+  balance: number;
+  draft: SendDraft;
+  reduced: boolean;
+  onCancel: () => void;
+  onSent: (wallet: WalletState, tx: TxRecord) => void;
+}) {
+  const [checked, setChecked] = useState(false);
+  const [signing, setSigning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useDialogKeys(panelRef, onCancel);
+
+  useEffect(() => {
+    cancelRef.current?.focus();
+  }, []);
+
+  const feeSats = feeSatsForTier(draft.feeTier);
+  const total = draft.amountSats + feeSats;
+  const remaining = balance - total;
+  const [toHead, toTail] = truncateMiddle(draft.to).split("…");
+
+  async function sign() {
+    if (!checked || signing) return;
+    setSigning(true);
+    setError(null);
+    const t0 = performance.now();
+    try {
+      const res = await fetch("/api/wallet/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          to: draft.to,
+          amountSats: draft.amountSats,
+          feeTier: draft.feeTier,
+          memo: draft.memo,
+        }),
+      });
+      const data = (await res.json()) as { tx?: TxRecord; wallet?: WalletState; error?: string };
+      if (!res.ok || !data.tx || !data.wallet) {
+        throw new Error(data.error || "Could not send.");
+      }
+      if (!reduced) {
+        const wait = 600 - (performance.now() - t0);
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      }
+      onSent(data.wallet, data.tx);
+    } catch (err) {
+      setSigning(false);
+      setError(err instanceof Error ? err.message : "Could not send.");
+    }
+  }
+
+  return (
+    <div className="w-overlay" onClick={onCancel}>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Review and send"
+        className="w-sheet"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-sheet-head">
+          <h2>Review</h2>
+          <button
+            ref={cancelRef}
+            type="button"
+            className="w-icon-btn"
+            aria-label="Close"
+            onClick={onCancel}
+          >
+            ×
+          </button>
+        </div>
+
+        <dl className="w-review-rows">
+          <div className="w-review-row">
+            <dt>To</dt>
+            <dd className="w-mono">
+              {toHead}…<span className="w-amber">{toTail ?? ""}</span>
+            </dd>
+          </div>
+          <div className="w-review-row">
+            <dt>Amount</dt>
+            <dd>
+              {formatBtcTrim(draft.amountSats)} BTC (
+              {draft.amountSats.toLocaleString("en-US")} sats)
+            </dd>
+          </div>
+          <div className="w-review-row">
+            <dt>Fee</dt>
+            <dd>
+              {formatBtcTrim(feeSats)} BTC ({feeSats.toLocaleString("en-US")} sats)
+            </dd>
+          </div>
+          <div className="w-review-row">
+            <dt>Total</dt>
+            <dd>{formatBtcTrim(total)} BTC</dd>
+          </div>
+          <div className="w-review-row">
+            <dt>Remaining</dt>
+            <dd>{formatBtcTrim(remaining)} BTC</dd>
+          </div>
+        </dl>
+
+        <CoachNote text="There's no undo. Check the recipient's last 6 characters." />
+
+        <label className="w-check-row">
+          <input
+            type="checkbox"
+            className="w-check"
+            checked={checked}
+            onChange={(e) => setChecked(e.target.checked)}
+          />
+          <span>I checked the last 6 characters.</span>
+        </label>
+
+        {error ? (
+          <p className="w-field-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+
+        <div className="w-review-actions">
+          <button
+            type="button"
+            className={`w-send-btn w-full${signing ? " w-signing" : ""}`}
+            disabled={!checked || signing}
+            onClick={sign}
+          >
+            {signing ? "Signing…" : "Sign and send"}
+          </button>
+          <button type="button" className="w-receive-btn w-full" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -468,10 +877,12 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
   const [phase, setPhase] = useState<"home" | "reveal" | "confirm">("home");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<null | "receive">(null);
+  const [sheet, setSheet] = useState<null | "receive" | "send" | "review">(null);
+  const [draft, setDraft] = useState<SendDraft | null>(null);
   const [arrivingId, setArrivingId] = useState<string | null>(null);
   const reduced = useReducedMotion();
   const receiveRef = useRef<HTMLButtonElement>(null);
+  const sendRef = useRef<HTMLButtonElement>(null);
   const walletRef = useRef(wallet);
   const tickingRef = useRef(false);
   const timerRef = useRef(0);
@@ -587,7 +998,12 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
         >
           Receive
         </button>
-        <button type="button" className="w-send-btn">
+        <button
+          ref={sendRef}
+          type="button"
+          className="w-send-btn"
+          onClick={() => setSheet("send")}
+        >
           Send
         </button>
       </div>
@@ -620,6 +1036,43 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
 
       {sheet === "receive" ? (
         <ReceiveSheet address={wallet.address} onClose={closeReceive} />
+      ) : null}
+      {sheet === "send" ? (
+        <SendSheet
+          balance={wallet.balance}
+          onClose={() => {
+            setSheet(null);
+            sendRef.current?.focus();
+          }}
+          onReview={(d) => {
+            setDraft(d);
+            setSheet("review");
+          }}
+        />
+      ) : null}
+      {sheet === "review" && draft ? (
+        <ReviewSheet
+          balance={wallet.balance}
+          draft={draft}
+          reduced={reduced}
+          onCancel={() => {
+            setSheet(null);
+            setDraft(null);
+            sendRef.current?.focus();
+          }}
+          onSent={(next, tx) => {
+            walletRef.current = next;
+            setArrivingId(tx.id);
+            setWallet(next);
+            setSheet(null);
+            setDraft(null);
+            sendRef.current?.focus();
+            startTickLoop();
+            window.setTimeout(() => {
+              setArrivingId((id) => (id === tx.id ? null : id));
+            }, 600);
+          }}
+        />
       ) : null}
     </div>
   );

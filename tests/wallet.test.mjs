@@ -48,6 +48,14 @@ describe("wallet formatting", () => {
     assert.equal(wallet.truncateMiddle(ADDR), "bc1qw5…v8f3t4");
     assert.equal(wallet.truncateMiddle("short"), "short");
   });
+
+  it("trims BTC decimals for review rows", () => {
+    assert.equal(wallet.formatBtcTrim(100000), "0.001");
+    assert.equal(wallet.formatBtcTrim(700), "0.000007");
+    assert.equal(wallet.formatBtcTrim(100700), "0.001007");
+    assert.equal(wallet.formatBtcTrim(100000000), "1");
+    assert.equal(wallet.formatBtcTrim(0), "0");
+  });
 });
 
 describe("wallet validation", () => {
@@ -108,6 +116,26 @@ describe("wallet send", () => {
       wallet.validateSend(w, { to: ADDR, amountSats: 99000, feeTier: "standard" }),
       null,
     );
+    assert.equal(
+      wallet.validateSend(w, { to: ADDR, amountSats: 0, feeTier: "standard" }),
+      "Enter an amount.",
+    );
+  });
+
+  it("prices fee tiers at 140 / 700 / 2100 sats", () => {
+    assert.equal(wallet.feeSatsForTier("economy"), 140);
+    assert.equal(wallet.feeSatsForTier("standard"), 700);
+    assert.equal(wallet.feeSatsForTier("priority"), 2100);
+    const w = { ...freshWallet(), balance: 500000 };
+    const eco = wallet.applySend(w, {
+      txid: "e".repeat(64),
+      to: ADDR,
+      amountSats: 100000,
+      feeTier: "economy",
+      timestamp: "2026-10-15T00:00:00.000Z",
+    });
+    assert.equal(eco.history[0].fee, 140);
+    assert.equal(eco.balance, 500000 - 100000 - 140);
   });
 
   it("debits amount + fee and prepends a pending tx", () => {

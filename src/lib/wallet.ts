@@ -81,6 +81,13 @@ export function formatBtcGrouped(sats: number): string {
   return `${whole}.${frac.slice(0, 3)} ${frac.slice(3, 6)} ${frac.slice(6, 8)}`;
 }
 
+/** Trimmed BTC for review rows: 100000 → "0.001", 700 → "0.000007". */
+export function formatBtcTrim(sats: number): string {
+  const [whole, frac] = satsToBtc(sats).split(".") as [string, string];
+  const trimmed = frac.replace(/0+$/, "");
+  return trimmed ? `${whole}.${trimmed}` : whole;
+}
+
 /** Strict BTC decimal → sats, or null. "0.001" → 100000. No float math. */
 export function parseBtcToSats(input: string): number | null {
   const raw = input.trim();
@@ -130,7 +137,7 @@ export function validateSend(
     return "That doesn't look like a Bitcoin address. It should start with bc1.";
   }
   if (!Number.isSafeInteger(args.amountSats) || args.amountSats <= 0) {
-    return "Enter an amount above zero.";
+    return "Enter an amount.";
   }
   const total = args.amountSats + feeSatsForTier(args.feeTier);
   if (total > wallet.balance) {
