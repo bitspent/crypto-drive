@@ -20,6 +20,7 @@ import {
   type StepAnswer,
 } from "./practice-samples";
 import { createWalletState, type WalletState } from "./wallet";
+import { getBitcoinProvider } from "./bitcoin/index";
 
 assertCertHashSecret();
 
@@ -195,7 +196,10 @@ export async function createWalletForSession(sessionId: string | undefined): Pro
     throw new Error("Unlock again with your license to start practice.");
   }
   const practice = practiceFor(student.practiceSeed);
-  const wallet = createWalletState({ seedWords: practice.words, address: practice.address });
+  // Wallet address follows the active backend's HRP (simulated: same bc1q
+  // address as the drives). Drive practice values always stay simulated.
+  const address = getBitcoinProvider().getAddressForSeed(student.practiceSeed);
+  const wallet = createWalletState({ seedWords: practice.words, address });
   const data = await ensureStore();
   const stored = data.students[student.id];
   if (!stored) throw new Error("Unlock with your license before you continue.");

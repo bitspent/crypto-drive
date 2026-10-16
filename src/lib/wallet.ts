@@ -49,21 +49,40 @@ export const SEED_CONFIRM_POSITIONS = [3, 7, 11] as const;
 
 export type FeeTierId = "economy" | "standard" | "priority";
 
-export const FEE_TIERS: ReadonlyArray<{
+export type ResolvedFeeTier = {
   id: FeeTierId;
   label: string;
   satPerVb: number;
   etaLabel: string;
-}> = [
+};
+
+export const FEE_TIERS: ReadonlyArray<ResolvedFeeTier> = [
   { id: "economy", label: "Economy", satPerVb: 1, etaLabel: "~60 min" },
   { id: "standard", label: "Standard", satPerVb: 5, etaLabel: "~30 min" },
   { id: "priority", label: "Priority", satPerVb: 15, etaLabel: "~10 min" },
 ];
 
-export function feeSatsForTier(tier: FeeTierId): number {
-  const found = FEE_TIERS.find((t) => t.id === tier);
+export function feeSatsForTier(
+  tier: FeeTierId,
+  tiers: ReadonlyArray<ResolvedFeeTier> = FEE_TIERS,
+): number {
+  const found = tiers.find((t) => t.id === tier);
   if (!found) throw new Error(`Unknown fee tier: ${tier}`);
   return found.satPerVb * WALLET_TX_VBYTES;
+}
+
+/** Map live sat/vB rates onto the static tier shape (labels/etas stay put). */
+export function feeTiersFromRates(rates: {
+  fastest: number;
+  halfHour: number;
+  economy: number;
+}): ResolvedFeeTier[] {
+  const vb = (n: number): number => Math.max(1, Math.round(n));
+  return [
+    { id: "economy", label: "Economy", satPerVb: vb(rates.economy), etaLabel: "~60 min" },
+    { id: "standard", label: "Standard", satPerVb: vb(rates.halfHour), etaLabel: "~30 min" },
+    { id: "priority", label: "Priority", satPerVb: vb(rates.fastest), etaLabel: "~10 min" },
+  ];
 }
 
 const SATS_PER_BTC = 100_000_000;
@@ -106,12 +125,16 @@ export function truncateMiddle(value: string, head = 6, tail = 6): string {
 
 const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
-/** P2WPKH shape check: bc1q + bech32 chars. No checksum, no network. */
+/**
+ * P2WPKH shape check: bc1q/tb1q/bcrt1q + bech32 chars. No checksum, no network.
+ * Multi-HRP so regtest/signet modes can receive; simulated copy is unchanged.
+ */
 export function isValidBtcAddress(address: string): boolean {
   const trimmed = address.trim();
   const lower = trimmed === trimmed.toUpperCase() ? trimmed.toLowerCase() : trimmed;
-  if (!/^bc1q/.test(lower)) return false;
-  const body = lower.slice(4);
+  const m = /^(bc1q|tb1q|bcrt1q)/.exec(lower);
+  if (!m) return false;
+  const body = lower.slice(m[1].length);
   if (body.length < 11 || body.length > 71) return false;
   return [...body].every((c) => BECH32_CHARSET.includes(c));
 }
@@ -131,7 +154,7 @@ export function createWalletState(args: { seedWords: string[]; address: string }
 
 export function validateSend(
   wallet: WalletState,
-  args: { to: string; amountSats: number; feeTier: FeeTierId },
+  args: { to: string; amountSats: number; feeTier: FeeTierId; feeSats?: number },
 ): string | null {
   if (!isValidBtcAddress(args.to)) {
     return "That doesn't look like a Bitcoin address. It should start with bc1.";
@@ -139,7 +162,7 @@ export function validateSend(
   if (!Number.isSafeInteger(args.amountSats) || args.amountSats <= 0) {
     return "Enter an amount.";
   }
-  const total = args.amountSats + feeSatsForTier(args.feeTier);
+  const total = args.amountSats + (args.feeSats ?? feeSatsForTier(args.feeTier));
   if (total > wallet.balance) {
     return "Not enough. Don't forget the fee.";
   }
@@ -156,9 +179,10 @@ export function applySend(
     feeTier: FeeTierId;
     timestamp: string;
     memo?: string;
+    feeSats?: number;
   },
 ): WalletState {
-  const fee = feeSatsForTier(args.feeTier);
+  const fee = args.feeSats ?? feeSatsForTier(args.feeTier);
   const tx: TxRecord = {
     id: args.txid,
     direction: "out",
@@ -195,6 +219,28 @@ export function applyDeposit(
 }
 
 export type AdvanceResult = { wallet: WalletState; confirmed: boolean };
+
+/**
+ * Apply a polled confirmation count (regtest mode). Credits deposits when the
+ * threshold is reached; confirmed txs and unknown ids are a no-op.
+ */
+export function applyTxStatus(
+  wallet: WalletState,
+  txid: string,
+  status: { confirmations: number },
+): AdvanceResult {
+  const tx = wallet.history.find((t) => t.id === txid);
+  if (!tx || tx.status === "confirmed") return { wallet, confirmed: false };
+  const confirmations = Math.max(0, Math.floor(status.confirmations));
+  const confirmed = confirmations >= wallet.confirmedThreshold;
+  const history = wallet.history.map((t) =>
+    t.id === txid
+      ? { ...t, confirmations, status: confirmed ? ("confirmed" as const) : t.status }
+      : t,
+  );
+  const balance = confirmed && tx.direction === "in" ? wallet.balance + tx.amount : wallet.balance;
+  return { wallet: { ...wallet, history, balance }, confirmed };
+}
 
 /** Tick one confirmation onto a tx; credit deposits at the threshold. */
 export function advanceTx(wallet: WalletState, txid: string): AdvanceResult {

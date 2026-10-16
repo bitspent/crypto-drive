@@ -4,9 +4,11 @@ import { SESSION_COOKIE } from "@/lib/session";
 import { getStudentBySession, saveWalletForSession } from "@/lib/store";
 import {
   applySend,
+  feeSatsForTier,
   validateSend,
   type FeeTierId,
 } from "@/lib/wallet";
+import { getActiveFeeTiers } from "@/lib/bitcoin";
 import { walletTxid } from "@/lib/practice-samples";
 
 function err(message: string, status: number) {
@@ -15,7 +17,11 @@ function err(message: string, status: number) {
 
 const TIERS = new Set(["economy", "standard", "priority"]);
 
-/** Simulate an outgoing payment: validate, debit amount + fee, prepend pending tx. */
+/**
+ * Record an outgoing payment: validate, debit amount + fee, prepend pending tx.
+ * Sends are recorded, never broadcast — the app holds no keys — in every mode.
+ * The fee comes from the active backend's tiers (simulated: today's values).
+ */
 export async function POST(req: Request) {
   try {
     const jar = await cookies();
@@ -35,19 +41,24 @@ export async function POST(req: Request) {
     if (typeof body.feeTier !== "string" || !TIERS.has(body.feeTier)) {
       return err("Pick a fee tier.", 400);
     }
+    const feeTier = body.feeTier as FeeTierId;
+    const tiers = await getActiveFeeTiers();
+    const feeSats = feeSatsForTier(feeTier, tiers);
     const verdict = validateSend(wallet, {
       to: body.to,
       amountSats: body.amountSats,
-      feeTier: body.feeTier as FeeTierId,
+      feeTier,
+      feeSats,
     });
     if (verdict) return err(verdict, 400);
     const next = applySend(wallet, {
       txid: walletTxid(student.practiceSeed, wallet.history.length),
       to: body.to,
       amountSats: body.amountSats,
-      feeTier: body.feeTier as FeeTierId,
+      feeTier,
       timestamp: new Date().toISOString(),
       ...(typeof body.memo === "string" ? { memo: body.memo } : {}),
+      feeSats,
     });
     await saveWalletForSession(sessionId, next);
     return NextResponse.json({ tx: next.history[0], wallet: next });

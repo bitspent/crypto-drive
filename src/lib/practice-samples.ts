@@ -61,8 +61,10 @@ function bech32Encode(hrp: string, data: number[]): string {
   return `${hrp}1${combined.map((d) => CHARSET[d]).join("")}`;
 }
 
-/** Witness v0 P2WPKH from 20 program bytes → bc1q… */
-function p2wpkhAddress(program20: Buffer): string {
+export type AddressHrp = "bc" | "tb" | "bcrt";
+
+/** Witness v0 P2WPKH from 20 program bytes → bc1q… (HRP overridable). */
+function p2wpkhAddress(program20: Buffer, hrp: AddressHrp = "bc"): string {
   if (program20.length !== 20) throw new Error("P2WPKH needs 20 bytes.");
   const data = [0];
   let acc = 0;
@@ -76,7 +78,12 @@ function p2wpkhAddress(program20: Buffer): string {
     }
   }
   if (bits > 0) data.push((acc << (5 - bits)) & 31);
-  return bech32Encode("bc", data);
+  return bech32Encode(hrp, data);
+}
+
+/** Deterministic wallet address for a seed, with the network's HRP. */
+export function addressForSeed(seed: string, hrp: AddressHrp = "bc"): string {
+  return p2wpkhAddress(seedBytes(seed, "recv", 20), hrp);
 }
 
 function seedBytes(seed: string, label: string, length: number): Buffer {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE } from "@/lib/session";
 import { createWalletForSession, getWalletForSession } from "@/lib/store";
+import { providerFailure } from "@/lib/bitcoin";
 
 export async function GET() {
   const jar = await cookies();
@@ -23,7 +24,8 @@ export async function POST() {
     const wallet = await createWalletForSession(sessionId);
     return NextResponse.json({ wallet });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Could not create wallet.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    // Regtest selected but infra missing/unreachable: the 503 offline message.
+    const { message, status } = providerFailure(err, "Could not create wallet.");
+    return NextResponse.json({ error: message }, { status });
   }
 }

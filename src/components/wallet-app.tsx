@@ -21,6 +21,7 @@ import {
   parseBtcToSats,
   truncateMiddle,
   type FeeTierId,
+  type ResolvedFeeTier,
   type TxRecord,
   type WalletState,
 } from "@/lib/wallet";
@@ -246,6 +247,7 @@ export type SendDraft = {
   to: string;
   amountSats: number;
   feeTier: FeeTierId;
+  feeSats: number;
   memo: string;
 };
 
@@ -266,6 +268,7 @@ function SendSheet({
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
   const [feeTier, setFeeTier] = useState<FeeTierId>("standard");
+  const [tiers, setTiers] = useState<ResolvedFeeTier[]>(() => [...FEE_TIERS]);
   const [toError, setToError] = useState<string | null>(null);
   const [amountError, setAmountError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -276,8 +279,32 @@ function SendSheet({
     firstRef.current?.focus();
   }, []);
 
+  // Live tiers for signet/regtest; simulated resolves to the same static
+  // tiers, and any failure keeps them. Secrets stay server-side: the
+  // browser never imports the provider, only this route.
+  useEffect(() => {
+    let live = true;
+    fetch("/api/wallet/fees")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: unknown) => {
+        const list = (data as { tiers?: ResolvedFeeTier[] } | null)?.tiers;
+        if (
+          live &&
+          Array.isArray(list) &&
+          list.length === 3 &&
+          list.every((t) => typeof t?.satPerVb === "number")
+        ) {
+          setTiers(list);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
   const amountSats = parseBtcToSats(amount.trim());
-  const feeSats = feeSatsForTier(feeTier);
+  const feeSats = feeSatsForTier(feeTier, tiers);
 
   function checkAddress(value: string): string | null {
     return value.trim() && !isValidBtcAddress(value.trim()) ? ADDRESS_ERROR : null;
@@ -305,7 +332,7 @@ function SendSheet({
     setToError(tErr);
     setAmountError(aErr);
     if (tErr || aErr || amountSats === null) return;
-    onReview({ to: to.trim(), amountSats, feeTier, memo: memo.trim() });
+    onReview({ to: to.trim(), amountSats, feeTier, feeSats, memo: memo.trim() });
   }
 
   return (
@@ -414,7 +441,7 @@ function SendSheet({
         <fieldset className="w-fee-field">
           <legend className="w-field-label">Fee</legend>
           <div className="w-fee-pills">
-            {FEE_TIERS.map((tier) => (
+            {tiers.map((tier) => (
               <label
                 key={tier.id}
                 className={`w-fee-pill${feeTier === tier.id ? " w-fee-pill-on" : ""}`}
@@ -434,7 +461,7 @@ function SendSheet({
                 />
                 <span className="w-fee-name">{tier.label}</span>
                 <span className="w-fee-sub">
-                  {feeSatsForTier(tier.id).toLocaleString("en-US")} sats · {tier.etaLabel}
+                  {feeSatsForTier(tier.id, tiers).toLocaleString("en-US")} sats · {tier.etaLabel}
                 </span>
               </label>
             ))}
@@ -476,7 +503,7 @@ function ReviewSheet({
     cancelRef.current?.focus();
   }, []);
 
-  const feeSats = feeSatsForTier(draft.feeTier);
+  const feeSats = draft.feeSats;
   const total = draft.amountSats + feeSats;
   const remaining = balance - total;
   const [toHead, toTail] = truncateMiddle(draft.to).split("…");
@@ -1281,6 +1308,7 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
   >(null);
   const [draft, setDraft] = useState<SendDraft | null>(null);
   const [menu, setMenu] = useState(false);
+  const [depositError, setDepositError] = useState<string | null>(null);
   const [backup, setBackup] = useState<null | "reveal" | "confirm" | "done">(null);
   const [arrivingId, setArrivingId] = useState<string | null>(null);
   const reduced = useReducedMotion();
@@ -1356,10 +1384,15 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
 
   function closeReceive() {
     setSheet(null);
+    setDepositError(null);
     receiveRef.current?.focus();
     window.setTimeout(async () => {
       const res = await fetch("/api/wallet/deposit", { method: "POST" });
-      if (!res.ok) return;
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setDepositError(data?.error || "Could not receive.");
+        return;
+      }
       const data = (await res.json()) as { tx: TxRecord; wallet: WalletState };
       walletRef.current = data.wallet;
       setArrivingId(data.tx.id);
@@ -1453,6 +1486,11 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
       </div>
 
       <h2 className="w-section-label">Activity</h2>
+      {depositError ? (
+        <p className="w-field-error" role="alert">
+          {depositError}
+        </p>
+      ) : null}
       {wallet.history.length === 0 ? (
         <p className="w-empty-history">No activity yet.</p>
       ) : (

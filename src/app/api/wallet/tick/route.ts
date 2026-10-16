@@ -2,13 +2,17 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE } from "@/lib/session";
 import { getStudentBySession, saveWalletForSession } from "@/lib/store";
-import { advanceTx } from "@/lib/wallet";
+import { advanceTx, applyTxStatus } from "@/lib/wallet";
+import { getBitcoinProvider, providerFailure } from "@/lib/bitcoin";
 
 function err(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
 }
 
-/** Advance one confirmation onto a pending tx. Confirms at the threshold. */
+/**
+ * Regtest mode polls the real tx status; every other mode advances one
+ * simulated confirmation (unchanged behavior). Confirms at the threshold.
+ */
 export async function POST(req: Request) {
   try {
     const jar = await cookies();
@@ -19,6 +23,24 @@ export async function POST(req: Request) {
     if (!wallet) return err("Create your wallet first.", 400);
     const body = (await req.json().catch(() => ({}))) as { txid?: string };
     if (typeof body.txid !== "string" || !body.txid) return err("Missing txid.", 400);
+    const provider = getBitcoinProvider();
+    if (provider.network === "regtest") {
+      let status: { confirmations: number };
+      try {
+        status = await provider.getTxStatus(body.txid);
+      } catch (e) {
+        if (e instanceof Error && e.message === "tx not found") return err(e.message, 404);
+        const { message, status: code } = providerFailure(e, "Could not advance.");
+        return err(message, code);
+      }
+      const { wallet: next, confirmed } = applyTxStatus(wallet, body.txid, status);
+      await saveWalletForSession(sessionId, next);
+      return NextResponse.json({
+        tx: next.history.find((t) => t.id === body.txid) ?? null,
+        wallet: next,
+        confirmed,
+      });
+    }
     const { wallet: next, confirmed } = advanceTx(wallet, body.txid);
     await saveWalletForSession(sessionId, next);
     return NextResponse.json({
@@ -27,6 +49,7 @@ export async function POST(req: Request) {
       confirmed,
     });
   } catch (e) {
-    return err(e instanceof Error ? e.message : "Could not advance.", 400);
+    const { message, status } = providerFailure(e, "Could not advance.");
+    return err(message, status);
   }
 }

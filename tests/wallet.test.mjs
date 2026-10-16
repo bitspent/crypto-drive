@@ -49,6 +49,15 @@ describe("wallet formatting", () => {
     assert.equal(wallet.truncateMiddle("short"), "short");
   });
 
+  it("accepts tb1q and bcrt1q alongside bc1q, rejects the rest", () => {
+    const seed = samples.derivePracticeSeed("w@example.com", "CD-DRIVE-2026");
+    assert.equal(wallet.isValidBtcAddress(samples.addressForSeed(seed, "bc")), true);
+    assert.equal(wallet.isValidBtcAddress(samples.addressForSeed(seed, "tb")), true);
+    assert.equal(wallet.isValidBtcAddress(samples.addressForSeed(seed, "bcrt")), true);
+    assert.equal(wallet.isValidBtcAddress("0xabc"), false);
+    assert.equal(wallet.isValidBtcAddress("bc1qshort"), false);
+  });
+
   it("trims BTC decimals for review rows", () => {
     assert.equal(wallet.formatBtcTrim(100000), "0.001");
     assert.equal(wallet.formatBtcTrim(700), "0.000007");
@@ -120,6 +129,40 @@ describe("wallet send", () => {
       wallet.validateSend(w, { to: ADDR, amountSats: 0, feeTier: "standard" }),
       "Enter an amount.",
     );
+  });
+
+  it("maps live rates onto tiers, floors at 1 sat/vB", () => {
+    const tiers = wallet.feeTiersFromRates({ fastest: 9.6, halfHour: 4.2, economy: 0.3 });
+    assert.deepEqual(
+      tiers.map((t) => [t.id, t.satPerVb]),
+      [
+        ["economy", 1],
+        ["standard", 4],
+        ["priority", 10],
+      ],
+    );
+    assert.equal(tiers[1].label, "Standard");
+  });
+
+  it("applies polled confirmations and credits once at the threshold", () => {
+    let w = wallet.applyDeposit(freshWallet(), {
+      txid: "c".repeat(64),
+      from: ADDR,
+      amountSats: 500000,
+      timestamp: "2026-10-15T00:00:00.000Z",
+    });
+    let r = wallet.applyTxStatus(w, "c".repeat(64), { confirmations: 1 });
+    assert.equal(r.confirmed, false);
+    assert.equal(r.wallet.balance, 0);
+    r = wallet.applyTxStatus(r.wallet, "c".repeat(64), { confirmations: 3 });
+    assert.equal(r.confirmed, true);
+    assert.equal(r.wallet.balance, 500000);
+    const again = wallet.applyTxStatus(r.wallet, "c".repeat(64), { confirmations: 9 });
+    assert.equal(again.confirmed, false);
+    assert.equal(again.wallet.balance, 500000);
+    const unknown = wallet.applyTxStatus(w, "d".repeat(64), { confirmations: 6 });
+    assert.equal(unknown.confirmed, false);
+    assert.equal(unknown.wallet.balance, 0);
   });
 
   it("prices fee tiers at 140 / 700 / 2100 sats", () => {
