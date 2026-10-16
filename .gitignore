@@ -45,3 +45,6 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.auth/
+
+# Nigiri installer drops its binary in CWD before moving it
+/nigiri
