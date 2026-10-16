@@ -150,6 +150,20 @@ describe("wallet send", () => {
     assert.equal(again.confirmed, false);
     assert.equal(again.wallet.balance, 500000);
   });
+
+  it("records an incoming deposit as pending 0/3", () => {
+    const w = wallet.applyDeposit(freshWallet(), {
+      txid: "b".repeat(64),
+      from: ADDR,
+      amountSats: 500000,
+      timestamp: "2026-10-15T00:00:00.000Z",
+    });
+    assert.equal(w.history.length, 1);
+    assert.equal(w.history[0].direction, "in");
+    assert.equal(w.history[0].status, "pending");
+    assert.equal(w.history[0].confirmations, 0);
+    assert.equal(w.history[0].amount, 500000);
+  });
 });
 
 describe("wallet setup positions", () => {

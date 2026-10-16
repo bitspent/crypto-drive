@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import QRCode from "qrcode";
 import {
   SEED_CONFIRM_POSITIONS,
   formatBtcGrouped,
@@ -8,6 +9,186 @@ import {
   type TxRecord,
   type WalletState,
 } from "@/lib/wallet";
+
+const DEPOSIT_DELAY_MS = 3000;
+const TICK_MS = 4000;
+
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = () => setReduced(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return reduced;
+}
+
+function AnimatedBalance({ sats, reduced }: { sats: number; reduced: boolean }) {
+  const [shown, setShown] = useState(sats);
+  const prevRef = useRef(sats);
+  useEffect(() => {
+    const from = prevRef.current;
+    prevRef.current = sats;
+    if (from === sats || reduced) {
+      setShown(sats);
+      return;
+    }
+    let raf = 0;
+    const start = performance.now();
+    const step = (t: number) => {
+      const k = Math.min(1, (t - start) / 400);
+      const eased = 1 - Math.pow(1 - k, 3);
+      setShown(Math.round(from + (sats - from) * eased));
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [sats, reduced]);
+  return (
+    <>
+      <p className="w-balance" aria-live="polite" aria-label={`${sats} satoshis`}>
+        {formatBtcGrouped(shown)}
+      </p>
+      <p className="w-balance-unit">BTC</p>
+      <p className="w-balance-sub">≈ {sats.toLocaleString("en-US")} sats</p>
+    </>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="6" y="6" width="9" height="9" rx="2" />
+      <path d="M12 6V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h1" />
+    </svg>
+  );
+}
+
+function ReceiveSheet({ address, onClose }: { address: string; onClose: () => void }) {
+  const [qr, setQr] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    let live = true;
+    QRCode.toDataURL(address, { width: 240, margin: 0 })
+      .then((url) => {
+        if (live) setQr(url);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [address]);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !panelRef.current) return;
+      const els = [...panelRef.current.querySelectorAll<HTMLElement>("button")].filter(
+        (el) => !el.hasAttribute("disabled") && el.getAttribute("aria-hidden") !== "true",
+      );
+      if (els.length === 0) return;
+      const first = els[0] as HTMLElement;
+      const last = els[els.length - 1] as HTMLElement;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable (permissions, insecure context): leave silent.
+    }
+  }
+
+  return (
+    <div className="w-overlay" onClick={onClose}>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Your address"
+        className="w-sheet"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-sheet-head">
+          <h2>Your address</h2>
+          <button
+            ref={closeRef}
+            type="button"
+            className="w-icon-btn"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+        <div className="w-qr-tile">
+          {qr ? (
+            // Data-URL QR: next/image optimization does not apply.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={qr} alt={`QR code for ${address}`} width={240} height={240} />
+          ) : (
+            <p className="w-qr-loading">Drawing code…</p>
+          )}
+        </div>
+        <div className="w-addr-row">
+          <p className="w-addr-full">{address}</p>
+          <button
+            type="button"
+            className="w-copy-btn"
+            aria-label="Copy address"
+            onClick={copy}
+          >
+            {copied ? <span aria-hidden="true">✓</span> : <CopyIcon />}
+          </button>
+        </div>
+        {copied ? (
+          <p className="w-copied" role="status">
+            Copied.
+          </p>
+        ) : null}
+        <p className="w-caption">Bitcoin only. Not for any other coin.</p>
+        <CoachNote text="Your address is safe to share. That's the point." />
+      </div>
+    </div>
+  );
+}
 
 const REVEAL_MASK_MS = 5000;
 
@@ -190,17 +371,25 @@ function StatusBadge({ tx, threshold }: { tx: TxRecord; threshold: number }) {
     );
   }
   return (
-    <span className="w-badge w-badge-pending">
+    <span className="w-badge w-badge-pending w-tick-pop">
       <span aria-hidden="true" className="w-badge-dot" />
       {tx.confirmations}/{threshold}
     </span>
   );
 }
 
-function HistoryRow({ tx, threshold }: { tx: TxRecord; threshold: number }) {
+function HistoryRow({
+  tx,
+  threshold,
+  arriving,
+}: {
+  tx: TxRecord;
+  threshold: number;
+  arriving: boolean;
+}) {
   const incoming = tx.direction === "in";
   return (
-    <li className="w-history-row">
+    <li className={`w-history-row${arriving ? " w-row-enter" : ""}`}>
       <DirectionIcon direction={tx.direction} />
       <div className="w-row-main">
         <p className="w-row-title">{incoming ? "Received" : "Sent"}</p>
@@ -213,7 +402,11 @@ function HistoryRow({ tx, threshold }: { tx: TxRecord; threshold: number }) {
           {incoming ? "+" : "−"}
           {formatBtcGrouped(tx.amount)} BTC
         </p>
-        <StatusBadge tx={tx} threshold={threshold} />
+        <StatusBadge
+          key={tx.status === "pending" ? tx.confirmations : "done"}
+          tx={tx}
+          threshold={threshold}
+        />
       </div>
     </li>
   );
@@ -275,6 +468,60 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
   const [phase, setPhase] = useState<"home" | "reveal" | "confirm">("home");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<null | "receive">(null);
+  const [arrivingId, setArrivingId] = useState<string | null>(null);
+  const reduced = useReducedMotion();
+  const receiveRef = useRef<HTMLButtonElement>(null);
+  const walletRef = useRef(wallet);
+  const tickingRef = useRef(false);
+  const timerRef = useRef(0);
+
+  useEffect(() => {
+    walletRef.current = wallet;
+  }, [wallet]);
+
+  const tickOnce = useCallback(async (): Promise<boolean> => {
+    const current = walletRef.current;
+    if (!current) return false;
+    const pending = current.history.filter((t) => t.status === "pending");
+    if (pending.length === 0) return false;
+    let latest: WalletState = current;
+    for (const tx of pending) {
+      const res = await fetch("/api/wallet/tick", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ txid: tx.id }),
+      });
+      if (!res.ok) continue;
+      const data = (await res.json()) as { wallet: WalletState };
+      latest = data.wallet;
+    }
+    walletRef.current = latest;
+    setWallet(latest);
+    return latest.history.some((t) => t.status === "pending");
+  }, []);
+
+  const startTickLoop = useCallback(() => {
+    if (tickingRef.current) return;
+    tickingRef.current = true;
+    const round = async () => {
+      const more = await tickOnce().catch(() => true);
+      if (more) {
+        timerRef.current = window.setTimeout(round, TICK_MS);
+      } else {
+        tickingRef.current = false;
+      }
+    };
+    timerRef.current = window.setTimeout(round, TICK_MS);
+  }, [tickOnce]);
+
+  useEffect(() => {
+    if (walletRef.current?.history.some((t) => t.status === "pending")) startTickLoop();
+    return () => {
+      window.clearTimeout(timerRef.current);
+      tickingRef.current = false;
+    };
+  }, [startTickLoop]);
 
   async function create() {
     setCreating(true);
@@ -292,6 +539,23 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
     }
   }
 
+  function closeReceive() {
+    setSheet(null);
+    receiveRef.current?.focus();
+    window.setTimeout(async () => {
+      const res = await fetch("/api/wallet/deposit", { method: "POST" });
+      if (!res.ok) return;
+      const data = (await res.json()) as { tx: TxRecord; wallet: WalletState };
+      walletRef.current = data.wallet;
+      setArrivingId(data.tx.id);
+      setWallet(data.wallet);
+      startTickLoop();
+      window.setTimeout(() => {
+        setArrivingId((id) => (id === data.tx.id ? null : id));
+      }, 600);
+    }, DEPOSIT_DELAY_MS);
+  }
+
   if (!wallet) {
     return <EmptyState onCreate={create} creating={creating} error={error} />;
   }
@@ -302,20 +566,25 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
     return <SeedConfirm words={wallet.seedWords} onDone={() => setPhase("home")} />;
   }
 
+  const incoming = wallet.history.filter((t) => t.direction === "in");
+  const sawFirstConfirmation = incoming.some((t) => t.confirmations >= 1);
+  const sawConfirmed = incoming.some((t) => t.status === "confirmed");
+
   return (
     <div className="w-shell">
       <WalletTop />
 
       <div className="w-balance-block">
-        <p className="w-balance" aria-live="polite" aria-label={`${wallet.balance} satoshis`}>
-          {formatBtcGrouped(wallet.balance)}
-        </p>
-        <p className="w-balance-unit">BTC</p>
-        <p className="w-balance-sub">≈ {wallet.balance.toLocaleString("en-US")} sats</p>
+        <AnimatedBalance sats={wallet.balance} reduced={reduced} />
       </div>
 
       <div className="w-actions">
-        <button type="button" className="w-receive-btn">
+        <button
+          ref={receiveRef}
+          type="button"
+          className="w-receive-btn"
+          onClick={() => setSheet("receive")}
+        >
           Receive
         </button>
         <button type="button" className="w-send-btn">
@@ -329,12 +598,29 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
       ) : (
         <ul className="w-history">
           {wallet.history.map((tx) => (
-            <HistoryRow key={tx.id} tx={tx} threshold={wallet.confirmedThreshold} />
+            <HistoryRow
+              key={tx.id}
+              tx={tx}
+              threshold={wallet.confirmedThreshold}
+              arriving={tx.id === arrivingId}
+            />
           ))}
         </ul>
       )}
 
-      <CoachNote text="Receive first. That's how wallets get money." />
+      {wallet.history.length === 0 ? (
+        <CoachNote text="Receive first. That's how wallets get money." />
+      ) : null}
+      {sawFirstConfirmation ? (
+        <CoachNote text="Confirmations make a payment harder to reverse." />
+      ) : null}
+      {sawConfirmed ? (
+        <CoachNote text="You don't do anything. The balance updates itself." />
+      ) : null}
+
+      {sheet === "receive" ? (
+        <ReceiveSheet address={wallet.address} onClose={closeReceive} />
+      ) : null}
     </div>
   );
 }
