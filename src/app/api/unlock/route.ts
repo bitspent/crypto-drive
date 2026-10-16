@@ -1,31 +1,14 @@
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE } from "@/lib/session";
-import {
-  createSessionForStudent,
-  findStudentByLicenseKey,
-  isValidLicense,
-  provisionLicensedStudent,
-  REVOKED_ERROR,
-  unlockStudent,
-  type Student,
-} from "@/lib/store";
-import { resolveLicenseKind, tierFromLicenseKey } from "@/lib/license";
-import { verifyGumroadLicense } from "@/lib/gumroad";
+import { isValidLicense, REVOKED_ERROR, unlockStudent } from "@/lib/store";
+import { resolveLicenseKind } from "@/lib/license";
+import { unlockWithLicense } from "@/lib/unlock";
 import {
   checkRateLimit,
   clientIp,
   isAdminBypass,
   rateLimitedResponse,
 } from "@/lib/rate-limit";
-
-function productIdForTier(tier: "starter" | "certified" | "vip"): string | null {
-  const table = {
-    starter: process.env.GUMROAD_PRODUCT_STARTER?.trim(),
-    certified: process.env.GUMROAD_PRODUCT_CERTIFIED?.trim(),
-    vip: process.env.GUMROAD_PRODUCT_VIP?.trim(),
-  } as const;
-  return table[tier] || null;
-}
 
 function sessioned(tier: string, sessionId: string) {
   const response = NextResponse.json({ ok: true, tier });
@@ -72,29 +55,11 @@ export async function POST(request: Request) {
     }
 
     if (kind === "licensed") {
-      const tier = tierFromLicenseKey(license);
-      if (!tier) {
-        return NextResponse.json({ error: "License not recognized." }, { status: 401 });
+      const result = await unlockWithLicense(license);
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: 401 });
       }
-      const known: Student | null = await findStudentByLicenseKey(license);
-      if (known) {
-        if (known.revokedAt) {
-          return NextResponse.json({ error: REVOKED_ERROR }, { status: 401 });
-        }
-        const sessionId = await createSessionForStudent(known.id);
-        return sessioned(known.tier, sessionId);
-      }
-      // Unknown key: ask Gumroad before rejecting.
-      const productId = productIdForTier(tier);
-      if (productId) {
-        const check = await verifyGumroadLicense(productId, license);
-        if (check.ok) {
-          const created = await provisionLicensedStudent(check.email, tier, license);
-          const sessionId = await createSessionForStudent(created.id);
-          return sessioned(created.tier, sessionId);
-        }
-      }
-      return NextResponse.json({ error: "License not recognized." }, { status: 401 });
+      return sessioned(result.tier, result.sessionId);
     }
 
     if (kind === "demo") {
