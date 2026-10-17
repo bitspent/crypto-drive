@@ -17,6 +17,8 @@ export type TxRecord = {
   counterparty: string;
   status: TxStatus;
   confirmations: number;
+  /** Block height the tx confirmed in; null while pending or simulated. */
+  blockHeight?: number | null;
   /** Fee in sats, outgoing only. */
   fee?: number;
   timestamp: string;
@@ -227,15 +229,21 @@ export type AdvanceResult = { wallet: WalletState; confirmed: boolean };
 export function applyTxStatus(
   wallet: WalletState,
   txid: string,
-  status: { confirmations: number },
+  status: { confirmations: number; blockHeight?: number | null },
 ): AdvanceResult {
   const tx = wallet.history.find((t) => t.id === txid);
   if (!tx || tx.status === "confirmed") return { wallet, confirmed: false };
   const confirmations = Math.max(0, Math.floor(status.confirmations));
   const confirmed = confirmations >= wallet.confirmedThreshold;
+  const blockHeight = status.blockHeight ?? tx.blockHeight ?? null;
   const history = wallet.history.map((t) =>
     t.id === txid
-      ? { ...t, confirmations, status: confirmed ? ("confirmed" as const) : t.status }
+      ? {
+          ...t,
+          confirmations,
+          blockHeight,
+          status: confirmed ? ("confirmed" as const) : t.status,
+        }
       : t,
   );
   const balance = confirmed && tx.direction === "in" ? wallet.balance + tx.amount : wallet.balance;

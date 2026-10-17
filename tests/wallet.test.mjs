@@ -165,6 +165,32 @@ describe("wallet send", () => {
     assert.equal(unknown.wallet.balance, 0);
   });
 
+  it("stores the polled block height and keeps it across polls", () => {
+    const w = wallet.applyDeposit(freshWallet(), {
+      txid: "c".repeat(64),
+      from: ADDR,
+      amountSats: 500000,
+      timestamp: "2026-10-15T00:00:00.000Z",
+    });
+    assert.equal(w.history[0].blockHeight, undefined);
+    const first = wallet.applyTxStatus(w, "c".repeat(64), {
+      confirmations: 1,
+      blockHeight: 108,
+    });
+    assert.equal(first.wallet.history[0].blockHeight, 108);
+    // A later poll without a height (or a null one) must not wipe it.
+    const second = wallet.applyTxStatus(first.wallet, "c".repeat(64), {
+      confirmations: 2,
+    });
+    assert.equal(second.wallet.history[0].blockHeight, 108);
+    const third = wallet.applyTxStatus(second.wallet, "c".repeat(64), {
+      confirmations: 3,
+      blockHeight: null,
+    });
+    assert.equal(third.confirmed, true);
+    assert.equal(third.wallet.history[0].blockHeight, 108);
+  });
+
   it("prices fee tiers at 140 / 700 / 2100 sats", () => {
     assert.equal(wallet.feeSatsForTier("economy"), 140);
     assert.equal(wallet.feeSatsForTier("standard"), 700);

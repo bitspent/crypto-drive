@@ -4474,6 +4474,93 @@ body {
   cursor: not-allowed;
 }
 
+/* ── Wallet sandbox: transaction details ── */
+
+.w-history-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.w-history-btn:hover {
+  background: color-mix(in oklab, var(--paper) 4%, transparent);
+}
+
+.w-history-btn:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.w-tx-rows {
+  margin: 0 0 4px;
+}
+
+.w-tx-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--w-hairline);
+}
+
+.w-tx-label {
+  flex: none;
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.w-tx-value {
+  margin: 0;
+  text-align: right;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.w-tx-amount,
+.w-tx-sub,
+.w-tx-mono,
+.w-tx-plain {
+  margin: 0;
+}
+
+.w-tx-amount {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.w-tx-sub {
+  font-size: 0.8rem;
+  color: var(--mute);
+}
+
+.w-tx-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+}
+
+.w-tx-id-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .w-signing {
   position: relative;
   overflow: hidden;

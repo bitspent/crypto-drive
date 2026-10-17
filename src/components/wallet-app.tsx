@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
   type RefObject,
 } from "react";
 import QRCode from "qrcode";
@@ -1213,36 +1214,182 @@ function StatusBadge({ tx, threshold }: { tx: TxRecord; threshold: number }) {
   );
 }
 
+function TxDetailRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="w-tx-row">
+      <p className="w-tx-label">{label}</p>
+      <div className="w-tx-value">{children}</div>
+    </div>
+  );
+}
+
+function TxDetailsSheet({
+  tx,
+  threshold,
+  onClose,
+}: {
+  tx: TxRecord;
+  threshold: number;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const incoming = tx.direction === "in";
+
+  useEffect(() => {
+    closeRef.current?.focus();
+  }, []);
+
+  useDialogKeys(panelRef, onClose);
+
+  async function copyTxid() {
+    try {
+      await navigator.clipboard.writeText(tx.id);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable (permissions, insecure context): leave silent.
+    }
+  }
+
+  const block =
+    tx.status !== "confirmed"
+      ? "Pending"
+      : (tx.blockHeight ?? "Simulated");
+
+  return (
+    <div className="w-overlay" onClick={onClose}>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Transaction details"
+        className="w-sheet"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-sheet-head">
+          <h2>{incoming ? "Received" : "Sent"}</h2>
+          <button
+            ref={closeRef}
+            type="button"
+            className="w-icon-btn"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+        <div className="w-tx-rows">
+          <TxDetailRow label="Status">
+            <StatusBadge tx={tx} threshold={threshold} />
+          </TxDetailRow>
+          <TxDetailRow label="Amount">
+            <p className={`w-tx-amount ${incoming ? "w-amount-in" : "w-amount-out"}`}>
+              {incoming ? "+" : "−"}
+              {formatBtcGrouped(tx.amount)} BTC
+            </p>
+            <p className="w-tx-sub">≈ {tx.amount.toLocaleString("en-US")} sats</p>
+          </TxDetailRow>
+          <TxDetailRow label={incoming ? "From" : "To"}>
+            <p className="w-tx-mono">{truncateMiddle(tx.counterparty)}</p>
+          </TxDetailRow>
+          <TxDetailRow label="Transaction ID">
+            <div className="w-tx-id-row">
+              <p className="w-tx-mono">{truncateMiddle(tx.id)}</p>
+              <button
+                type="button"
+                className="w-copy-btn"
+                aria-label="Copy transaction ID"
+                onClick={copyTxid}
+              >
+                {copied ? <span aria-hidden="true">✓</span> : <CopyIcon />}
+              </button>
+            </div>
+            {copied ? (
+              <p className="w-copied" role="status">
+                Copied.
+              </p>
+            ) : null}
+          </TxDetailRow>
+          <TxDetailRow label="Confirmations">
+            <p className="w-tx-plain">
+              {tx.status === "confirmed" ? "Confirmed" : `${tx.confirmations}/${threshold}`}
+            </p>
+          </TxDetailRow>
+          <TxDetailRow label="Block">
+            <p className="w-tx-plain">{block}</p>
+          </TxDetailRow>
+          <TxDetailRow label="Date">
+            <p className="w-tx-plain">
+              {new Date(tx.timestamp).toLocaleString("en-US", {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+            </p>
+          </TxDetailRow>
+          {tx.fee != null ? (
+            <TxDetailRow label="Fee">
+              <p className="w-tx-plain">
+                {formatBtcGrouped(tx.fee)} BTC (≈ {tx.fee.toLocaleString("en-US")} sats)
+              </p>
+            </TxDetailRow>
+          ) : null}
+          {tx.memo ? (
+            <TxDetailRow label="Memo">
+              <p className="w-tx-plain">{tx.memo}</p>
+            </TxDetailRow>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HistoryRow({
   tx,
   threshold,
   arriving,
+  onOpen,
 }: {
   tx: TxRecord;
   threshold: number;
   arriving: boolean;
+  onOpen: (txid: string) => void;
 }) {
   const incoming = tx.direction === "in";
+  const state =
+    tx.status === "confirmed"
+      ? "confirmed"
+      : `${tx.confirmations} of ${threshold} confirmations`;
   return (
     <li className={`w-history-row${arriving ? " w-row-enter" : ""}`}>
-      <DirectionIcon direction={tx.direction} />
-      <div className="w-row-main">
-        <p className="w-row-title">{incoming ? "Received" : "Sent"}</p>
-        <p className="w-row-sub">
-          {incoming ? "from" : "to"} {truncateMiddle(tx.counterparty)}
-        </p>
-      </div>
-      <div className="w-row-side">
-        <p className={`w-row-amount ${incoming ? "w-amount-in" : "w-amount-out"}`}>
-          {incoming ? "+" : "−"}
-          {formatBtcGrouped(tx.amount)} BTC
-        </p>
-        <StatusBadge
-          key={tx.status === "pending" ? tx.confirmations : "done"}
-          tx={tx}
-          threshold={threshold}
-        />
-      </div>
+      <button
+        type="button"
+        id={`w-tx-${tx.id}`}
+        className="w-history-btn"
+        onClick={() => onOpen(tx.id)}
+        aria-label={`${incoming ? "Received" : "Sent"} ${formatBtcTrim(tx.amount)} bitcoin, ${state}. Show details.`}
+      >
+        <DirectionIcon direction={tx.direction} />
+        <div className="w-row-main">
+          <p className="w-row-title">{incoming ? "Received" : "Sent"}</p>
+          <p className="w-row-sub">
+            {incoming ? "from" : "to"} {truncateMiddle(tx.counterparty)}
+          </p>
+        </div>
+        <div className="w-row-side">
+          <p className={`w-row-amount ${incoming ? "w-amount-in" : "w-amount-out"}`}>
+            {incoming ? "+" : "−"}
+            {formatBtcGrouped(tx.amount)} BTC
+          </p>
+          <StatusBadge
+            key={tx.status === "pending" ? tx.confirmations : "done"}
+            tx={tx}
+            threshold={threshold}
+          />
+        </div>
+      </button>
     </li>
   );
 }
@@ -1306,6 +1453,7 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
   const [sheet, setSheet] = useState<
     null | "receive" | "send" | "review" | "restore" | "reset"
   >(null);
+  const [detailsTxId, setDetailsTxId] = useState<string | null>(null);
   const [draft, setDraft] = useState<SendDraft | null>(null);
   const [menu, setMenu] = useState(false);
   const [depositError, setDepositError] = useState<string | null>(null);
@@ -1457,6 +1605,15 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
   const incoming = wallet.history.filter((t) => t.direction === "in");
   const sawFirstConfirmation = incoming.some((t) => t.confirmations >= 1);
   const sawConfirmed = incoming.some((t) => t.status === "confirmed");
+  const detailsTx = detailsTxId
+    ? (wallet.history.find((t) => t.id === detailsTxId) ?? null)
+    : null;
+
+  function closeDetails() {
+    const id = detailsTxId;
+    setDetailsTxId(null);
+    window.setTimeout(() => document.getElementById(`w-tx-${id}`)?.focus(), 0);
+  }
 
   return (
     <div className="w-shell">
@@ -1501,6 +1658,7 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
               tx={tx}
               threshold={wallet.confirmedThreshold}
               arriving={tx.id === arrivingId}
+              onOpen={setDetailsTxId}
             />
           ))}
         </ul>
@@ -1518,6 +1676,13 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
 
       {sheet === "receive" ? (
         <ReceiveSheet address={wallet.address} onClose={closeReceive} />
+      ) : null}
+      {detailsTx ? (
+        <TxDetailsSheet
+          tx={detailsTx}
+          threshold={wallet.confirmedThreshold}
+          onClose={closeDetails}
+        />
       ) : null}
       {sheet === "send" ? (
         <SendSheet
