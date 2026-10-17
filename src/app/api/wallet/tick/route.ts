@@ -11,7 +11,7 @@ import {
 } from "@/lib/ratelimit";
 import { getClientIp } from "@/lib/request-ip";
 import { advanceTx, applyTxStatus } from "@/lib/wallet";
-import { getBitcoinProvider, providerFailure } from "@/lib/bitcoin";
+import { getBitcoinProvider, pollRegtestTx, providerFailure } from "@/lib/bitcoin";
 
 function err(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     if (provider.network === "regtest") {
       let status: { confirmations: number };
       try {
-        status = await provider.getTxStatus(body.txid);
+        status = await pollRegtestTx(provider, body.txid, wallet.confirmedThreshold);
       } catch (e) {
         if (e instanceof Error && e.message === "tx not found") return err(e.message, 404);
         const { message, status: code } = providerFailure(e, "Could not advance.");

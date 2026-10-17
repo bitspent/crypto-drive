@@ -32,5 +32,6 @@ fi
 export BITCOIN_MODE=regtest
 export INFRA_BASE_URL=http://localhost:8081
 export INFRA_SHARED_SECRET=dev
+export ADMIN_MINE_TOKEN=dev
 
 exec next dev --port 43127

@@ -8,6 +8,7 @@ import { SimulatedProvider } from "./simulated";
 export type { BitcoinMode, BitcoinNetwork, FeeEstimates, FeeSource, TxStatus } from "./provider";
 export type { BitcoinProvider } from "./provider";
 export { OFFLINE_MESSAGE } from "./regtest";
+export { pollRegtestTx } from "./poll";
 
 let cached: { mode: BitcoinMode; provider: BitcoinProvider } | null = null;
 
