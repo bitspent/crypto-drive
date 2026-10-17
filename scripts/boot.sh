@@ -1,0 +1,494 @@
+#!/usr/bin/env bash
+# Full local boot: checks every dependency, resolves every port conflict
+# (jump / kill / abort), starts Nigiri + infra-api (+ Postgres on request),
+# then execs the Next.js dev server. Interactive by default; --yes for CI.
+#
+# Probing here deliberately overlaps scripts/check-ports.sh: that script only
+# diagnoses (never kills, never starts), this one resolves and boots.
+#
+# Usage: bash scripts/boot.sh [MODE] [options]
+#   MODE                       simulated | signet | regtest (default: simulated)
+#   --mode MODE                same as positional
+#   --app-port PORT            app port, jumps on conflict (default: $APP_PORT or 43127)
+#   --infra-port PORT          infra-api host port, regtest only (default: 8081)
+#   --with-db                  also ensure crypto-drive-pg :5433 and run the app on Postgres
+#   --wait SEC                 how long to wait for services (default: 60)
+#   --yes, -y                  non-interactive: auto-jump, auto-start, never kill
+#   --kill-ours                with --yes: also kill OUR OWN stale app instead of jumping
+#   --dry-run                  probe + print the plan, start/kill/exec nothing
+#   -h, --help                 this text
+#
+# Port policy:
+#   app + infra-api ports can JUMP (+1 until free) — except onto/away from our
+#   own `next dev`, which holds a repo lock (.next/dev/lock): a second dev
+#   server in this repo refuses to start on ANY port, so that case is
+#   restart-or-abort, never jump. Nigiri's ports are fixed (Nigiri owns them)
+#   — free them or abort. Chopsticks :3000 is soft: only chopsticks fails
+#   when it is taken, nothing in our path uses it, so the script warns and
+#   continues (jumping it would change nothing).
+# Kill policy: our own stale app (cwd is this repo) may be restarted after
+# asking; anything foreign is only killed after an explicit second confirm,
+# and never with --yes.
+set -uo pipefail
+
+MODE="simulated"
+APP_PORT="${APP_PORT:-43127}"
+INFRA_PORT="8081"
+WITH_DB=0
+WAIT_SECS=60
+YES=0
+KILL_OURS=0
+DRY_RUN=0
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+JUMPED_APP=0
+JUMPED_INFRA=0
+
+usage() { sed -n '2,/^set -uo pipefail$/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//'; }
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    simulated|signet|regtest) MODE="$1"; shift ;;
+    --mode) MODE="${2:?--mode needs a value}"; shift 2 ;;
+    --mode=*) MODE="${1#--mode=}"; shift ;;
+    --app-port) APP_PORT="${2:?--app-port needs a value}"; shift 2 ;;
+    --app-port=*) APP_PORT="${1#--app-port=}"; shift ;;
+    --infra-port) INFRA_PORT="${2:?--infra-port needs a value}"; shift 2 ;;
+    --infra-port=*) INFRA_PORT="${1#--infra-port=}"; shift ;;
+    --with-db) WITH_DB=1; shift ;;
+    --wait) WAIT_SECS="${2:?--wait needs seconds}"; shift 2 ;;
+    --wait=*) WAIT_SECS="${1#--wait=}"; shift ;;
+    --yes|-y) YES=1; shift ;;
+    --kill-ours) KILL_OURS=1; shift ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1 (see --help)" >&2; exit 2 ;;
+  esac
+done
+case "$MODE" in
+  simulated|signet|regtest) ;;
+  *) echo "bad --mode: $MODE (simulated|signet|regtest)" >&2; exit 2 ;;
+esac
+
+step() { echo "── [$1] $2 ──"; }
+say() { echo "   $1"; }
+ok() { echo "   ok: $1"; }
+warn() { echo "   warn: $1"; }
+die() { echo "   ABORT: $1" >&2; exit 1; }
+have() { command -v "$1" >/dev/null 2>&1; }
+
+echo "crypto-drive boot — mode=$MODE app-port=$APP_PORT$([ "$DRY_RUN" = 1 ] && echo " (DRY RUN)" || true)"
+echo "repo: $REPO"
+
+# ── listeners / ownership probes ──────────────────────────────────────
+
+# listeners <port>: "pid|command" per LISTEN holder, "" when free.
+listeners() {
+  local port=$1
+  if have lsof; then
+    lsof -nP -iTCP:"$port" -sTCP:LISTEN -Fp -Fc 2>/dev/null | awk '
+      /^p/ { pid = substr($0, 2) }
+      /^c/ { print pid "|" substr($0, 2); pid = "" }'
+  else
+    echo "no-probe|lsof missing" >&2
+    return 1
+  fi
+}
+
+# our_container_on <port>: container name when one of OUR services holds it.
+our_container_on() {
+  local port=$1
+  have docker || return 1
+  docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null | while read -r name ports; do
+    case "$ports" in
+      *":$port->"*|*":$port,"*|*":$port-"*|*"-$port->"*)
+        case "$name" in
+          bitcoin|electrs|electrum-ws|chopsticks|esplora|crypto-drive-infra-api-1|crypto-drive-pg)
+            echo "$name" ;;
+        esac ;;
+    esac
+  done
+}
+
+# is_own_pid <pid>: true when the process runs with cwd == this repo.
+is_own_pid() {
+  local pid=$1 cwd
+  cwd=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1)
+  [ -n "$cwd" ] && [ "$cwd" = "$REPO" ]
+}
+
+# own_dev_lock: "pid|port" of OUR repo's live `next dev` (from the same
+# .next/dev/lock Next itself checks), or nothing when absent/stale/foreign.
+own_dev_lock() {
+  local lock="$REPO/.next/dev/lock"
+  [ -f "$lock" ] || return 1
+  local info pid port
+  info=$(node -e 'const fs=require("fs");const l=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));console.log(l.pid+"|"+l.port)' "$lock" 2>/dev/null) || return 1
+  pid="${info%%|*}"
+  port="${info##*|}"
+  kill -0 "$pid" 2>/dev/null || return 1
+  # The lock pid is the next-server child ("next-server (v16.4.0)" carries no
+  # repo path in its args), so ownership is proven by cwd, not argv.
+  is_own_pid "$pid" || return 1
+  echo "$pid|$port"
+}
+
+next_free_port() {
+  local port=$1 i
+  for i in $(seq 1 20); do
+    port=$((port + 1))
+    if [ -z "$(listeners "$port")" ] && [ -z "$(our_container_on "$port" | head -1)" ]; then
+      echo "$port"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# ask <prompt> <default>: interactive choice. Prints the (lowercased) answer.
+# Returns 1 when stdin is not a TTY — callers MUST use `ans=$(ask …) || exit 1`
+# because `exit` inside a command substitution would only kill the subshell.
+ask() {
+  local prompt=$1 default=$2 ans
+  if [ ! -t 0 ]; then
+    echo "   ABORT: no TTY for '$prompt' — re-run with --yes/--dry-run or free the port first" >&2
+    return 1
+  fi
+  printf '   %s [%s]: ' "$prompt" "$default" >&2
+  read -r ans || ans=""
+  ans="${ans:-$default}"
+  echo "$ans" | tr '[:upper:]' '[:lower:]'
+}
+
+kill_pid() {
+  local pid=$1 desc=$2 i
+  if [ "$DRY_RUN" = 1 ]; then
+    say "would kill $desc"
+    return 0
+  fi
+  say "killing ${desc}…"
+  kill "$pid" 2>/dev/null || die "could not signal $desc"
+  for i in $(seq 1 5); do
+    kill -0 "$pid" 2>/dev/null || { ok "$desc stopped"; return 0; }
+    sleep 1
+  done
+  die "$desc survived SIGTERM — run 'kill -9 $pid' yourself, then re-run boot"
+}
+
+# ── port resolution ───────────────────────────────────────────────────
+# resolve_jumpable <port-var> <label>: free/ours/jump/kill/abort. Sets the
+# variable to the final port. Returns 0, or dies on abort.
+
+resolve_jumpable() {
+  local var=$1 label=$2
+  local port found ours pid cmd ans target
+  port="${!var}"
+  found=$(listeners "$port")
+  if [ -z "$found" ]; then
+    ok ":$port ($label) is free"
+    return 0
+  fi
+  ours=$(our_container_on "$port" | head -1)
+  if [ -n "$ours" ]; then
+    ok ":$port ($label) is ours already (container $ours) — reusing"
+    return 0
+  fi
+  pid=$(echo "$found" | head -1 | cut -d'|' -f1)
+  cmd=$(echo "$found" | head -1 | cut -d'|' -f2)
+  target=$(next_free_port "$port") || die ":$port ($label) busy and no free port nearby"
+
+  if is_own_pid "$pid"; then
+    # Our own `next dev` holds the repo lock: jumping cannot help (the new
+    # server would refuse to start on any port), so this is restart-or-abort.
+    if [ "$label" = "app" ] && [ -n "${DEVLOCK_PID:-}" ] && [ "$pid" = "$DEVLOCK_PID" ]; then
+      warn ":$port ($label) is held by OUR OWN dev server (pid $pid) — it holds the repo lock"
+      if [ "$YES" = 1 ]; then
+        if [ "$KILL_OURS" = 1 ]; then
+          say "--yes --kill-ours: restarting our own dev server"
+          kill_pid "$pid" "pid $pid ($cmd)"
+          DEVLOCK_PID=""; DEVLOCK_PORT=""
+          return 0
+        fi
+        die "our own dev server holds the repo lock — re-run with --kill-ours or stop pid $pid"
+      fi
+      ans=$(ask ":$port busy (our dev server) — (r)estart it, (a)bort" "r") || exit 1
+      case "$ans" in
+        a*) die "aborted by you" ;;
+        *) say "restarting our own dev server"; kill_pid "$pid" "pid $pid ($cmd)"; DEVLOCK_PID=""; DEVLOCK_PORT=""; return 0 ;;
+      esac
+    fi
+    warn ":$port ($label) is held by OUR OWN previous boot (pid $pid $cmd)"
+    if [ "$YES" = 1 ]; then
+      if [ "$KILL_OURS" = 1 ]; then
+        say "--yes --kill-ours: restarting our own $label"
+        kill_pid "$pid" "pid $pid ($cmd)"
+        return 0
+      fi
+      say "--yes: jumping our stale $label :$port → :$target"
+    else
+      ans=$(ask ":$port busy (ours) — (r)estart it, (j)ump to :$target, (a)bort" "r") || exit 1
+      case "$ans" in
+        j*) say "jumping :$port → :$target" ;;
+        a*) die "aborted by you" ;;
+        *) say "restarting our own $label"; kill_pid "$pid" "pid $pid ($cmd)"; return 0 ;;
+      esac
+    fi
+  else
+    warn ":$port ($label) is held by a FOREIGN process (pid $pid $cmd)"
+    if [ "$YES" = 1 ]; then
+      say "--yes: never kills foreign PIDs — jumping :$port → :$target"
+    else
+      ans=$(ask ":$port busy (foreign) — (j)ump to :$target, (k)ill pid $pid, (a)bort" "j") || exit 1
+      case "$ans" in
+        k*)
+          ans=$(ask "really kill FOREIGN pid $pid ($cmd)? type 'kill' to confirm" "no") || exit 1
+          [ "$ans" = "kill" ] || die "aborted by you"
+          kill_pid "$pid" "pid $pid ($cmd)"
+          return 0
+          ;;
+        a*) die "aborted by you" ;;
+        *) say "jumping :$port → :$target" ;;
+      esac
+    fi
+  fi
+  printf -v "$var" '%s' "$target"
+  if [ "$var" = "APP_PORT" ]; then JUMPED_APP=1; else JUMPED_INFRA=1; fi
+}
+
+# resolve_fixed <port> <label> <hint>: Nigiri/PG ports cannot jump.
+resolve_fixed() {
+  local port=$1 label=$2 hint=$3
+  local found ours pid cmd ans
+  found=$(listeners "$port")
+  if [ -z "$found" ]; then
+    ok ":$port ($label) is free"
+    return 0
+  fi
+  ours=$(our_container_on "$port" | head -1)
+  if [ -n "$ours" ]; then
+    ok ":$port ($label) is ours already (container $ours) — reusing"
+    return 0
+  fi
+  pid=$(echo "$found" | head -1 | cut -d'|' -f1)
+  cmd=$(echo "$found" | head -1 | cut -d'|' -f2)
+  warn ":$port ($label) is held by pid $pid ($cmd) — this port is FIXED ($hint)"
+  if [ "$YES" = 1 ]; then
+    die "--yes never kills, and :$port cannot jump — free it and re-run"
+  fi
+  ans=$(ask ":$port fixed — (k)ill pid $pid, (a)bort" "a") || exit 1
+  case "$ans" in
+    k*)
+      ans=$(ask "really kill pid $pid ($cmd)? type 'kill' to confirm" "no") || exit 1
+      [ "$ans" = "kill" ] || die "aborted by you"
+      kill_pid "$pid" "pid $pid ($cmd)"
+      ;;
+    *) die "aborted by you (hint: $hint)" ;;
+  esac
+}
+
+note_soft() {
+  local port=$1 label=$2
+  local found ours
+  found=$(listeners "$port")
+  ours=$(our_container_on "$port" | head -1)
+  if [ -z "$found" ]; then
+    ok ":$port ($label) is free"
+  elif [ -n "$ours" ]; then
+    ok ":$port ($label) is ours already (container $ours) — reusing"
+  else
+    warn ":$port ($label) is taken — only $label fails; nothing in our path uses it, continuing"
+  fi
+}
+
+# ── [1/6] tooling ─────────────────────────────────────────────────────
+
+step "1/6" "tooling"
+have node || die "node not found — install Node 20+ first"
+have npm || die "npm not found"
+say "node $(node --version), npm $(npm --version)"
+if [ "$MODE" = "regtest" ] || [ "$WITH_DB" = 1 ]; then
+  have docker || die "docker not found — needed for mode=$MODE / --with-db"
+  docker ps >/dev/null 2>&1 || die "docker daemon is not reachable — start Docker Desktop"
+  ok "docker daemon answers"
+fi
+if [ "$MODE" = "regtest" ]; then
+  if have nigiri; then
+    ok "nigiri found ($(nigiri --version 2>/dev/null | head -1 || echo version unknown))"
+  else
+    echo "   Nigiri not installed."
+    echo "   Install: curl https://getnigiri.vulpem.com | bash  (needs sudo for /usr/local/bin;"
+    echo "            or fetch the binary into ~/.local/bin and add it to PATH)"
+    echo "   Then:    nigiri start"
+    die "nigiri missing"
+  fi
+fi
+
+# ── [2/6] ports ───────────────────────────────────────────────────────
+
+step "2/6" "ports"
+DEVLOCK="$(own_dev_lock || true)"
+DEVLOCK_PID="${DEVLOCK%%|*}"
+DEVLOCK_PORT="${DEVLOCK##*|}"
+if [ -z "$DEVLOCK" ]; then DEVLOCK_PID=""; DEVLOCK_PORT=""; fi
+resolve_jumpable APP_PORT "app"
+# A live dev server on ANY other port still blocks us via the repo lock.
+if [ -n "$DEVLOCK_PID" ] && [ "$DEVLOCK_PORT" != "$APP_PORT" ]; then
+  warn "our own dev server runs on :$DEVLOCK_PORT (pid $DEVLOCK_PID, repo lock) — next dev on :$APP_PORT would refuse to start"
+  if [ "$YES" = 1 ]; then
+    if [ "$KILL_OURS" = 1 ]; then
+      say "--yes --kill-ours: restarting our own dev server on :$APP_PORT"
+      kill_pid "$DEVLOCK_PID" "pid $DEVLOCK_PID (dev server :$DEVLOCK_PORT)"
+      DEVLOCK_PID=""; DEVLOCK_PORT=""
+    else
+      die "our own dev server holds the repo lock — re-run with --kill-ours or stop pid $DEVLOCK_PID"
+    fi
+  else
+    ans=$(ask "dev server on :$DEVLOCK_PORT — (r)estart it on :$APP_PORT, (a)bort" "r") || exit 1
+    case "$ans" in
+      a*) die "aborted by you" ;;
+      *)
+        say "restarting our own dev server on :$APP_PORT"
+        kill_pid "$DEVLOCK_PID" "pid $DEVLOCK_PID (dev server :$DEVLOCK_PORT)"
+        DEVLOCK_PID=""; DEVLOCK_PORT=""
+        ;;
+    esac
+  fi
+fi
+if [ "$MODE" = "regtest" ]; then
+  resolve_jumpable INFRA_PORT "infra-api"
+  resolve_fixed 18443 "bitcoind RPC" "Nigiri owns this port"
+  resolve_fixed 18444 "bitcoind P2P" "Nigiri owns this port"
+  resolve_fixed 30000 "electrs HTTP" "Nigiri owns this port"
+  resolve_fixed 50000 "electrs P2P" "Nigiri owns this port"
+  resolve_fixed 50003 "electrum-ws" "Nigiri owns this port"
+  note_soft 3000 "chopsticks"
+  say ":5000 (Esplora UI) is skipped by design — macOS AirPlay owns it, nothing in our path uses it"
+fi
+if [ "$WITH_DB" = 1 ]; then
+  resolve_fixed 5433 "crypto-drive-pg" "change the recipe in tests/e2e/README.md if you must move it"
+fi
+
+# ── [3/6] nigiri ──────────────────────────────────────────────────────
+
+nigiri_up() {
+  curl -s -o /dev/null --max-time 3 http://localhost:18443/ 2>/dev/null
+}
+
+if [ "$MODE" = "regtest" ]; then
+  step "3/6" "nigiri (bitcoind + electrs)"
+  if nigiri_up; then
+    ok "bitcoind RPC answers on :18443 — Nigiri already running, reusing"
+  else
+    say "bitcoind RPC is silent — Nigiri needs a start"
+    if [ "$DRY_RUN" = 1 ]; then
+      say "would run: nigiri start"
+    else
+      if [ "$YES" = 0 ]; then
+        ans=$(ask "start Nigiri now? (y)es / (a)bort" "y") || exit 1
+        case "$ans" in y*|s*) ;; *) die "aborted by you" ;; esac
+      else
+        say "--yes: starting Nigiri"
+      fi
+      export PATH="$HOME/.local/bin:$PATH"
+      nigiri start || die "'nigiri start' failed"
+      say "waiting for bitcoind RPC (up to ${WAIT_SECS}s)…"
+      for _ in $(seq 1 "$WAIT_SECS"); do
+        nigiri_up && break
+        sleep 1
+      done
+      nigiri_up || die "bitcoind never answered — check 'docker ps' and Nigiri logs"
+      ok "bitcoind RPC answers"
+    fi
+  fi
+fi
+
+# ── [4/6] infra-api ───────────────────────────────────────────────────
+
+infra_health() {
+  curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer dev" \
+    --max-time 3 "http://localhost:${INFRA_PORT}/api/health" 2>/dev/null || echo "000"
+}
+
+if [ "$MODE" = "regtest" ]; then
+  step "4/6" "infra-api (:$INFRA_PORT)"
+  if [ "$(infra_health)" = "200" ]; then
+    faucet=$(curl -s -H "Authorization: Bearer dev" --max-time 3 \
+      "http://localhost:${INFRA_PORT}/api/health" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).faucet_balance)}catch{console.log('?')}})")
+    ok "infra-api already healthy (faucet $faucet sats) — reusing"
+  else
+    say "infra-api is not healthy on :$INFRA_PORT — it needs a (re)start"
+    if [ "$DRY_RUN" = 1 ]; then
+      say "would run: INFRA_API_PORT=$INFRA_PORT docker compose -f docker-compose.infra-api.yml up -d --build"
+    else
+      if [ "$YES" = 0 ]; then
+        ans=$(ask "start infra-api now? (y)es / (a)bort" "y") || exit 1
+        case "$ans" in y*|s*) ;; *) die "aborted by you" ;; esac
+      else
+        say "--yes: starting infra-api"
+      fi
+      (
+        cd "$REPO" || exit 1
+        INFRA_API_PORT="$INFRA_PORT" docker compose -f docker-compose.infra-api.yml up -d --build || exit 1
+      ) || die "infra-api compose failed"
+      say "waiting for infra-api health (up to ${WAIT_SECS}s)…"
+      for _ in $(seq 1 "$WAIT_SECS"); do
+        [ "$(infra_health)" = "200" ] && break
+        sleep 1
+      done
+      [ "$(infra_health)" = "200" ] || die "infra-api never turned healthy — 'docker logs crypto-drive-infra-api-1'"
+      ok "infra-api healthy on :$INFRA_PORT"
+    fi
+  fi
+fi
+
+# ── [5/6] postgres ────────────────────────────────────────────────────
+
+if [ "$WITH_DB" = 1 ]; then
+  step "5/6" "postgres (crypto-drive-pg :5433)"
+  state=$(docker inspect crypto-drive-pg --format '{{.State.Running}}' 2>/dev/null || echo "missing")
+  if [ "$state" = "true" ]; then
+    ok "crypto-drive-pg already running — reusing"
+  elif [ "$state" = "false" ]; then
+    say "crypto-drive-pg exists but is stopped"
+    if [ "$DRY_RUN" = 1 ]; then
+      say "would run: docker start crypto-drive-pg"
+    else
+      docker start crypto-drive-pg >/dev/null || die "'docker start crypto-drive-pg' failed"
+      ok "crypto-drive-pg started"
+    fi
+  else
+    say "crypto-drive-pg does not exist — creating it (recipe from tests/e2e/README.md)"
+    if [ "$DRY_RUN" = 1 ]; then
+      say "would run: docker run -d --name crypto-drive-pg -p 5433:5432 -e POSTGRES_PASSWORD=postgres postgres:16"
+    else
+      docker run -d --name crypto-drive-pg -p 5433:5432 \
+        -e POSTGRES_PASSWORD=postgres postgres:16 >/dev/null || die "postgres container failed to start"
+      ok "crypto-drive-pg created and running"
+    fi
+  fi
+fi
+
+# ── [6/6] app ─────────────────────────────────────────────────────────
+
+step "6/6" "app"
+export APP_PORT
+export BITCOIN_MODE="$MODE"
+if [ "$MODE" = "regtest" ]; then
+  export INFRA_BASE_URL="http://localhost:${INFRA_PORT}"
+  export INFRA_SHARED_SECRET=dev
+  export ADMIN_MINE_TOKEN=dev
+fi
+if [ "$WITH_DB" = 1 ]; then
+  export DATABASE_URL="postgres://postgres:postgres@127.0.0.1:5433/postgres"
+fi
+echo "   env: BITCOIN_MODE=$MODE APP_PORT=$APP_PORT$([ "$MODE" = "regtest" ] && echo " INFRA_BASE_URL=$INFRA_BASE_URL" || true)$([ "$WITH_DB" = 1 ] && echo " DATABASE_URL=pg:5433" || true)"
+[ "$JUMPED_APP" = 1 ] && warn "app port jumped — the app will NOT be on :43127"
+[ "$JUMPED_INFRA" = 1 ] && warn "infra-api port jumped — INFRA_BASE_URL points at :$INFRA_PORT"
+echo "   open:  http://localhost:${APP_PORT}/wallet   (after unlock at /unlock)"
+if [ "$DRY_RUN" = 1 ]; then
+  say "would exec: next dev --port $APP_PORT"
+  echo "DRY RUN complete — nothing was started, killed, or jumped."
+  exit 0
+fi
+cd "$REPO" || die "cannot cd to $REPO"
+say "exec: next dev --port $APP_PORT"
+exec npx next dev --port "$APP_PORT"

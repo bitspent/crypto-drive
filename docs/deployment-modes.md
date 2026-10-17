@@ -63,6 +63,12 @@ replaces the Bitcoin layer with Nigiri and runs only the `api/` service
 from this repo:
 
 ```bash
+npm run boot -- regtest   # ports + Nigiri + infra-api + app, interactively
+```
+
+or step by step:
+
+```bash
 nigiri start                                        # bitcoind, electrs, Esplora
 docker compose -f docker-compose.infra-api.yml up -d  # api/ → Nigiri's ports
 npm run dev:regtest                                 # app with BITCOIN_MODE=regtest

@@ -36,14 +36,20 @@ Setup for regtest dev:
 
 ```bash
 curl https://getnigiri.vulpem.com | bash
-nigiri start
-docker compose -f docker-compose.infra-api.yml up -d
-npm run dev:regtest
+npm run boot -- regtest   # checks ports, starts Nigiri + infra-api, boots the app
 ```
 
-`dev:regtest` refuses to boot unless Nigiri's bitcoind answers on
-`localhost:18443` and the infra-api answers on `localhost:8081`. On a fresh
-Nigiri start, mine one block so electrs leaves its sync wait (any
+`boot` is the interactive full-stack boot: it verifies tooling, resolves
+every port conflict (jump / kill / abort — never kills foreign PIDs without
+asking), starts Nigiri and the infra-api when they are down, then execs the
+dev server. Flags: `--app-port`, `--infra-port`, `--with-db` (also boot local
+Postgres), `--yes` (non-interactive), `--kill-ours`, `--dry-run`.
+`npm run boot -- --help` prints the full policy. The older
+`npm run dev:regtest` still works as a fail-fast variant (it refuses to boot
+unless bitcoind answers on `localhost:18443` and the infra-api on
+`localhost:8081`, and starts nothing itself).
+
+On a fresh Nigiri start, mine one block so electrs leaves its sync wait (any
 `generatetoaddress` call does it). Stop with `nigiri stop` and
 `docker compose -f docker-compose.infra-api.yml down`.
 
@@ -114,6 +120,8 @@ without it). `DATABASE_URL` unset means the dev-only file store.
 | `npm run dev` | Dev server on port **43127** (simulated Bitcoin) |
 | `npm run dev:signet` | Dev server with live signet fees (needs internet) |
 | `npm run dev:regtest` | Dev server on local regtest (needs Nigiri + infra-api) |
+| `npm run boot -- [mode]` | Interactive full-stack boot: ports, Nigiri, infra-api, app (`--help` for flags) |
+| `bash scripts/check-ports.sh [mode]` | Diagnose port conflicts without changing anything |
 | `npm run build` | Production build |
 | `npm start` | Production server on **43127** |
 | `npm run lint` | ESLint |
