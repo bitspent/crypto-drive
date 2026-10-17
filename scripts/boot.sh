@@ -929,9 +929,10 @@ if [ "$WITH_DB" = 1 ]; then
   else
     say "crypto-drive-pg does not exist — creating it (recipe from tests/e2e/README.md)"
     if [ "$DRY_RUN" = 1 ]; then
-      say "would run: docker run -d --name crypto-drive-pg -p $PG_PORT:5432 -e POSTGRES_PASSWORD=postgres postgres:16"
+      say "would run: docker run -d --name crypto-drive-pg -p $PG_PORT:5432 --health-cmd='pg_isready -U postgres' -e POSTGRES_PASSWORD=postgres postgres:16"
     else
       docker run -d --name crypto-drive-pg -p "$PG_PORT:5432" \
+        --health-cmd="pg_isready -U postgres" --health-interval=10s --health-timeout=5s --health-retries=3 --health-start-period=15s \
         -e POSTGRES_PASSWORD=postgres postgres:16 >/dev/null || die "postgres container failed to start"
       ok "crypto-drive-pg created and running on :$PG_PORT"
     fi

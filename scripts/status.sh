@@ -48,9 +48,9 @@ have() { command -v "$1" >/dev/null 2>&1; }
 APP_UP=0; APP_MODE=""; APP_DB=""; APP_PID=""; APP_AGE=""; LOCK_PID=""; LOCK_PORT=""
 BITCOIND_CONTAINER="unknown"; BITCOIND_SINCE=""; BITCOIND_RESTARTS=""; BITCOIND_HEIGHT=""
 ELECTRS_CONTAINER="unknown"; ELECTRS_SINCE=""; ELECTRS_TIP=""
-CHOP_CONTAINER="unknown"; ESPLORA_CONTAINER="unknown"; ESPLORA_NIGIRI="unknown"; ESPLORA_URL=""; ESPLORA_UP=0
-INFRA_CONTAINER="unknown"; INFRA_SINCE=""; INFRA_UP=0; INFRA_BC=""; INFRA_EL=""; FAUCET=""
-PG_CONTAINER="unknown"; PG_SINCE=""; PG_READY=""; PG_MIGRATED=""
+CHOP_CONTAINER="unknown"; ESPLORA_CONTAINER="unknown"; ESPLORA_NIGIRI="unknown"; ESPLORA_URL=""; ESPLORA_UP=0; ESPLORA_HEALTH=""
+INFRA_CONTAINER="unknown"; INFRA_SINCE=""; INFRA_UP=0; INFRA_BC=""; INFRA_EL=""; FAUCET=""; INFRA_HEALTH=""
+PG_CONTAINER="unknown"; PG_SINCE=""; PG_READY=""; PG_MIGRATED=""; PG_HEALTH=""
 PG_STUDENTS=""; PG_SESSIONS=""; PG_CERTS=""; PG_WEBHOOKS=""
 FS_PRESENT=0; FS_BYTES=""; FS_STUDENTS=""
 ERR_BC=""; ERR_EL=""; ERR_INFRA=""; ERR_PG=""
@@ -98,6 +98,7 @@ probe_chain() {
   CHOP_CONTAINER=$(container_state chopsticks | cut -d'|' -f1)
   # Our UI first (self-discovers its jumped port); Nigiri's :5000 otherwise.
   ESPLORA_CONTAINER=$(container_state crypto-drive-esplora-ui-1 | cut -d'|' -f1)
+  ESPLORA_HEALTH=$(container_health crypto-drive-esplora-ui-1)
   ESPLORA_NIGIRI=$(container_state esplora | cut -d'|' -f1)
   if [ "$ESPLORA_CONTAINER" = "running" ]; then
     local eport
@@ -119,6 +120,7 @@ probe_infra() {
   local st body
   st=$(container_state crypto-drive-infra-api-1); INFRA_CONTAINER="${st%%|*}"
   if [[ "$st" == *"|"* ]]; then INFRA_SINCE=$(echo "$st" | cut -d'|' -f2 | cut -c1-16 | tr 'T' ' '); fi
+  INFRA_HEALTH=$(container_health crypto-drive-infra-api-1)
   body=$(curl -s -m 3 -H "Authorization: Bearer $INFRA_SECRET" "http://127.0.0.1:${INFRA_PORT}/api/health" 2>/dev/null) || body=""
   if [ -n "$body" ]; then
     INFRA_UP=1
@@ -132,6 +134,7 @@ probe_pg() {
   local st
   st=$(container_state crypto-drive-pg); PG_CONTAINER="${st%%|*}"
   if [[ "$st" == *"|"* ]]; then PG_SINCE=$(echo "$st" | cut -d'|' -f2 | cut -c1-16 | tr 'T' ' '); fi
+  PG_HEALTH=$(container_health crypto-drive-pg)
   if [ "$PG_CONTAINER" != "running" ]; then return 0; fi
   if docker exec crypto-drive-pg pg_isready -U postgres -q 2>/dev/null; then
     PG_READY="yes"
@@ -162,8 +165,14 @@ probe_filestore() {
   fi
 }
 
+# container_health <name>: healthy|unhealthy|starting|none (no HEALTHCHECK).
+container_health() {
+  have docker || { echo "unknown"; return 0; }
+  docker inspect "$1" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' 2>/dev/null || echo "missing"
+}
+
 probe_errors() {
-  # probe_errors <var> <container>: count of error-ish log lines in 10m.
+# probe_errors <var> <container>: count of error-ish log lines in 10m.
   local var=$1 name=$2 n
   if [ "$(container_state "$name" | cut -d'|' -f1)" != "running" ]; then
     printf -v "$var" '%s' "-"
@@ -267,12 +276,13 @@ emit_human() {
   echo
   printf 'chopsticks %s  container %s\n' "$(mark "$([ "$CHOP_CONTAINER" = "running" ] && echo up || echo warn)")" "$CHOP_CONTAINER"
   if [ "$ESPLORA_UP" = 1 ]; then
-    printf 'esplora    %s  ours %s answers (nigiri: %s)\n' "$(mark up)" "$ESPLORA_URL" "$ESPLORA_NIGIRI"
+    printf 'esplora    %s  ours %s answers (nigiri: %s) health=%s\n' "$(mark up)" "$ESPLORA_URL" "$ESPLORA_NIGIRI" "${ESPLORA_HEALTH:-?}"
   else
-    printf 'esplora    %s  ours=%s nigiri=%s\n' "$(mark warn)" "$ESPLORA_CONTAINER" "$ESPLORA_NIGIRI"
+    printf 'esplora    %s  ours=%s nigiri=%s health=%s\n' "$(mark warn)" "$ESPLORA_CONTAINER" "$ESPLORA_NIGIRI" "${ESPLORA_HEALTH:-?}"
   fi
   printf 'infra-api  %s  container %s' "$(mark "$([ "$INFRA_UP" = 1 ] && echo up || echo down)")" "$INFRA_CONTAINER"
   [ -n "$INFRA_SINCE" ] && printf ' since %s' "$INFRA_SINCE"
+  [ -n "$INFRA_HEALTH" ] && printf ' health=%s' "$INFRA_HEALTH"
   if [ "$INFRA_UP" = 1 ]; then
     printf ' bitcoind=%s electrs=%s' "${INFRA_BC:-?}" "${INFRA_EL:-?}"
     [ -n "$FAUCET" ] && printf ' faucet %s sats (%s BTC)' "$FAUCET" "$(btc "$FAUCET")"
@@ -282,6 +292,7 @@ emit_human() {
   echo
   printf 'postgres   %s  container %s' "$(mark "$([ "$PG_CONTAINER" = "running" ] && [ "$PG_READY" = "yes" ] && echo up || ([ "$PG_CONTAINER" = "missing" ] && echo warn || echo down))")" "$PG_CONTAINER"
   [ -n "$PG_SINCE" ] && printf ' since %s' "$PG_SINCE"
+  [ -n "$PG_HEALTH" ] && printf ' health=%s' "$PG_HEALTH"
   if [ "$PG_READY" = "yes" ]; then
     if [ "$PG_MIGRATED" = "yes" ]; then
       printf ' students=%s sessions=%s certs=%s webhooks=%s' "$PG_STUDENTS" "$PG_SESSIONS" "$PG_CERTS" "$PG_WEBHOOKS"
@@ -334,9 +345,9 @@ emit_json() {
     printf '"bitcoind":{"container":%s,"since":%s,"restarts":%s,"height":%s},' "$(jstr "$BITCOIND_CONTAINER")" "$(jstr "$BITCOIND_SINCE")" "$(jnum "$BITCOIND_RESTARTS")" "$(jnum "$BITCOIND_HEIGHT")"
     printf '"electrs":{"container":%s,"since":%s,"tip":%s,"lag":%s},' "$(jstr "$ELECTRS_CONTAINER")" "$(jstr "$ELECTRS_SINCE")" "$(jnum "$ELECTRS_TIP")" "$lag"
     printf '"chopsticks":{"container":%s},' "$(jstr "$CHOP_CONTAINER")"
-    printf '"esplora":{"container":%s,"nigiri":%s,"url":%s,"up":%s},' "$(jstr "$ESPLORA_CONTAINER")" "$(jstr "$ESPLORA_NIGIRI")" "$(jstr "$ESPLORA_URL")" "$(jbool "$ESPLORA_UP")"
-    printf '"infraApi":{"container":%s,"since":%s,"up":%s,"bitcoindReady":%s,"electrsReady":%s,"faucetSats":%s},' "$(jstr "$INFRA_CONTAINER")" "$(jstr "$INFRA_SINCE")" "$(jbool "$INFRA_UP")" "$(jbool "$INFRA_BC")" "$(jbool "$INFRA_EL")" "$(jnum "$FAUCET")"
-    printf '"postgres":{"container":%s,"since":%s,"ready":%s,"migrated":%s,' "$(jstr "$PG_CONTAINER")" "$(jstr "$PG_SINCE")" "$(jbool "$PG_READY")" "$(jbool "$PG_MIGRATED")"
+    printf '"esplora":{"container":%s,"nigiri":%s,"url":%s,"up":%s,"health":%s},' "$(jstr "$ESPLORA_CONTAINER")" "$(jstr "$ESPLORA_NIGIRI")" "$(jstr "$ESPLORA_URL")" "$(jbool "$ESPLORA_UP")" "$(jstr "$ESPLORA_HEALTH")"
+    printf '"infraApi":{"container":%s,"since":%s,"up":%s,"health":%s,"bitcoindReady":%s,"electrsReady":%s,"faucetSats":%s},' "$(jstr "$INFRA_CONTAINER")" "$(jstr "$INFRA_SINCE")" "$(jbool "$INFRA_UP")" "$(jstr "$INFRA_HEALTH")" "$(jbool "$INFRA_BC")" "$(jbool "$INFRA_EL")" "$(jnum "$FAUCET")"
+    printf '"postgres":{"container":%s,"since":%s,"health":%s,"ready":%s,"migrated":%s,' "$(jstr "$PG_CONTAINER")" "$(jstr "$PG_SINCE")" "$(jstr "$PG_HEALTH")" "$(jbool "$PG_READY")" "$(jbool "$PG_MIGRATED")"
     printf '"students":%s,"sessions":%s,"certificates":%s,"webhooks":%s},' "$(jnum "$PG_STUDENTS")" "$(jnum "$PG_SESSIONS")" "$(jnum "$PG_CERTS")" "$(jnum "$PG_WEBHOOKS")"
     printf '"filestore":{"present":%s,"bytes":%s,"students":%s},' "$(jbool "$FS_PRESENT")" "$(jnum "$FS_BYTES")" "$(jnum "$FS_STUDENTS")"
     printf '"errors10m":{"bitcoind":%s,"electrs":%s,"infraApi":%s,"postgres":%s},' "$(jnum "$ERR_BC")" "$(jnum "$ERR_EL")" "$(jnum "$ERR_INFRA")" "$(jnum "$ERR_PG")"

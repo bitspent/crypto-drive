@@ -48,6 +48,8 @@ The suite also runs against Postgres; both modes must stay green.
 
 ```sh
 docker run -d --name crypto-drive-pg -p 5433:5432 \
+  --health-cmd="pg_isready -U postgres" --health-interval=10s \
+  --health-timeout=5s --health-retries=3 --health-start-period=15s \
   -e POSTGRES_PASSWORD=postgres postgres:16   # once; keep it running
 export E2E_DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5433/postgres
 DATABASE_URL=$E2E_DATABASE_URL npm run db:test-setup   # migrate + truncate

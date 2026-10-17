@@ -87,6 +87,15 @@ that port is AirPlay by default (System Settings → AirPlay Receiver off to
 free it) — ours dodges the fight entirely. Signet links to mempool.space;
 simulated shows no link (those txids are invented).
 
+Health visibility: the images we own carry Docker HEALTHCHECKs —
+`api/Dockerfile` probes `/api/health` (liveness only: HTTP 200 means the
+process answers; downstream outages stay blamed on the functional probes),
+`esplora-ui` gets one via compose, and `boot.sh` creates `crypto-drive-pg`
+with `pg_isready` flags (existing pg containers pick it up on recreate).
+Nigiri's images are untouched. `status.sh` prints the native state as
+`health=` on each row (and `"health"` in `--json`) next to the functional
+answer-checks, which remain the source of truth.
+
 ## Reaching the infra from Vercel
 
 The regtest stack is self-hosted; Vercel only needs outbound HTTPS to

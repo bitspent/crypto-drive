@@ -32,3 +32,10 @@ services:
     environment:
       API_URL: http://localhost:30000
       CORS_ALLOW: "*"
+    # The image ships no curl; node (v16, http module — no global fetch) probes.
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/',function(r){process.exit(r.statusCode===200?0:1)}).on('error',function(){process.exit(1)})"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s

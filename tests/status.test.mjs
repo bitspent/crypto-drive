@@ -47,6 +47,14 @@ describe("status.sh", () => {
     assert.equal(typeof j.app.up, "boolean");
     assert.equal(typeof j.app.port, "number");
     assert.ok("url" in j.esplora && "up" in j.esplora && "nigiri" in j.esplora);
+    for (const section of [j.esplora, j.infraApi, j.postgres]) {
+      assert.ok("health" in section);
+      assert.ok(
+        section.health === null ||
+          ["healthy", "unhealthy", "starting", "none", "unknown", "missing"].includes(section.health),
+        `unexpected health value ${section.health}`,
+      );
+    }
     assert.ok(Array.isArray(j.warnings));
   });
 
@@ -68,6 +76,7 @@ describe("status.sh", () => {
     for (const s of ["crypto-drive status", "bitcoind", "electrs", "infra-api", "postgres", "filestore", "errors-10m", "warnings"]) {
       assert.match(r.stdout, new RegExp(s), `missing ${s}`);
     }
+    assert.match(r.stdout, /health=(healthy|unhealthy|starting|none|unknown|missing|\?)/);
   });
 
   it("--watch re-reports until killed", async () => {
