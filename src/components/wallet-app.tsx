@@ -1269,22 +1269,20 @@ function TxDetailsSheet({
   tx,
   threshold,
   network,
+  esploraBase,
   onClose,
 }: {
   tx: TxRecord;
   threshold: number;
   network: BitcoinNetwork;
+  esploraBase: string;
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const incoming = tx.direction === "in";
-  const explorerUrl = explorerTxUrl(
-    network,
-    tx.id,
-    process.env.NEXT_PUBLIC_ESPLORA_URL || undefined,
-  );
+  const explorerUrl = explorerTxUrl(network, tx.id, esploraBase);
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -1512,9 +1510,11 @@ function EmptyState({
 export function WalletApp({
   initial,
   network,
+  esploraBase,
 }: {
   initial: WalletState | null;
   network: BitcoinNetwork;
+  esploraBase: string;
 }) {
   const [wallet, setWallet] = useState<WalletState | null>(initial);
   const [phase, setPhase] = useState<"home" | "reveal" | "confirm">("home");
@@ -1752,6 +1752,7 @@ export function WalletApp({
           tx={detailsTx}
           threshold={wallet.confirmedThreshold}
           network={network}
+          esploraBase={esploraBase}
           onClose={closeDetails}
         />
       ) : null}

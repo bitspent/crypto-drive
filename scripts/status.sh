@@ -48,7 +48,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
 APP_UP=0; APP_MODE=""; APP_DB=""; APP_PID=""; APP_AGE=""; LOCK_PID=""; LOCK_PORT=""
 BITCOIND_CONTAINER="unknown"; BITCOIND_SINCE=""; BITCOIND_RESTARTS=""; BITCOIND_HEIGHT=""
 ELECTRS_CONTAINER="unknown"; ELECTRS_SINCE=""; ELECTRS_TIP=""
-CHOP_CONTAINER="unknown"; ESPLORA_CONTAINER="unknown"
+CHOP_CONTAINER="unknown"; ESPLORA_CONTAINER="unknown"; ESPLORA_NIGIRI="unknown"; ESPLORA_URL=""; ESPLORA_UP=0
 INFRA_CONTAINER="unknown"; INFRA_SINCE=""; INFRA_UP=0; INFRA_BC=""; INFRA_EL=""; FAUCET=""
 PG_CONTAINER="unknown"; PG_SINCE=""; PG_READY=""; PG_MIGRATED=""
 PG_STUDENTS=""; PG_SESSIONS=""; PG_CERTS=""; PG_WEBHOOKS=""
@@ -96,7 +96,20 @@ probe_chain() {
   st=$(container_state electrs); ELECTRS_CONTAINER="${st%%|*}"
   if [[ "$st" == *"|"* ]]; then ELECTRS_SINCE=$(echo "$st" | cut -d'|' -f2 | cut -c1-16 | tr 'T' ' '); fi
   CHOP_CONTAINER=$(container_state chopsticks | cut -d'|' -f1)
-  ESPLORA_CONTAINER=$(container_state esplora | cut -d'|' -f1)
+  # Our UI first (self-discovers its jumped port); Nigiri's :5000 otherwise.
+  ESPLORA_CONTAINER=$(container_state crypto-drive-esplora-ui-1 | cut -d'|' -f1)
+  ESPLORA_NIGIRI=$(container_state esplora | cut -d'|' -f1)
+  if [ "$ESPLORA_CONTAINER" = "running" ]; then
+    local eport
+    eport=$(docker port crypto-drive-esplora-ui-1 5000 2>/dev/null | head -1 | sed 's/.*://')
+    case "$eport" in
+      ''|*[!0-9]*) ESPLORA_URL="" ;;
+      *)
+        ESPLORA_URL="http://localhost:${eport}"
+        if curl -s -o /dev/null -m 3 "${ESPLORA_URL}/" 2>/dev/null; then ESPLORA_UP=1; fi
+        ;;
+    esac
+  fi
   # Dev-only Nigiri RPC credentials (defaults, also in docker-compose.infra-api.yml).
   BITCOIND_HEIGHT=$(curl -s -m 4 --user admin1:123 --data-binary '{"jsonrpc":"1.0","method":"getblockcount","params":[]}' -H 'content-type: text/plain' http://127.0.0.1:18443/ 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const r=JSON.parse(s).result;if(Number.isInteger(r))process.stdout.write(String(r))}catch{}})" 2>/dev/null)
   ELECTRS_TIP=$(curl -s -m 4 http://127.0.0.1:30000/blocks/tip/height 2>/dev/null | tr -cd '0-9')
@@ -188,8 +201,12 @@ crosscheck() {
   if [ "$CHOP_CONTAINER" != "running" ]; then
     warn "chopsticks is $CHOP_CONTAINER (:3000 taken?) — soft, nothing in our path uses it"
   fi
-  if [ "$ESPLORA_CONTAINER" != "running" ]; then
-    warn "esplora is $ESPLORA_CONTAINER (:5000 is macOS AirPlay) — skipped by design"
+  if [ "$ESPLORA_UP" = 1 ]; then
+    : # ours answers — links work, nothing to say
+  elif [ "$ESPLORA_CONTAINER" = "running" ]; then
+    warn "our esplora-ui runs but ${ESPLORA_URL:-its port} is silent — wallet links may fail"
+  else
+    warn "our esplora-ui is $ESPLORA_CONTAINER (nigiri's is $ESPLORA_NIGIRI; :5000 is macOS AirPlay) — wallet links fall back to :5000"
   fi
   if [ "$PG_CONTAINER" = "running" ] && [ "$PG_MIGRATED" = "no" ]; then
     warn "postgres runs but tables are missing — run npm run db:test-setup"
@@ -249,7 +266,11 @@ emit_human() {
   [ -n "$ELECTRS_TIP" ] && printf ' tip %s%s' "$ELECTRS_TIP" "$lag"
   echo
   printf 'chopsticks %s  container %s\n' "$(mark "$([ "$CHOP_CONTAINER" = "running" ] && echo up || echo warn)")" "$CHOP_CONTAINER"
-  printf 'esplora    %s  container %s\n' "$(mark "$([ "$ESPLORA_CONTAINER" = "running" ] && echo up || echo warn)")" "$ESPLORA_CONTAINER"
+  if [ "$ESPLORA_UP" = 1 ]; then
+    printf 'esplora    %s  ours %s answers (nigiri: %s)\n' "$(mark up)" "$ESPLORA_URL" "$ESPLORA_NIGIRI"
+  else
+    printf 'esplora    %s  ours=%s nigiri=%s\n' "$(mark warn)" "$ESPLORA_CONTAINER" "$ESPLORA_NIGIRI"
+  fi
   printf 'infra-api  %s  container %s' "$(mark "$([ "$INFRA_UP" = 1 ] && echo up || echo down)")" "$INFRA_CONTAINER"
   [ -n "$INFRA_SINCE" ] && printf ' since %s' "$INFRA_SINCE"
   if [ "$INFRA_UP" = 1 ]; then
@@ -313,7 +334,7 @@ emit_json() {
     printf '"bitcoind":{"container":%s,"since":%s,"restarts":%s,"height":%s},' "$(jstr "$BITCOIND_CONTAINER")" "$(jstr "$BITCOIND_SINCE")" "$(jnum "$BITCOIND_RESTARTS")" "$(jnum "$BITCOIND_HEIGHT")"
     printf '"electrs":{"container":%s,"since":%s,"tip":%s,"lag":%s},' "$(jstr "$ELECTRS_CONTAINER")" "$(jstr "$ELECTRS_SINCE")" "$(jnum "$ELECTRS_TIP")" "$lag"
     printf '"chopsticks":{"container":%s},' "$(jstr "$CHOP_CONTAINER")"
-    printf '"esplora":{"container":%s},' "$(jstr "$ESPLORA_CONTAINER")"
+    printf '"esplora":{"container":%s,"nigiri":%s,"url":%s,"up":%s},' "$(jstr "$ESPLORA_CONTAINER")" "$(jstr "$ESPLORA_NIGIRI")" "$(jstr "$ESPLORA_URL")" "$(jbool "$ESPLORA_UP")"
     printf '"infraApi":{"container":%s,"since":%s,"up":%s,"bitcoindReady":%s,"electrsReady":%s,"faucetSats":%s},' "$(jstr "$INFRA_CONTAINER")" "$(jstr "$INFRA_SINCE")" "$(jbool "$INFRA_UP")" "$(jbool "$INFRA_BC")" "$(jbool "$INFRA_EL")" "$(jnum "$FAUCET")"
     printf '"postgres":{"container":%s,"since":%s,"ready":%s,"migrated":%s,' "$(jstr "$PG_CONTAINER")" "$(jstr "$PG_SINCE")" "$(jbool "$PG_READY")" "$(jbool "$PG_MIGRATED")"
     printf '"students":%s,"sessions":%s,"certificates":%s,"webhooks":%s},' "$(jnum "$PG_STUDENTS")" "$(jnum "$PG_SESSIONS")" "$(jnum "$PG_CERTS")" "$(jnum "$PG_WEBHOOKS")"

@@ -14,6 +14,9 @@
 #   --infra-port PORT          infra-api host port, regtest only (default: 8081)
 #   --pg-port PORT             postgres host port with --with-db, jumps on
 #                              conflict (default: 5433)
+#   --esplora-port PORT        our Esplora UI host port, regtest only, always
+#                              auto-jumps (default: 5001; Nigiri's own :5000
+#                              is AirPlay on macOS)
 #   --with-db                  also ensure crypto-drive-pg :5433 and run the app on Postgres
 #   --wait SEC                 how long to wait for services (default: 60)
 #   --yes, -y                  non-interactive: auto-jump, auto-start, never kill
@@ -31,7 +34,8 @@
 #   ANY port, so that case is restart-or-abort, never jump. Nigiri's ports
 #   are fixed (Nigiri owns them) — free them or abort. Chopsticks :3000 is
 #   soft: only chopsticks fails when it is taken, nothing in our path uses
-#   it, so the script warns and continues (jumping it would change nothing).
+#   it. Chopsticks cannot jump (Nigiri owns the mapping), so the remedy is
+#   free-it-and-start-it, skip (the default), or abort; declines skip.
 #   When a DOCKER container holds a port, the offer is `docker stop <name>`
 #   (killing the backend PID would be wrong); foreign containers are stopped
 #   only after asking, never with --yes.
@@ -46,6 +50,15 @@ MODE="simulated"
 APP_PORT="${APP_PORT:-43127}"
 INFRA_PORT="8081"
 PG_PORT="5433"
+ESPLORA_PORT="5001"
+# Explicit user value (self-hosted UI) always wins for links; otherwise the
+# boot points links at our own UI when it answers, :5000 if not.
+if [ -n "${ESPLORA_PUBLIC_URL:-}" ]; then
+  ESPLORA_AUTO=0
+else
+  ESPLORA_PUBLIC_URL="http://localhost:5000"
+  ESPLORA_AUTO=1
+fi
 WITH_DB=0
 WAIT_SECS=60
 YES=0
@@ -70,6 +83,8 @@ while [ $# -gt 0 ]; do
     --infra-port=*) INFRA_PORT="${1#--infra-port=}"; shift ;;
     --pg-port) PG_PORT="${2:?--pg-port needs a value}"; shift 2 ;;
     --pg-port=*) PG_PORT="${1#--pg-port=}"; shift ;;
+    --esplora-port) ESPLORA_PORT="${2:?--esplora-port needs a value}"; shift 2 ;;
+    --esplora-port=*) ESPLORA_PORT="${1#--esplora-port=}"; shift ;;
     --with-db) WITH_DB=1; shift ;;
     --wait) WAIT_SECS="${2:?--wait needs seconds}"; shift 2 ;;
     --wait=*) WAIT_SECS="${1#--wait=}"; shift ;;
@@ -237,7 +252,7 @@ our_container_on() {
     case "$ports" in
       *":$port->"*|*":$port,"*|*":$port-"*|*"-$port->"*)
         case "$name" in
-          bitcoin|electrs|electrum-ws|chopsticks|esplora|crypto-drive-infra-api-1|crypto-drive-pg)
+          bitcoin|electrs|electrum-ws|chopsticks|esplora|crypto-drive-infra-api-1|crypto-drive-esplora-ui-1|crypto-drive-pg)
             echo "$name" ;;
         esac ;;
     esac
@@ -254,6 +269,43 @@ foreign_container_on() {
       *":$port->"*|*":$port,"*|*":$port-"*|*"-$port->"*) echo "$name" ;;
     esac
   done
+}
+
+# resolve_esplora_port: our Esplora UI auto-jumps from :5001 — it is
+# auxiliary, so it never prompts and never kills; worst case it moves, and
+# if nothing nearby is free the wallet links fall back to :5000.
+resolve_esplora_port() {
+  local found ours target
+  found=$(listeners "$ESPLORA_PORT")
+  if [ -z "$found" ]; then
+    ok ":$ESPLORA_PORT (esplora-ui) is free"
+    return 0
+  fi
+  ours=$(our_container_on "$ESPLORA_PORT" | head -1)
+  if [ -n "$ours" ]; then
+    ok ":$ESPLORA_PORT (esplora-ui) is ours already (container $ours) — reusing"
+    return 0
+  fi
+  target=$(next_free_port "$ESPLORA_PORT") || {
+    warn ":$ESPLORA_PORT (esplora-ui) is taken and nothing nearby is free — links fall back to :5000"
+    ESPLORA_PORT=""
+    return 0
+  }
+  say ":$ESPLORA_PORT (esplora-ui) is taken — ours will use :$target"
+  ESPLORA_PORT="$target"
+}
+
+esplora_ui_up() {
+  [ -n "$ESPLORA_PORT" ] || return 1
+  curl -s -o /dev/null --max-time 3 "http://localhost:${ESPLORA_PORT}/" 2>/dev/null
+}
+
+point_links_at_ours() {
+  if [ "$ESPLORA_AUTO" = 1 ]; then
+    ESPLORA_PUBLIC_URL="http://localhost:${ESPLORA_PORT}"
+  else
+    say "keeping explicit ESPLORA_PUBLIC_URL=$ESPLORA_PUBLIC_URL for links"
+  fi
 }
 
 # follow_pg_mapping: an existing crypto-drive-pg keeps its own host mapping
@@ -531,17 +583,82 @@ resolve_fixed() {
   done
 }
 
-note_soft() {
-  local port=$1 label=$2
-  local found ours
+# resolve_chopsticks: :3000 is Nigiri-fixed (it cannot jump — the mapping
+# lives in Nigiri's own compose files), so the remedy is free-it-and-start
+# it, or skip. Chopsticks is soft: a declined confirm or a failed start
+# degrades to skip + continue; only an explicit (a)bort — or a confirmed
+# kill/stop that fails — aborts. --yes and non-TTY always skip.
+resolve_chopsticks() {
+  local port=3000 label="chopsticks"
+  local found ours pid cmd foreign ans
   found=$(listeners "$port")
-  ours=$(our_container_on "$port" | head -1)
   if [ -z "$found" ]; then
     ok ":$port ($label) is free"
-  elif [ -n "$ours" ]; then
+    return 0
+  fi
+  ours=$(our_container_on "$port" | head -1)
+  if [ -n "$ours" ]; then
     ok ":$port ($label) is ours already (container $ours) — reusing"
+    return 0
+  fi
+  pid=$(echo "$found" | head -1 | cut -d'|' -f1)
+  cmd=$(echo "$found" | head -1 | cut -d'|' -f2)
+  foreign=$(foreign_container_on "$port" | head -1)
+  if [ -n "$foreign" ]; then
+    warn ":$port ($label) is held by FOREIGN container $foreign — chopsticks can't start (and can't jump: Nigiri owns the mapping)"
   else
-    warn ":$port ($label) is taken — only $label fails; nothing in our path uses it, continuing"
+    warn ":$port ($label) is held by FOREIGN process (pid $pid $cmd) — chopsticks can't start (and can't jump: Nigiri owns the mapping)"
+  fi
+  say "chopsticks is optional: nothing in our path uses it"
+  if [ "$YES" = 1 ]; then
+    say "--yes: skipping chopsticks"
+    return 0
+  fi
+  if [ ! -t 0 ]; then
+    say "no TTY to ask on: skipping chopsticks"
+    return 0
+  fi
+  while true; do
+    ans=$(ask ":$port busy — (f)ree it and start chopsticks, (s)kip, (a)bort" "s") || exit 1
+    case "$ans" in
+      f*) break ;;
+      s*) say "skipping chopsticks"; return 0 ;;
+      a*) die "aborted by you" ;;
+      *) say "answer f, s, or a" ;;
+    esac
+  done
+  if [ -n "$foreign" ]; then
+    ans=$(ask "really stop FOREIGN container $foreign? type 'stop' to confirm" "no") || exit 1
+    if [ "$ans" != "stop" ]; then say "skipping chopsticks"; return 0; fi
+    stop_container "$foreign"
+  else
+    ans=$(ask "really kill FOREIGN pid $pid ($cmd)? type 'kill' to confirm" "no") || exit 1
+    if [ "$ans" != "kill" ]; then say "skipping chopsticks"; return 0; fi
+    kill_pid "$pid" "pid $pid ($cmd)"
+  fi
+  start_chopsticks
+}
+
+# start_chopsticks: bring the container up now :3000 is free. Soft: warn
+# and continue on any failure.
+start_chopsticks() {
+  if [ "$DRY_RUN" = 1 ]; then
+    say "would run: docker start chopsticks"
+    return 0
+  fi
+  if ! have docker; then say "no docker: skipping chopsticks"; return 0; fi
+  if docker start chopsticks >/dev/null 2>&1; then
+    local i
+    for i in $(seq 1 15); do
+      if curl -s -o /dev/null --max-time 2 http://localhost:3000/ 2>/dev/null; then
+        ok "chopsticks is up on :3000"
+        return 0
+      fi
+      sleep 1
+    done
+    warn "chopsticks started but :3000 never answered — continuing without it"
+  else
+    warn "'docker start chopsticks' failed (container missing?) — 'nigiri stop && nigiri start' rebuilds it; continuing without it"
   fi
 }
 
@@ -617,8 +734,13 @@ if [ "$MODE" = "regtest" ]; then
   resolve_fixed 30000 "electrs HTTP" "Nigiri owns this port"
   resolve_fixed 50000 "electrs P2P" "Nigiri owns this port"
   resolve_fixed 50003 "electrum-ws" "Nigiri owns this port"
-  note_soft 3000 "chopsticks"
-  say ":5000 (Esplora UI) is skipped by design — macOS AirPlay owns it, nothing in our path uses it"
+  resolve_chopsticks
+  resolve_esplora_port
+  if [ -n "$ESPLORA_PORT" ]; then
+    say ":5000 (Nigiri Esplora) is skipped — macOS AirPlay owns it; ours runs on :$ESPLORA_PORT (see step 4)"
+  else
+    say ":5000 (Nigiri Esplora) is skipped — macOS AirPlay owns it; no free port for ours, links use :5000"
+  fi
 fi
 if [ "$WITH_DB" = 1 ]; then
   follow_pg_mapping
@@ -681,7 +803,7 @@ if [ "$MODE" = "regtest" ]; then
   else
     say "infra-api is not healthy on :$INFRA_PORT — it needs a (re)start"
     if [ "$DRY_RUN" = 1 ]; then
-      say "would run: INFRA_API_PORT=$INFRA_PORT docker compose -f docker-compose.infra-api.yml up -d --build"
+      say "would run: INFRA_API_PORT=$INFRA_PORT docker compose -f docker-compose.infra-api.yml up -d --build infra-api"
     else
       if [ "$YES" = 0 ]; then
         while true; do
@@ -697,7 +819,7 @@ if [ "$MODE" = "regtest" ]; then
       fi
       (
         cd "$REPO" || exit 1
-        INFRA_API_PORT="$INFRA_PORT" docker compose -f docker-compose.infra-api.yml up -d --build || exit 1
+        INFRA_API_PORT="$INFRA_PORT" docker compose -f docker-compose.infra-api.yml up -d --build infra-api || exit 1
       ) || die "infra-api compose failed"
       say "waiting for infra-api health (up to ${WAIT_SECS}s)…"
       for _ in $(seq 1 "$WAIT_SECS"); do
@@ -706,6 +828,38 @@ if [ "$MODE" = "regtest" ]; then
       done
       [ "$(infra_health)" = "200" ] || die "infra-api never turned healthy — 'docker logs crypto-drive-infra-api-1'"
       ok "infra-api healthy on :$INFRA_PORT"
+    fi
+  fi
+  # Our Esplora UI (soft): the wallet links regtest txs here. Any failure
+  # keeps the :5000 fallback — the boot never aborts over the explorer.
+  if [ -z "$ESPLORA_PORT" ]; then
+    say "no port for our Esplora UI — wallet links use :5000"
+  elif esplora_ui_up; then
+    ok "esplora-ui already answers on :$ESPLORA_PORT — reusing"
+    point_links_at_ours
+  elif [ "$DRY_RUN" = 1 ]; then
+    say "would run: ESPLORA_PORT=$ESPLORA_PORT docker compose -f docker-compose.infra-api.yml up -d esplora-ui"
+    point_links_at_ours
+  else
+    (
+      cd "$REPO" || exit 1
+      ESPLORA_PORT="$ESPLORA_PORT" docker compose -f docker-compose.infra-api.yml up -d esplora-ui || exit 1
+    ) || warn "esplora-ui compose failed — wallet links use :5000"
+    if esplora_ui_up; then
+      ok "esplora-ui answers on :$ESPLORA_PORT"
+      point_links_at_ours
+    else
+      say "waiting for esplora-ui (up to 30s)…"
+      for _ in $(seq 1 30); do
+        esplora_ui_up && break
+        sleep 1
+      done
+      if esplora_ui_up; then
+        ok "esplora-ui answers on :$ESPLORA_PORT"
+        point_links_at_ours
+      else
+        warn "esplora-ui never answered — wallet links use :5000"
+      fi
     fi
   fi
 fi
@@ -746,11 +900,12 @@ if [ "$MODE" = "regtest" ]; then
   export INFRA_BASE_URL="http://localhost:${INFRA_PORT}"
   export INFRA_SHARED_SECRET=dev
   export ADMIN_MINE_TOKEN=dev
+  export ESPLORA_PUBLIC_URL
 fi
 if [ "$WITH_DB" = 1 ]; then
   export DATABASE_URL="postgres://postgres:postgres@127.0.0.1:${PG_PORT}/postgres"
 fi
-echo "   env: BITCOIN_MODE=$MODE APP_PORT=$APP_PORT$([ "$MODE" = "regtest" ] && echo " INFRA_BASE_URL=$INFRA_BASE_URL" || true)$([ "$WITH_DB" = 1 ] && echo " DATABASE_URL=pg:$PG_PORT" || true)"
+echo "   env: BITCOIN_MODE=$MODE APP_PORT=$APP_PORT$([ "$MODE" = "regtest" ] && echo " INFRA_BASE_URL=$INFRA_BASE_URL ESPLORA_PUBLIC_URL=$ESPLORA_PUBLIC_URL" || true)$([ "$WITH_DB" = 1 ] && echo " DATABASE_URL=pg:$PG_PORT" || true)"
 [ "$JUMPED_APP" = 1 ] && warn "app port jumped — the app will NOT be on :43127"
 [ "$JUMPED_INFRA" = 1 ] && warn "infra-api port jumped — INFRA_BASE_URL points at :$INFRA_PORT"
 [ "$JUMPED_PG" = 1 ] && warn "postgres port jumped — DATABASE_URL points at :$PG_PORT"

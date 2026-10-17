@@ -43,7 +43,7 @@ our_container_on() {
     case "$ports" in
       *":$port->"*|*":$port,"*|*":$port-"*|*"-$port->"*)
         case "$name" in
-          bitcoin|electrs|electrum-ws|chopsticks|esplora|crypto-drive-infra-api-1|crypto-drive-pg)
+          bitcoin|electrs|electrum-ws|chopsticks|esplora|crypto-drive-infra-api-1|crypto-drive-esplora-ui-1|crypto-drive-pg)
             echo "$name" ;;
         esac ;;
     esac
@@ -100,6 +100,7 @@ case "$MODE" in
     check 50000 "electrs P2P" hard "another electrs? 'nigiri stop' if ours"
     check 50003 "electrum-ws" hard "another electrum-ws? 'nigiri stop' if ours"
     check 3000 "chopsticks" soft "only chopsticks fails; nothing in our path uses it"
+    check "${ESPLORA_PORT:-5001}" "esplora-ui" soft "boot.sh jumps it automatically"
     if [ "$MODE" = "all" ]; then
       check 5433 "crypto-drive-pg" hard "stop it or remap -p"
     fi

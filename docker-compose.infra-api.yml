@@ -20,3 +20,15 @@ services:
       ESPLORA_URL: http://host.docker.internal:5000
       INFRA_SHARED_SECRET: dev
       ADMIN_MINE_TOKEN: dev
+
+  # Our own Esplora UI. Nigiri ships one on :5000, but on macOS AirPlay owns
+  # that port — so we run the same image on :5001 (jumpable via ESPLORA_PORT)
+  # with its browser-side API pointed straight at electrs (CORS is open).
+  # The wallet links regtest txs here (ESPLORA_PUBLIC_URL).
+  esplora-ui:
+    image: ghcr.io/vulpemventures/esplora:latest
+    ports:
+      - "${ESPLORA_PORT:-5001}:5000"
+    environment:
+      API_URL: http://localhost:30000
+      CORS_ALLOW: "*"

@@ -270,7 +270,7 @@ export function advanceTx(wallet: WalletState, txid: string): AdvanceResult {
 /**
  * Public explorer URL for a txid, or null when there is no chain to look at.
  * Signet uses mempool.space; regtest uses the local Esplora UI (override
- * with NEXT_PUBLIC_ESPLORA_URL when it does not run on localhost:5000).
+ * with ESPLORA_PUBLIC_URL when it does not run on localhost:5000).
  * Simulated txids are invented — linking them anywhere would be a lie.
  */
 export function explorerTxUrl(

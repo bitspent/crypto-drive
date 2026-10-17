@@ -43,9 +43,9 @@ npm run boot -- regtest   # checks ports, starts Nigiri + infra-api, boots the a
 every port conflict (jump / kill / `docker stop` / abort — never touches
 foreign processes or containers without asking, and no prompt kills on its
 default), starts Nigiri and the infra-api when they are down, then execs the
-dev server. Flags: `--app-port`, `--infra-port`, `--pg-port`, `--with-db`
-(also boot local Postgres), `--yes` (non-interactive), `--kill-ours`,
-`--dry-run`, and `-i`
+dev server. Flags: `--app-port`, `--infra-port`, `--pg-port`, `--esplora-port`,
+`--with-db` (also boot local Postgres), `--yes` (non-interactive),
+`--kill-ours`, `--dry-run`, and `-i`
 (guided 7-question setup first — mode, ports, db, conflict policy, confirm;
 flags you pass become the defaults).
 `npm run boot -- --help` prints the full policy. The older

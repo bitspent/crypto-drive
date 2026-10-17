@@ -46,6 +46,7 @@ describe("status.sh", () => {
     }
     assert.equal(typeof j.app.up, "boolean");
     assert.equal(typeof j.app.port, "number");
+    assert.ok("url" in j.esplora && "up" in j.esplora && "nigiri" in j.esplora);
     assert.ok(Array.isArray(j.warnings));
   });
 

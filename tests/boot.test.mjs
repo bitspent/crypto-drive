@@ -60,7 +60,7 @@ describe("boot.sh", () => {
   it("--help explains every flag", () => {
     const r = run(["--help"]);
     assert.equal(r.status, 0);
-    for (const flag of ["--mode", "--app-port", "--infra-port", "--pg-port", "--with-db", "--wait", "--yes", "--kill-ours", "--interactive", "--dry-run"]) {
+    for (const flag of ["--mode", "--app-port", "--infra-port", "--pg-port", "--esplora-port", "--with-db", "--wait", "--yes", "--kill-ours", "--interactive", "--dry-run"]) {
       assert.match(r.stdout, new RegExp(flag), `missing ${flag}`);
     }
   });
@@ -451,13 +451,120 @@ exit 0
     }
   });
 
+  it("esplora-ui auto-jumps a taken port without asking", async () => {
+    const held = await holdPort();
+    try {
+      await withNoLock(() => {
+        const r = run(
+          ["regtest", "--app-port", "43981", "--infra-port", "43982", "--esplora-port", String(held.port), "--yes", "--dry-run"],
+        );
+        assert.equal(r.status, 0);
+        assert.match(r.stdout, new RegExp(`:${held.port} \\(esplora-ui\\) is taken — ours will use :${held.port + 1}`));
+        assert.match(r.stdout, new RegExp(`up -d esplora-ui`));
+        assert.match(r.stdout, new RegExp(`ESPLORA_PUBLIC_URL=http://localhost:${held.port + 1}`));
+      });
+    } finally {
+      held.close();
+    }
+  });
+
+  it("chopsticks: --yes skips a taken :3000 without asking", async () => {
+    const fakebin = writeFakeBin({
+      lsof: `#!/usr/bin/env bash
+for a in "$@"; do
+  case "$a" in
+    -iTCP:3000) printf 'p99999\\ncnode\\n'; exit 0 ;;
+  esac
+done
+exit 0
+`,
+    });
+    try {
+      await withNoLock(() => {
+        const env = { PATH: `${fakebin}:${process.env.PATH}` };
+        const r = run(
+          ["regtest", "--app-port", "43981", "--infra-port", "43982", "--yes", "--dry-run"],
+          undefined,
+          env,
+        );
+        assert.equal(r.status, 0);
+        assert.match(r.stdout, /FOREIGN process \(pid 99999 node\)/);
+        assert.match(r.stdout, /--yes: skipping chopsticks/);
+      });
+    } finally {
+      fs.rmSync(fakebin, { recursive: true, force: true });
+    }
+  });
+
+  it("chopsticks: 's' skips, 'f'+'kill' frees, declining skips (never aborts)", async () => {
+    const fakebin = writeFakeBin({
+      lsof: `#!/usr/bin/env bash
+for a in "$@"; do
+  case "$a" in
+    -iTCP:3000) printf 'p99999\\ncnode\\n'; exit 0 ;;
+  esac
+done
+exit 0
+`,
+    });
+    const args = ["regtest", "--app-port", "43981", "--infra-port", "43982", "--dry-run"];
+    const env = { PATH: `${fakebin}:${process.env.PATH}` };
+    try {
+      await withNoLock(() => {
+        const skip = runPty(args, ["s"], env);
+        assert.equal(skip.status, 0);
+        assert.match(skip.stdout, /skipping chopsticks/);
+      });
+      await withNoLock(() => {
+        const free = runPty(args, ["f", "kill"], env);
+        assert.equal(free.status, 0);
+        assert.match(free.stdout, /would kill pid 99999/);
+        assert.match(free.stdout, /would run: docker start chopsticks/);
+      });
+      await withNoLock(() => {
+        const decline = runPty(args, ["f", "no"], env);
+        assert.equal(decline.status, 0);
+        assert.match(decline.stdout, /skipping chopsticks/);
+      });
+    } finally {
+      fs.rmSync(fakebin, { recursive: true, force: true });
+    }
+  });
+
+  it("chopsticks: piped stdin (no TTY) skips instead of refusing", async () => {
+    const fakebin = writeFakeBin({
+      lsof: `#!/usr/bin/env bash
+for a in "$@"; do
+  case "$a" in
+    -iTCP:3000) printf 'p99999\\ncnode\\n'; exit 0 ;;
+  esac
+done
+exit 0
+`,
+    });
+    try {
+      await withNoLock(() => {
+        const env = { PATH: `${fakebin}:${process.env.PATH}` };
+        const r = run(
+          ["regtest", "--app-port", "43981", "--infra-port", "43982", "--dry-run"],
+          "s\n",
+          env,
+        );
+        assert.equal(r.status, 0);
+        assert.match(r.stdout, /no TTY to ask on: skipping chopsticks/);
+      });
+    } finally {
+      fs.rmSync(fakebin, { recursive: true, force: true });
+    }
+  });
+
   it("dry-run regtest narrates the full stack", async () => {
     await withNoLock(() => {
       const r = run(["regtest", "--app-port", "43982", "--infra-port", "43983", "--dry-run"]);
       assert.equal(r.status, 0);
       assert.match(r.stdout, /\[3\/6\] nigiri/);
       assert.match(r.stdout, /\[4\/6\] infra-api/);
-      assert.match(r.stdout, /:5000 \(Esplora UI\) is skipped by design/);
+      assert.match(r.stdout, /:5000 \(Nigiri Esplora\) is skipped — macOS AirPlay owns it/);
       assert.match(r.stdout, /INFRA_BASE_URL=http:\/\/localhost:43983/);
     });
   });
