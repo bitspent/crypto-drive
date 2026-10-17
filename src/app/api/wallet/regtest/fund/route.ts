@@ -2,14 +2,21 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { clearSessionId, SESSION_COOKIE } from "@/lib/session";
 import { getSessionAccess, saveWalletForSession } from "@/lib/store";
+import {
+  checkRateLimit,
+  isAdminRequest,
+  isLocalDevRequest,
+  RATE_LIMITS,
+  rateLimitedResponse,
+} from "@/lib/ratelimit";
+import { getClientIp } from "@/lib/request-ip";
 import { applyDeposit, WALLET_DEPOSIT_SATS } from "@/lib/wallet";
 import { getBitcoinProvider, providerFailure } from "@/lib/bitcoin";
 
 const MAX_FUND_SATS = 1_000_000;
-const FUND_COOLDOWN_MS = 60_000;
 
 /** MVP session throttle. Prompt 5 replaces this with route-wide rate limits. */
-const lastFundAt = new Map<string, number>();
+
 
 function err(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
@@ -53,12 +60,14 @@ export async function POST(req: Request) {
     ) {
       return err("Amount out of range.", 400);
     }
-    if (sessionId) {
-      const last = lastFundAt.get(sessionId) ?? 0;
-      if (Date.now() - last < FUND_COOLDOWN_MS) {
-        return err("One funding per minute. Try again shortly.", 429);
-      }
-      lastFundAt.set(sessionId, Date.now());
+    // Faucet protection: 3 fundings per session per 5 minutes, on the
+    // shared limiter (replaces the old one-per-minute cooldown).
+    if (!isAdminRequest(req) && !isLocalDevRequest(req)) {
+      const limited = checkRateLimit({
+        key: `faucet:${sessionId ?? getClientIp(req)}`,
+        ...RATE_LIMITS.faucet,
+      });
+      if (!limited.allowed) return rateLimitedResponse(limited.retryAfter);
     }
     let txid: string;
     try {

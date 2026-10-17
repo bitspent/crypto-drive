@@ -5,18 +5,22 @@ import { clearSessionId, SESSION_COOKIE } from "@/lib/session";
 import { getSessionAccess, passStep } from "@/lib/store";
 import {
   checkRateLimit,
-  clientIp,
-  isAdminBypass,
+  isLocalDevRequest,
+  RATE_LIMITS,
   rateLimitedResponse,
-} from "@/lib/rate-limit";
+} from "@/lib/ratelimit";
+import { getClientIp } from "@/lib/request-ip";
 
 export async function POST(request: Request) {
   try {
     const jar = await cookies();
     const sessionId = jar.get(SESSION_COOKIE)?.value;
-    if (!isAdminBypass(request)) {
-      const verdict = checkRateLimit("progress", sessionId ?? clientIp(request));
-      if (!verdict.ok) return rateLimitedResponse(verdict.retryAfter);
+    if (!isLocalDevRequest(request)) {
+      const result = checkRateLimit({
+        key: `progress:${sessionId ?? getClientIp(request)}`,
+        ...RATE_LIMITS.progress,
+      });
+      if (!result.allowed) return rateLimitedResponse(result.retryAfter);
     }
     if (!sessionId) {
       return NextResponse.json(

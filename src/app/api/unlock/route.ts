@@ -5,10 +5,11 @@ import { resolveLicenseKind } from "@/lib/license";
 import { unlockWithLicense } from "@/lib/unlock";
 import {
   checkRateLimit,
-  clientIp,
-  isAdminBypass,
+  isLocalDevRequest,
+  RATE_LIMITS,
   rateLimitedResponse,
-} from "@/lib/rate-limit";
+} from "@/lib/ratelimit";
+import { getClientIp } from "@/lib/request-ip";
 
 function sessioned(tier: string, sessionId: string) {
   const response = NextResponse.json({ ok: true, tier });
@@ -41,11 +42,14 @@ export async function POST(request: Request) {
 
     const kind = resolveLicenseKind(license);
 
-    // Demo keys are exempt (they only exist in dev and test harnesses), as
-    // are admin-token requests. Everything else counts, valid or not.
-    if (kind !== "demo" && !isAdminBypass(request)) {
-      const verdict = checkRateLimit("unlock", clientIp(request));
-      if (!verdict.ok) return rateLimitedResponse(verdict.retryAfter);
+    // Demo keys are exempt (dev and test harnesses only), as is localhost
+    // in dev. Everything else counts, valid or not.
+    if (kind !== "demo" && !isLocalDevRequest(request)) {
+      const result = checkRateLimit({
+        key: `unlock:${getClientIp(request)}`,
+        ...RATE_LIMITS.unlock,
+      });
+      if (!result.allowed) return rateLimitedResponse(result.retryAfter);
     }
 
     if (kind === "demo-blocked") {

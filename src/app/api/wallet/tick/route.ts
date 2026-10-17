@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { clearSessionId, SESSION_COOKIE } from "@/lib/session";
 import { getSessionAccess, saveWalletForSession } from "@/lib/store";
+import {
+  checkRateLimit,
+  isAdminRequest,
+  isLocalDevRequest,
+  RATE_LIMITS,
+  rateLimitedResponse,
+} from "@/lib/ratelimit";
+import { getClientIp } from "@/lib/request-ip";
 import { advanceTx, applyTxStatus } from "@/lib/wallet";
 import { getBitcoinProvider, providerFailure } from "@/lib/bitcoin";
 
@@ -17,6 +25,13 @@ export async function POST(req: Request) {
   try {
     const jar = await cookies();
     const sessionId = jar.get(SESSION_COOKIE)?.value;
+    if (!isAdminRequest(req) && !isLocalDevRequest(req)) {
+      const limited = checkRateLimit({
+        key: `wallet:${sessionId ?? getClientIp(req)}`,
+        ...RATE_LIMITS.wallet,
+      });
+      if (!limited.allowed) return rateLimitedResponse(limited.retryAfter);
+    }
     const access = await getSessionAccess(sessionId ?? undefined);
     if (access.status === "revoked") {
       await clearSessionId();

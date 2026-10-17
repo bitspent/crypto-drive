@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
 import { getBitcoinProvider, providerFailure } from "@/lib/bitcoin";
+import {
+  checkRateLimit,
+  isAdminRequest,
+  isLocalDevRequest,
+  RATE_LIMITS,
+  rateLimitedResponse,
+} from "@/lib/ratelimit";
+import { getClientIp } from "@/lib/request-ip";
 
 function err(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
@@ -24,6 +32,15 @@ export async function POST(req: Request) {
   const expected = process.env.ADMIN_MINE_TOKEN?.trim();
   if (!expected || token !== expected) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+  // Uniform wallet cap; the admin bypass below always fires here (this route
+  // requires the admin token), so mining itself is never throttled.
+  if (!isAdminRequest(req) && !isLocalDevRequest(req)) {
+    const limited = checkRateLimit({
+      key: `wallet:${getClientIp(req)}`,
+      ...RATE_LIMITS.wallet,
+    });
+    if (!limited.allowed) return rateLimitedResponse(limited.retryAfter);
   }
   const body = (await req.json().catch(() => ({}))) as { blocks?: unknown };
   const blocks = body.blocks === undefined ? 1 : body.blocks;

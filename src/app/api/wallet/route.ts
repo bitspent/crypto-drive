@@ -6,6 +6,14 @@ import {
   getSessionAccess,
   getWalletForSession,
 } from "@/lib/store";
+import {
+  checkRateLimit,
+  isAdminRequest,
+  isLocalDevRequest,
+  RATE_LIMITS,
+  rateLimitedResponse,
+} from "@/lib/ratelimit";
+import { getClientIp } from "@/lib/request-ip";
 import { providerFailure } from "@/lib/bitcoin";
 
 export async function GET() {
@@ -20,10 +28,17 @@ export async function GET() {
   return NextResponse.json({ wallet });
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
     const jar = await cookies();
     const sessionId = jar.get(SESSION_COOKIE)?.value;
+    if (!isAdminRequest(req) && !isLocalDevRequest(req)) {
+      const limited = checkRateLimit({
+        key: `wallet:${sessionId ?? getClientIp(req)}`,
+        ...RATE_LIMITS.wallet,
+      });
+      if (!limited.allowed) return rateLimitedResponse(limited.retryAfter);
+    }
     if (!sessionId) {
       return NextResponse.json(
         { error: "Unlock with your license before you continue." },

@@ -8,10 +8,11 @@ import {
 } from "@/lib/gumroad-webhook";
 import {
   checkRateLimit,
-  clientIp,
-  isAdminBypass,
+  isLocalDevRequest,
+  RATE_LIMITS,
   rateLimitedResponse,
-} from "@/lib/rate-limit";
+} from "@/lib/ratelimit";
+import { getClientIp } from "@/lib/request-ip";
 
 /**
  * Gumroad Ping receiver. Register with the secret in the URL:
@@ -23,9 +24,12 @@ export async function POST(request: Request) {
   try {
     // Limit before auth: the check is cheap and unauthenticated floods are
     // the threat. Gumroad retries real deliveries, so a 429 never loses a sale.
-    if (!isAdminBypass(request)) {
-      const verdict = checkRateLimit("webhook", clientIp(request));
-      if (!verdict.ok) return rateLimitedResponse(verdict.retryAfter);
+    if (!isLocalDevRequest(request)) {
+      const result = checkRateLimit({
+        key: `webhook:${getClientIp(request)}`,
+        ...RATE_LIMITS.webhook,
+      });
+      if (!result.allowed) return rateLimitedResponse(result.retryAfter);
     }
     const url = new URL(request.url);
     const authed = verifyWebhookSecret({
