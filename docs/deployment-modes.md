@@ -50,6 +50,12 @@ Three signals, strongest first:
    `regtest`) and the `db` field (`file` | `postgres`).
 3. `/api/wallet/regtest/*` returns 404 in every mode except regtest.
 
+Wallets are mode-bound: the address is minted from the active provider at
+creation, and an existing wallet survives a mode switch unchanged — so a
+`bc1q…` wallet from a simulated session will still show `bc1q…` after you
+restart in regtest. Reset the wallet (or unlock with a different email, which
+keeps the ledgers separate) whenever you switch modes.
+
 ## Local regtest dev (Nigiri)
 
 Production regtest is self-hosted infra behind Caddy + TLS. Local dev
