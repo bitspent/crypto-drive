@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -40,7 +41,15 @@ import { driveKey, JOURNEY_DRIVES } from "@/components/journey/registry";
 import { JOURNEY_3D_ENABLED } from "@/components/journey/enabled";
 import { useWebGLAvailable } from "@/components/journey/use-webgl";
 import type { IntroScene, QuickCheck, Step } from "@/lib/content";
+import type { BitcoinNetwork } from "@/lib/bitcoin/provider";
 import { PIZZA_EXPLORER } from "@/lib/explorer-lesson";
+import {
+  examReadiness,
+  explorerTxUrl,
+  isOnChainTx,
+  truncateMiddle,
+  type WalletState,
+} from "@/lib/wallet";
 import {
   CUSTODY_MODELS,
   FEE_STRATEGY,
@@ -68,6 +77,8 @@ type Props = {
   driveCount: number;
   stepIndex: number;
   stepCount: number;
+  network: BitcoinNetwork;
+  esploraBase: string;
 };
 
 const FootPrimaryContext = createContext<(node: ReactNode) => void>(() => undefined);
@@ -99,6 +110,8 @@ export function DriveStep({
   driveCount,
   stepIndex,
   stepCount,
+  network,
+  esploraBase,
 }: Props) {
   const router = useRouter();
   const [solved, setSolved] = useState(alreadyPassed);
@@ -238,6 +251,8 @@ export function DriveStep({
             review={done}
             busy={busy}
             onCommit={(answer) => void commit(answer)}
+            network={network}
+            esploraBase={esploraBase}
           />
         </BareContext.Provider>
 
@@ -353,12 +368,16 @@ function Scene({
   review,
   busy,
   onCommit,
+  network,
+  esploraBase,
 }: {
   step: Step;
   practice: PracticeSet;
   review: boolean;
   busy: boolean;
   onCommit: (answer?: StepAnswer) => void;
+  network: BitcoinNetwork;
+  esploraBase: string;
 }) {
   const action = step.action;
   if (action.type === "intro") {
@@ -485,6 +504,18 @@ function Scene({
   }
   if (action.type === "free-write-rubric") {
     return <ExplainScene step={step} review={review} busy={busy} onCommit={onCommit} />;
+  }
+  if (action.type === "wallet-exam") {
+    return (
+      <ExamScene
+        step={step}
+        review={review}
+        busy={busy}
+        onCommit={onCommit}
+        network={network}
+        esploraBase={esploraBase}
+      />
+    );
   }
   return (
     <RoadScene
@@ -2578,6 +2609,422 @@ function ExplainScene({
           </div>
         )}
       </Frame>
+      {localError ? (
+        <p className="text-sm text-[var(--danger)]" role="alert">
+          {localError}
+        </p>
+      ) : null}
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
+    </Split>
+  );
+}
+
+const EXAM_TICK_ROUNDS = 12;
+const EXAM_TICK_MS = 4000;
+
+function ExamScene({
+  step,
+  review,
+  busy,
+  onCommit,
+  network,
+  esploraBase,
+}: {
+  step: Step;
+  review: boolean;
+  busy: boolean;
+  onCommit: (answer?: StepAnswer) => void;
+  network: BitcoinNetwork;
+  esploraBase: string;
+}) {
+  const [wallet, setWallet] = useState<WalletState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [fundBusy, setFundBusy] = useState(false);
+  const [to, setTo] = useState("");
+  const [sats, setSats] = useState("");
+  const [sendBusy, setSendBusy] = useState(false);
+  const [claim, setClaim] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [pollNote, setPollNote] = useState<string | null>(null);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  const refresh = useCallback(async () => {
+    const res = await fetch("/api/wallet");
+    if (!res.ok) throw new Error("Could not load the wallet.");
+    const data = (await res.json()) as { wallet: WalletState | null };
+    if (alive.current) setWallet(data.wallet ?? null);
+  }, []);
+
+  useEffect(() => {
+    refresh()
+      .catch((e: unknown) => {
+        if (alive.current) setLocalError(e instanceof Error ? e.message : "Could not load.");
+      })
+      .finally(() => {
+        if (alive.current) setLoading(false);
+      });
+  }, [refresh]);
+
+  const readiness = useMemo(() => examReadiness(wallet, network), [wallet, network]);
+  const examTx = wallet?.history.find((t) => t.id === readiness.examTxid) ?? null;
+  const explorerUrl =
+    examTx && isOnChainTx(examTx) ? explorerTxUrl(network, examTx.id, esploraBase) : null;
+
+  async function tickToConfirm(txid: string) {
+    for (let i = 0; i < EXAM_TICK_ROUNDS; i++) {
+      const res = await fetch("/api/wallet/tick", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ txid }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        wallet?: WalletState;
+        error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "Could not advance.");
+      if (alive.current && data.wallet) setWallet(data.wallet);
+      const tx = data.wallet?.history.find((t) => t.id === txid);
+      if (tx?.status === "confirmed") return;
+      if (alive.current) setPollNote(`Confirming… ${tx?.confirmations ?? 0}/3`);
+      await new Promise((r) => setTimeout(r, EXAM_TICK_MS));
+      if (!alive.current) return;
+    }
+    throw new Error("Still confirming — press Refresh in a moment.");
+  }
+
+  async function fund() {
+    setLocalError(null);
+    setFundBusy(true);
+    setPollNote(null);
+    try {
+      const res = await fetch("/api/wallet/deposit", { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as {
+        tx?: { id: string };
+        wallet?: WalletState;
+        error?: string;
+      };
+      if (!res.ok || !data.tx) throw new Error(data.error ?? "Could not receive.");
+      if (alive.current && data.wallet) setWallet(data.wallet);
+      await tickToConfirm(data.tx.id);
+      await refresh();
+    } catch (e: unknown) {
+      if (alive.current) setLocalError(e instanceof Error ? e.message : "Could not receive.");
+    } finally {
+      if (alive.current) {
+        setFundBusy(false);
+        setPollNote(null);
+      }
+    }
+  }
+
+  async function send() {
+    setLocalError(null);
+    const amountSats = Number(sats);
+    if (!to.trim()) {
+      setLocalError("Enter a recipient address.");
+      return;
+    }
+    if (!Number.isSafeInteger(amountSats) || amountSats <= 0) {
+      setLocalError("Enter an amount in sats.");
+      return;
+    }
+    setSendBusy(true);
+    setPollNote(null);
+    try {
+      const res = await fetch("/api/wallet/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ to: to.trim(), amountSats, feeTier: "standard" }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        tx?: { id: string };
+        wallet?: WalletState;
+        error?: string;
+      };
+      if (!res.ok || !data.tx) throw new Error(data.error ?? "Could not send.");
+      if (alive.current && data.wallet) setWallet(data.wallet);
+      await tickToConfirm(data.tx.id);
+      await refresh();
+    } catch (e: unknown) {
+      if (alive.current) setLocalError(e instanceof Error ? e.message : "Could not send.");
+    } finally {
+      if (alive.current) {
+        setSendBusy(false);
+        setPollNote(null);
+      }
+    }
+  }
+
+  function submit() {
+    if (!readiness.setup) {
+      setLocalError("Set up your practice wallet first — create it in the wallet tab.");
+      return;
+    }
+    if (!readiness.receive) {
+      setLocalError("Receive from the faucet first — use the button above.");
+      return;
+    }
+    if (!readiness.send) {
+      setLocalError("Send a payment first — use the form above.");
+      return;
+    }
+    if (!readiness.restore) {
+      setLocalError("Restore your wallet from its 12 words first — the wallet tab proves it.");
+      return;
+    }
+    if (!readiness.examTxid) {
+      setLocalError("Receive first — there is no deposit to read back.");
+      return;
+    }
+    if (!claim.trim()) {
+      setLocalError(
+        network === "regtest"
+          ? "Paste the block height from the explorer tx page."
+          : "Paste the first 8 characters of the deposit txid.",
+      );
+      return;
+    }
+    setLocalError(null);
+    onCommit({ examTxid: readiness.examTxid, examClaim: claim.trim() });
+  }
+
+  useFootPrimary(
+    review ? null : (
+      <Button size="lg" disabled={busy || loading} onClick={submit}>
+        {step.button}
+      </Button>
+    ),
+    [review, busy, loading, step.button, readiness, claim],
+  );
+
+  const tasks = [
+    { id: "setup", label: "Set up the wallet", done: review || readiness.setup },
+    { id: "receive", label: "Receive from the faucet", done: review || readiness.receive },
+    { id: "send", label: "Send a payment", done: review || readiness.send },
+    { id: "restore", label: "Restore from 12 words", done: review || readiness.restore },
+    { id: "readback", label: "Read the chain back", done: review },
+  ];
+
+  return (
+    <Split
+      coach={step.coachLine}
+      left={
+        <div className="toy-stage flex min-h-[16rem] flex-col justify-center gap-4 p-5">
+          <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
+            FIVE TASKS
+          </p>
+          <ul className="space-y-2 text-sm">
+            {tasks.map((t) => (
+              <li key={t.id} className="flex items-baseline gap-3">
+                <span
+                  aria-hidden="true"
+                  className={t.done ? "text-[var(--go)]" : "text-[var(--mute)]"}
+                >
+                  {t.done ? "✓" : "○"}
+                </span>
+                <span className={t.done ? "text-[var(--fog)]" : "text-[var(--mute)]"}>
+                  {t.label}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm text-[var(--mute)]">
+            {tasks.filter((t) => t.done).length} of 5 done.
+          </p>
+        </div>
+      }
+    >
+      <IdeaPanel step={step} />
+      {loading ? (
+        <Frame title="EXAM">
+          <p className="text-sm text-[var(--mute)]">Loading wallet…</p>
+        </Frame>
+      ) : review ? (
+        <Frame title="EXAM PASSED">
+          <p className="text-sm text-[var(--go)]">
+            All five tasks verified — wallet operated end to end.
+          </p>
+        </Frame>
+      ) : (
+        <>
+          <Frame title="1 · SETUP">
+            {readiness.setup && wallet ? (
+              <p className="text-sm text-[var(--fog)]">
+                Wallet ready —{" "}
+                <span className="font-mono">{truncateMiddle(wallet.address, 6)}</span>.{" "}
+                <Link href="/wallet" className="text-[var(--amber)]">
+                  Open wallet
+                </Link>
+              </p>
+            ) : (
+              <p className="text-sm text-[var(--fog)]">
+                No wallet yet.{" "}
+                <Link href="/wallet" className="text-[var(--amber)]">
+                  Create your wallet
+                </Link>
+                , confirm the 3 words there, then Refresh below.
+              </p>
+            )}
+          </Frame>
+          <Frame title="2 · RECEIVE">
+            {readiness.receive && examTx ? (
+              <p className="text-sm text-[var(--fog)]">
+                +{examTx.amount.toLocaleString("en-US")} sats confirmed —{" "}
+                <span className="font-mono">{truncateMiddle(examTx.id, 6)}</span>
+              </p>
+            ) : (
+              <div>
+                <Button disabled={fundBusy || !readiness.setup} onClick={() => void fund()}>
+                  {fundBusy ? "Receiving…" : "Receive from faucet"}
+                </Button>
+                <p className="mt-2 text-xs text-[var(--mute)]">
+                  {network === "regtest"
+                    ? "Real faucet funds on your dev chain."
+                    : "Simulated faucet funds."}{" "}
+                  Set up first.
+                </p>
+              </div>
+            )}
+          </Frame>
+          <Frame title="3 · SEND">
+            {readiness.send ? (
+              <p className="text-sm text-[var(--go)]">A send confirmed. Spend proven.</p>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm text-[var(--fog)]" htmlFor="exam-to">
+                    To
+                  </label>
+                  <Input
+                    id="exam-to"
+                    value={to}
+                    onChange={(e) => setTo(e.target.value)}
+                    placeholder={network === "regtest" ? "bcrt1…" : "bc1…"}
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="mt-1 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-[var(--fog)]" htmlFor="exam-sats">
+                    Amount (sats)
+                  </label>
+                  <Input
+                    id="exam-sats"
+                    value={sats}
+                    onChange={(e) => setSats(e.target.value)}
+                    placeholder="10000"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Button
+                    disabled={sendBusy || !readiness.receive}
+                    onClick={() => void send()}
+                  >
+                    {sendBusy ? "Sending…" : "Send (Standard fee)"}
+                  </Button>
+                  <p className="mt-2 text-xs text-[var(--mute)]">
+                    Standard fee · needs confirmed balance — receive first.
+                  </p>
+                </div>
+              </div>
+            )}
+          </Frame>
+          <Frame title="4 · RESTORE">
+            {readiness.restore && wallet?.restoredAt ? (
+              <p className="text-sm text-[var(--fog)]">
+                Restored{" "}
+                {new Date(wallet.restoredAt).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+                .
+              </p>
+            ) : (
+              <p className="text-sm text-[var(--fog)]">
+                <Link href="/wallet" className="text-[var(--amber)]">
+                  Open wallet settings
+                </Link>
+                , restore from your 12 words, then Refresh below.
+              </p>
+            )}
+          </Frame>
+          <Frame title="5 · READ BACK">
+            {!readiness.examTxid || !examTx ? (
+              <p className="text-sm text-[var(--mute)]">Complete Receive first.</p>
+            ) : (
+              <div className="space-y-3">
+                <p className="font-mono text-sm text-[var(--fog)]">
+                  {explorerUrl
+                    ? truncateMiddle(examTx.id, 8)
+                    : `…${examTx.id.slice(-8)} (open it in the wallet to read the rest)`}
+                </p>
+                {explorerUrl ? (
+                  <p className="text-sm">
+                    <a
+                      href={explorerUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[var(--amber)]"
+                    >
+                      Open in explorer
+                    </a>
+                  </p>
+                ) : (
+                  <p className="text-xs text-[var(--mute)]">
+                    Find this deposit in the wallet activity list and open its details.
+                  </p>
+                )}
+                <div>
+                  <label className="block text-sm text-[var(--fog)]" htmlFor="exam-claim">
+                    {network === "regtest"
+                      ? "Block height from the explorer tx page"
+                      : "First 8 characters of the deposit txid"}
+                  </label>
+                  <Input
+                    id="exam-claim"
+                    value={claim}
+                    onChange={(e) => setClaim(e.target.value)}
+                    placeholder={network === "regtest" ? "850" : "abcd1234"}
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="mt-1 font-mono"
+                  />
+                </div>
+              </div>
+            )}
+          </Frame>
+          <div>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setLocalError(null);
+                void refresh().catch((e: unknown) => {
+                  if (alive.current)
+                    setLocalError(e instanceof Error ? e.message : "Could not load.");
+                });
+              }}
+            >
+              Refresh status
+            </Button>
+          </div>
+        </>
+      )}
+      {pollNote ? (
+        <p className="text-sm text-[var(--mute)]" aria-live="polite">
+          {pollNote}
+        </p>
+      ) : null}
       {localError ? (
         <p className="text-sm text-[var(--danger)]" role="alert">
           {localError}

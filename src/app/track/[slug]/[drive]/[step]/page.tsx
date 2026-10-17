@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { DriveStep } from "@/components/drive-step";
 import { SiteHeader } from "@/components/site-header";
+import { getBitcoinProvider } from "@/lib/bitcoin";
+import type { BitcoinNetwork } from "@/lib/bitcoin/provider";
 import { getTier, getTrack } from "@/lib/content";
 import {
   findStepBySlug,
@@ -59,6 +61,17 @@ export default async function DriveStepPage({ params }: Props) {
   const practice = await getPracticeForSession(sessionId ?? undefined);
   if (!practice) redirect("/unlock");
 
+  // Drives the final exam (prove-it/exam): task proofs differ per backend,
+  // and the read-back links at the runtime Esplora URL. A misconfigured
+  // backend must not 500 the page — the exam scene surfaces it instead.
+  let network: BitcoinNetwork = "simulated";
+  try {
+    network = getBitcoinProvider().network;
+  } catch {
+    network = "simulated";
+  }
+  const esploraBase = process.env.ESPLORA_PUBLIC_URL?.trim() || "http://localhost:5000";
+
   return (
     <div className="flex min-h-full flex-col">
       <SiteHeader />
@@ -85,6 +98,8 @@ export default async function DriveStepPage({ params }: Props) {
           driveCount={track.drives.length}
           stepIndex={found.stepIndex}
           stepCount={found.drive.steps.length}
+          network={network}
+          esploraBase={esploraBase}
         />
       </main>
     </div>

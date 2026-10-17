@@ -248,6 +248,63 @@ describe("wallet send", () => {
     assert.equal(wallet.isOnChainTx({ counterparty: ADDR }), false, "legacy invented tx");
   });
 
+  it("examReadiness derives the four store tasks plus the read-back target", () => {
+    assert.deepEqual(wallet.examReadiness(null, "regtest"), {
+      setup: false,
+      receive: false,
+      send: false,
+      restore: false,
+      examTxid: null,
+    });
+    const bare = freshWallet();
+    assert.equal(wallet.examReadiness(bare, "simulated").setup, true);
+    assert.equal(wallet.examReadiness(bare, "simulated").receive, false);
+    const funded = wallet.applyDeposit(bare, {
+      txid: "c".repeat(64),
+      from: wallet.REGTEST_FAUCET_LABEL,
+      amountSats: 500000,
+      timestamp: "2026-10-15T00:00:00.000Z",
+      onChain: true,
+    });
+    const confirmed = wallet.applyTxStatus(funded, "c".repeat(64), { confirmations: 3 });
+    const r = wallet.examReadiness(
+      { ...confirmed.wallet, restoredAt: "2026-10-15T00:00:00.000Z" },
+      "regtest",
+    );
+    assert.equal(r.receive, true);
+    assert.equal(r.restore, true);
+    assert.equal(r.examTxid, "c".repeat(64));
+    // Regtest demands a real fund: an invented confirmed deposit fails there…
+    const invented = wallet.applyTxStatus(
+      wallet.applyDeposit(bare, {
+        txid: "d".repeat(64),
+        from: ADDR,
+        amountSats: 500000,
+        timestamp: "2026-10-15T00:00:00.000Z",
+      }),
+      "d".repeat(64),
+      { confirmations: 3 },
+    );
+    assert.equal(wallet.examReadiness(invented.wallet, "regtest").receive, false);
+    // …but counts in simulated mode.
+    assert.equal(wallet.examReadiness(invented.wallet, "simulated").receive, true);
+    // A confirmed send flips the spend task in every mode.
+    const w = { ...freshWallet(), balance: 500000 };
+    const sent = wallet.applySend(w, {
+      txid: "e".repeat(64),
+      to: ADDR,
+      amountSats: 100000,
+      feeTier: "economy",
+      timestamp: "2026-10-15T00:00:00.000Z",
+    });
+    const spent = wallet.advanceTx(
+      wallet.advanceTx(wallet.advanceTx(sent, "e".repeat(64)).wallet, "e".repeat(64)).wallet,
+      "e".repeat(64),
+    );
+    assert.equal(spent.wallet.history[0].status, "confirmed");
+    assert.equal(wallet.examReadiness(spent.wallet, "regtest").send, true);
+  });
+
   it("shouldPollChain polls only regtest txs that exist on the chain", () => {
     const on = { onChain: true, counterparty: wallet.REGTEST_FAUCET_LABEL };
     const off = { onChain: false, counterparty: ADDR };

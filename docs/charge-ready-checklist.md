@@ -2,7 +2,7 @@
 
 The final gate between the current state and taking payment. If it is not
 in here, it is not a blocker. Bitcoin is content-complete (6 drives,
-24 steps, capstone cert); everything below is commerce, hosting, data,
+25 steps, capstone cert); everything below is commerce, hosting, data,
 or policy — not curriculum.
 
 Severity: **P0** = cannot charge without it. **P1** = needed before
@@ -95,7 +95,7 @@ sequence below plus P1/P2 items — no code blocks first charge.
 ## Done — kept here so the gate stays complete
 
 - **E2E harness** (`playwright.config.ts`, `tests/e2e/`): 67 specs green
-  in file and Postgres modes — full 24-step walk, layout, keyboard,
+  in file and Postgres modes — full 25-step walk, layout, keyboard,
   reduced-motion, no-WebGL, wallet flows, legal, health, modes.
 - **Unit suite** (`node --test --test-concurrency=1 tests/`, serial):
   practice, content, tiers, redirects, secrets, wallet, providers,

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { clearSessionId, SESSION_COOKIE } from "@/lib/session";
-import { getSessionAccess } from "@/lib/store";
+import { getSessionAccess, saveWalletForSession } from "@/lib/store";
 import {
   checkRateLimit,
   isAdminRequest,
@@ -17,8 +17,9 @@ function err(message: string, status: number) {
 }
 
 /**
- * Compare entered words against the saved seed. Never mutates: a match means
- * the same wallet, a mismatch leaves everything untouched.
+ * Compare entered words against the saved seed. A match means the same
+ * wallet and stamps restoredAt (the exam's restore proof); a mismatch
+ * leaves everything untouched.
  */
 export async function POST(req: Request) {
   try {
@@ -44,7 +45,14 @@ export async function POST(req: Request) {
     if (!Array.isArray(body.words) || body.words.some((w) => typeof w !== "string")) {
       return err("Enter all 12 words.", 400);
     }
-    return NextResponse.json({ match: restoreMatches(wallet.seedWords, body.words) });
+    const match = restoreMatches(wallet.seedWords, body.words);
+    if (match) {
+      await saveWalletForSession(sessionId, {
+        ...wallet,
+        restoredAt: new Date().toISOString(),
+      });
+    }
+    return NextResponse.json({ match });
   } catch (e) {
     return err(e instanceof Error ? e.message : "Could not check words.", 400);
   }

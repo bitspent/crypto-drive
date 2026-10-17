@@ -481,10 +481,6 @@
           "coachLine": "Your CFO asks: 'Why should we accept Bitcoin?' You have three sentences. No hype, no price, no investment talk. Why does this matter to the business?",
           "button": "Make my case",
           "action": { "type": "free-write-rubric" },
-          "cert": {
-            "certModuleLabel": "Bitcoin — First drive",
-            "certMilestoneLabel": "Can receive, verify, send, and custody Bitcoin. Can explain Bitcoin's role to a non-technical stakeholder."
-          },
           "ideaTitle": "The three-sentence test",
           "ideaBody": "If you can't explain Bitcoin to a non-technical executive in three sentences, you haven't learned it — you've memorised it. A defensible answer names what it is (settlement, not speculation), why it's scarce (fixed supply, published code), and how it's custodied (a decision you've made, not a default). Price and 'investment' have no place in an operational conversation.",
           "objective": "After this screen you can defend Bitcoin adoption to a non-technical executive in three sentences.",
@@ -502,6 +498,37 @@
             ],
             "answerIndex": 1,
             "explanation": "An operational answer covers scarcity, settlement, and custody — never price or investment."
+          }
+        },
+        {
+          "id": "btc-prove-exam",
+          "slug": "exam",
+          "title": "Final exam: operate the wallet",
+          "job": "Receive, send, restore, verify",
+          "coachLine": "Five tasks, one wallet, real checks. Receive from the faucet, send a payment, restore from your words, then read the chain back.",
+          "button": "Submit my exam",
+          "action": { "type": "wallet-exam" },
+          "cert": {
+            "certModuleLabel": "Bitcoin — First drive",
+            "certMilestoneLabel": "Can receive, verify, send, and custody Bitcoin. Can explain Bitcoin's role to a non-technical stakeholder."
+          },
+          "ideaTitle": "The operational final",
+          "ideaBody": "Knowing the words is not the skill — operating the wallet is. In this exam you fund a practice wallet from the faucet, send a payment, restore from your twelve words, and read a transaction back from the chain. Each task is checked by the server, not by your word, because that is how an auditor would check it.",
+          "objective": "After this screen you can set up, fund, spend from, restore, and independently verify a Bitcoin wallet.",
+          "whyItMatters": "A treasurer who has done this once on a test network can supervise it on any network; one who has not is guessing.",
+          "keyTerms": ["Faucet", "Restore", "Block height"],
+          "misconception": "Passing a quiz proves you can operate a wallet. Only operating one proves it.",
+          "pocketCard": "Receive. Send. Restore. Verify. Then certify.",
+          "quickCheck": {
+            "question": "What does the exam check that a quiz cannot?",
+            "options": [
+              "Your memory of definitions",
+              "That you operated a wallet end to end",
+              "Your typing speed",
+              "The current Bitcoin price"
+            ],
+            "answerIndex": 1,
+            "explanation": "The server verifies a funded wallet, a confirmed send, a restore, and a chain read-back — actions, not answers."
           }
         }
       ]

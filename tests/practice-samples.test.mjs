@@ -104,10 +104,10 @@ describe("bitcoin first drive", () => {
     assert.equal(bitcoin.drives.length, 6);
     assert.equal(bitcoin.drives[0].slug, "what-is");
     const steps = bitcoin.drives.flatMap((drive) => drive.steps);
-    assert.equal(steps.length, 24);
+    assert.equal(steps.length, 25);
     const certs = steps.filter((step) => step.cert);
     assert.equal(certs.length, 1);
-    assert.equal(certs[0].id, "btc-prove-explain");
+    assert.equal(certs[0].id, "btc-prove-exam");
     assert.match(
       certs[0].cert.certMilestoneLabel,
       /receive, verify, send, and custody Bitcoin\. Can explain Bitcoin's role to a non-technical stakeholder\./,
@@ -139,9 +139,9 @@ describe("bitcoin first drive", () => {
     assert.equal(new Set(bodies).size, bodies.length, "duplicate ideaBody in bitcoin.json");
   });
 
-  it("gives all 24 bitcoin steps the full idea panel", () => {
+  it("gives all 25 bitcoin steps the full idea panel", () => {
     const steps = bitcoin.drives.flatMap((d) => d.steps);
-    assert.equal(steps.length, 24);
+    assert.equal(steps.length, 25);
     for (const step of steps) {
       assert.ok(step.ideaTitle?.trim(), `${step.id} missing ideaTitle`);
       assert.ok(step.ideaBody?.trim(), `${step.id} missing ideaBody`);
@@ -160,7 +160,7 @@ describe("bitcoin first drive", () => {
     const prove = bitcoin.drives.find((d) => d.slug === "prove-it");
     assert.equal(
       prove.steps.map((s) => s.slug).join(","),
-      "verify,finality,custody,fees,restore,explain",
+      "verify,finality,custody,fees,restore,explain,exam",
     );
     const types = new Set([
       "explorer-read",
@@ -169,6 +169,7 @@ describe("bitcoin first drive", () => {
       "fee-strategy",
       "seed-restore",
       "free-write-rubric",
+      "wallet-exam",
     ]);
     for (const step of prove.steps) {
       assert.ok(types.has(step.action.type), `${step.id} action ${step.action.type}`);

@@ -44,6 +44,8 @@ export type WalletState = {
   confirmedThreshold: number;
   /** ISO date of last completed backup, or null. */
   backupAt: string | null;
+  /** ISO date of last successful restore check, or null. Absent on old rows. */
+  restoredAt?: string | null;
 };
 
 export const WALLET_CONFIRMED_THRESHOLD = 3;
@@ -161,6 +163,7 @@ export function createWalletState(args: { seedWords: string[]; address: string }
     history: [],
     confirmedThreshold: WALLET_CONFIRMED_THRESHOLD,
     backupAt: null,
+    restoredAt: null,
   };
 }
 
@@ -256,6 +259,35 @@ export function isOnChainTx(tx: TxRecord): boolean {
  */
 export function shouldPollChain(network: BitcoinNetwork, tx: TxRecord): boolean {
   return network === "regtest" && isOnChainTx(tx);
+}
+
+export type ExamTaskId = "setup" | "receive" | "send" | "restore";
+
+/**
+ * Store-derived exam tasks (the fifth, read-back, needs a live claim check
+ * and is verified at submit). History is newest-first, so examTxid is the
+ * newest qualifying deposit — the read-back target.
+ */
+export type ExamReadiness = Record<ExamTaskId, boolean> & { examTxid: string | null };
+
+export function examReadiness(
+  wallet: WalletState | null | undefined,
+  network: BitcoinNetwork,
+): ExamReadiness {
+  const setup =
+    !!wallet?.exists && wallet.seedWords.length === 12 && wallet.address.trim().length > 0;
+  const deposits = (wallet?.history ?? []).filter(
+    (t) =>
+      t.direction === "in" &&
+      t.status === "confirmed" &&
+      (network !== "regtest" || isOnChainTx(t)),
+  );
+  const receive = deposits.length > 0;
+  const send = (wallet?.history ?? []).some(
+    (t) => t.direction === "out" && t.status === "confirmed",
+  );
+  const restore = !!wallet?.restoredAt;
+  return { setup, receive, send, restore, examTxid: deposits[0]?.id ?? null };
 }
 
 export type AdvanceResult = { wallet: WalletState; confirmed: boolean };

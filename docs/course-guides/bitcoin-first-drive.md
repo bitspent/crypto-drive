@@ -1,6 +1,6 @@
 # Bitcoin first drive — build plan
 
-**Status:** Shipped (5 drives pre-capstone + 1 capstone drive, 24 steps). Retained as design history. `bitcoin.md` describes how to demo it.
+**Status:** Shipped (5 drives pre-capstone + 1 capstone drive, 25 steps). Retained as design history. `bitcoin.md` describes how to demo it.
 
 **Audience:** Someone who has never held crypto. Coach tone. Play money only.
 

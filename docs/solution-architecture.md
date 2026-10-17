@@ -88,7 +88,7 @@ flowchart TB
 | Gumroad webhooks / License API | Sync sale → student record; verify key | Gumroad → app | **Later** |
 | Landing page | Pitch + “Get course” + “I have a license” | Vercel (Next.js) | **Now** |
 | Unlock / access gate | Accept email + license; grant tier path | Vercel app | **Now** (demo keys; Gumroad verify later) |
-| Drive + step UI (Bitcoin: 6 drives, 24 steps) | Coach cues + graded drills + capstone | Vercel app (in-app content) | **Now** |
+| Drive + step UI (Bitcoin: 6 drives, 25 steps) | Coach cues + graded drills + capstone | Vercel app (in-app content) | **Now** |
 | Tracks ETH / USDT / Tron / Solana | Later tracks | Vercel app | **Scaffold** (`status: "coming"`) |
 | Cert generator | Name, date, unique id/hash → PNG | Vercel (`@vercel/og` / satori) | **Now** |
 | `/verify/[certId]` | Public attestation page | Vercel (public route) | **Now** |
@@ -129,7 +129,7 @@ sequenceDiagram
   Social-->>Ad: New attention → Gumroad buyers
 ```
 
-**Current shortcut:** demo key (`CD-DRIVE-*`) → unlock → 24 steps → capstone cert → verify → share. No live Gumroad or Supabase.
+**Current shortcut:** demo key (`CD-DRIVE-*`) → unlock → 25 steps → capstone cert → verify → share. No live Gumroad or Supabase.
 
 ---
 
@@ -141,7 +141,7 @@ sequenceDiagram
 - Full lesson body (Gumroad may host a thin welcome PDF only)
 
 ### Stays in-app (Vercel)
-- Landing, unlock UI, drive/step player (6 drives, 24 steps), graded drills  
+- Landing, unlock UI, drive/step player (6 drives, 25 steps), graded drills  
 - Cert OG image + `/verify/[id]`  
 - Share CTAs and coach-toned copy  
 
@@ -252,7 +252,7 @@ max (traveler orb); no postprocessing; no shadow maps.
 
 **Validation notes (Playwright, `tests/e2e/`, `npx playwright test`):**
 
-- Full 24-step walk on desktop + mobile, layout contract both viewports in
+- Full 25-step walk on desktop + mobile, layout contract both viewports in
   both themes, keyboard drive, reduced-motion, no-WebGL: all green. The
   harness asserts the 2D illustration card mounts and no `.journey-stage`
   exists.
@@ -277,10 +277,10 @@ Bitcoin is content-complete. All other tracks are scaffolds (`status:
 | `send` | Send a little | 3 — swapped, toll, no-undo |
 | `guard` | Guard the car | 2 — key, words |
 | `road-test` | Road test | 3 — support, network, mismatch |
-| `prove-it` | Prove you can drive | 6 — verify, finality, custody, fees, restore, explain |
+| `prove-it` | Prove you can drive | 7 — verify, finality, custody, fees, restore, explain, exam |
 
-24 steps total. Every step carries the six idea-panel fields. The certificate
-issues on `prove-it/explain` (the final step); all tiers walk every step, and
+25 steps total. Every step carries the six idea-panel fields. The certificate
+issues on `prove-it/exam` (the final step) after the five-task wallet exam; all tiers walk every step, and
 only the certificate is tier-gated.
 
 ---
@@ -289,8 +289,8 @@ only the certificate is tier-gated.
 
 | Suite | Command | Covers |
 | --- | --- | --- |
-| Unit | `node --test --test-concurrency=1 tests/` | Practice determinism + grading (incl. capstone rubric), content shape (24 steps, idea panels, cert target), tier flags, module redirects, `CERT_HASH_SECRET` production gate, wallet lib (formatting, send/deposit/restore, fee tiers), commerce + revocation + hashing (serial: file-store writers race across files) |
-| E2E | `npm run build` then `npx playwright test` (once: `npx playwright install chromium`) | Full 24-step walk on desktop + mobile viewports, layout contract, keyboard drive, reduced-motion, no-WebGL, mobile smoke, wallet sandbox flows (setup, deposit, send, backup/restore/reset), legal pages, health, bitcoin modes — in file-store and Postgres modes (`E2E_DATABASE_URL`, see `tests/e2e/README.md`). Config: `playwright.config.ts`; specs: `tests/e2e/` |
+| Unit | `node --test --test-concurrency=1 tests/` | Practice determinism + grading (incl. capstone rubric), content shape (25 steps, idea panels, cert target), tier flags, module redirects, `CERT_HASH_SECRET` production gate, wallet lib (formatting, send/deposit/restore, fee tiers), commerce + revocation + hashing (serial: file-store writers race across files) |
+| E2E | `npm run build` then `npx playwright test` (once: `npx playwright install chromium`) | Full 25-step walk on desktop + mobile viewports, layout contract, keyboard drive, reduced-motion, no-WebGL, mobile smoke, wallet sandbox flows (setup, deposit, send, backup/restore/reset), legal pages, health, bitcoin modes — in file-store and Postgres modes (`E2E_DATABASE_URL`, see `tests/e2e/README.md`). Config: `playwright.config.ts`; specs: `tests/e2e/` |
 
 Both suites must pass before any charge-readiness review. Pre-launch
 blockers live in `docs/charge-ready-checklist.md`.
@@ -307,8 +307,10 @@ Route + state: `src/app/wallet/page.tsx` renders `WalletApp`
 (`src/components/wallet-app.tsx`, `w-`-prefixed styles in `globals.css`).
 State lives at `student.wallet` in the file store (`src/lib/store.ts`):
 `{ exists, seedWords, address, balance, history, confirmedThreshold,
-backupAt }`. The address and 12 words ARE the drive practice seed
-(`practiceFor(seed)`), so the sandbox and `get-paid/address` agree.
+backupAt, restoredAt }`, with per-tx `onChain` (true only for real regtest
+faucet funds) and `blockHeight`. The address and 12 words ARE the drive
+practice seed (`practiceFor(seed)`), so the sandbox and `get-paid/address`
+agree.
 
 Flows: setup (empty → create → 12-word reveal with 5s auto-mask → 3/7/11
 confirm → ready), deposit (receive sheet with real QR → +0.005 BTC pending →
@@ -322,3 +324,11 @@ All simulated: every balance, txid, counterparty, and confirmation is
 deterministic practice-seed data. No chain calls, no private keys (the seed
 appears only in setup and backup), and a play-money disclosure strip sits on
 every wallet screen.
+
+Final exam (`prove-it/exam`, the cert step): five server-verified tasks over
+this wallet — setup, faucet receive, send, restore (stamps `restoredAt`), and
+a read-back (regtest: block height pasted from the explorer, checked against
+the chain; otherwise: first 8 txid chars from the details sheet). Proofs are
+per-mode (`src/lib/exam.ts`, `examReadiness` in `src/lib/wallet.ts`); the
+scene (`ExamScene`) performs receive/send inline and links out for setup and
+restore.

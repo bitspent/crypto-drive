@@ -96,7 +96,8 @@ export type StepAction =
   | { type: "model-compare" }
   | { type: "fee-strategy" }
   | { type: "seed-restore" }
-  | { type: "free-write-rubric" };
+  | { type: "free-write-rubric" }
+  | { type: "wallet-exam" };
 
 export type StepCert = {
   certModuleLabel: string;

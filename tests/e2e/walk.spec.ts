@@ -28,7 +28,7 @@ async function commitAndContinue(page: Page, buttonName: string, urlPart: string
   }
 }
 
-test("walks unlock to verified certificate across all 24 steps", async ({ page }) => {
+test("walks unlock to verified certificate across all 25 steps", async ({ page }) => {
   const failures = collectPageErrors(page);
   // A legitimate full walk must never trip rate limits.
   const throttled: string[] = [];
@@ -228,13 +228,79 @@ test("walks unlock to verified certificate across all 24 steps", async ({ page }
   await page.getByRole("link", { name: "Continue", exact: true }).click();
   await page.waitForURL("**/prove-it/explain");
 
-  // explain: a valid CFO answer, then the certificate issues here.
+  // explain: a valid CFO answer, then on to the final exam.
   await expectLayoutContract(page, "prove-it/explain");
   await page.fill(
     "#explain-text",
     "Bitcoin settles payments with finality in about ten minutes. Supply is scarce with a fixed supply capped at 21 million coins. We hold the keys in multi-sig custody with a named custodian.",
   );
   await page.getByRole("button", { name: "Make my case" }).click();
+  await page.getByRole("link", { name: "Continue", exact: true }).click();
+  await page.waitForURL("**/prove-it/exam");
+
+  // exam, task 1: set up the wallet (link out, full ceremony, back).
+  await expectLayoutContract(page, "prove-it/exam");
+  await page.getByRole("link", { name: "Create your wallet" }).click();
+  await page.waitForURL("**/wallet");
+  await page.getByRole("button", { name: "Create your wallet" }).click();
+  await expect(page.getByRole("heading", { name: "Your 12 words" })).toBeVisible();
+  const proceed = page.getByRole("button", { name: "I've written them down" });
+  await expect(page.locator(".w-seed-word").first()).toContainText("•", { timeout: 10000 });
+  await page.getByRole("button", { name: "Show them again" }).click();
+  await proceed.click();
+  for (const n of [3, 7, 11]) {
+    await expect(page.getByText(`Tap word ${n}`)).toBeVisible();
+    await page.getByRole("button", { name: words[n - 1] ?? "", exact: true }).click();
+  }
+  await expect(page.getByRole("button", { name: "Receive" })).toBeVisible();
+
+  // back to the exam; setup done.
+  await page.goto("/track/bitcoin/prove-it/exam");
+  await expect(page.getByText("Wallet ready")).toBeVisible();
+
+  // task 2: receive from the faucet, polled to confirmed by the scene.
+  await page.getByRole("button", { name: "Receive from faucet" }).click();
+  await expect(page.getByText(/sats confirmed/)).toBeVisible({ timeout: 60000 });
+
+  // task 3: send 10,000 sats to a valid address.
+  await page.fill("#exam-to", "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
+  await page.fill("#exam-sats", "10000");
+  await page.getByRole("button", { name: "Send (Standard fee)" }).click();
+  await expect(page.getByText("Spend proven.")).toBeVisible({ timeout: 60000 });
+
+  // task 4: restore from the same 12 words (link out and back).
+  await page.getByRole("link", { name: "Open wallet settings" }).click();
+  await page.waitForURL("**/wallet");
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("menuitem", { name: "Restore a wallet" }).click();
+  const restoreDialog = page.getByRole("dialog", { name: "Restore a wallet" });
+  await expect(restoreDialog).toBeVisible();
+  await restoreDialog.getByRole("button", { name: "Continue" }).click();
+  for (let i = 0; i < 12; i++) {
+    await page.getByLabel(`Word ${i + 1}`, { exact: true }).fill(words[i] ?? "");
+  }
+  await page.getByRole("button", { name: "Check words" }).click();
+  await expect(page.getByText("Same wallet. Same address. Same balance.")).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // task 5: read back the first 8 txid chars from the deposit details.
+  await page
+    .getByRole("button", { name: /^Received .* Show details\.$/ })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Transaction details" });
+  await expect(dialog).toBeVisible();
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await dialog.getByRole("button", { name: "Copy transaction ID" }).click();
+  const fullTxid = await page.evaluate(() => navigator.clipboard.readText());
+  expect(fullTxid).toMatch(/^[0-9a-f]{64}$/i);
+  await page.goto("/track/bitcoin/prove-it/exam");
+  await expect(page.getByText("Wallet ready")).toBeVisible();
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(page.getByText(/Restored /)).toBeVisible();
+  await page.fill("#exam-claim", fullTxid.slice(0, 8));
+
+  // submit → the certificate issues here.
+  await page.getByRole("button", { name: "Submit my exam" }).click();
   await page.locator("#name").waitFor();
   await page.fill("#name", "Playwright Driver");
   await Promise.all([

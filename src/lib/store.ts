@@ -21,6 +21,7 @@ import {
   type StepAnswer,
 } from "./practice-samples";
 import { createWalletState, type WalletState } from "./wallet";
+import { verifyWalletExam } from "./exam";
 import { hashLicenseKey, resolveLicenseKind } from "./license";
 import { getBitcoinProvider } from "./bitcoin/index";
 import { getDb, hasDatabase, warnFileFallbackOnce } from "./db/client";
@@ -700,13 +701,19 @@ export async function passStep(
   const foundStep = match.hit;
 
   const practice = practiceFor(student.practiceSeed);
-  const gradeError = gradeStepAnswer(
-    stepId,
-    foundStep.step.action.type,
-    practice,
-    answer,
-  );
-  if (gradeError) throw new Error(gradeError);
+  if (foundStep.step.action.type === "wallet-exam") {
+    // Async + wallet-backed: graded against the store and the chain, not the
+    // practice set. Throws the first incomplete task as a learner message.
+    await verifyWalletExam(student, answer);
+  } else {
+    const gradeError = gradeStepAnswer(
+      stepId,
+      foundStep.step.action.type,
+      practice,
+      answer,
+    );
+    if (gradeError) throw new Error(gradeError);
+  }
 
   if (!student.modulesPassed[stepId]) {
     const stamp = new Date().toISOString();

@@ -45,6 +45,9 @@ export type StepAnswer = {
   restoreWords?: string[];
     /** Capstone free-write-rubric: CFO answer text. */
   explainText?: string;
+  /** Final exam: read-back target txid + pasted claim (block height / txid prefix). */
+  examTxid?: string;
+  examClaim?: string;
 };
 
 /** Capstone policy-pick: accepted confirmation thresholds per scenario. */
