@@ -50,6 +50,39 @@ test("setup walks empty state to a ready wallet", async ({ page }) => {
   await expect(page.getByText("No activity yet.")).toBeVisible();
 });
 
+test("confirm focuses each new prompt and tracks Word N of 3", async ({ page }) => {
+  await unlock(page, uniqueEmail("wsetupfocus"));
+  await page.goto("/wallet");
+  await page.getByRole("button", { name: "Create your wallet" }).click();
+  const words = await readSeedWords(page);
+  const proceed = page.getByRole("button", { name: "I've written them down" });
+  await expect(page.locator(".w-seed-word").first()).toContainText("•", { timeout: 10000 });
+  await page.getByRole("button", { name: "Show them again" }).click();
+  await proceed.click();
+
+  // Round 1: three dots, first current, prompt unfocused on entry.
+  const dots = page.locator(".w-confirm-dot");
+  await expect(dots).toHaveCount(3);
+  await expect(dots.nth(0)).toHaveClass(/w-confirm-dot-current/);
+  await expect(page.getByText("Word 1 of 3")).toBeVisible();
+
+  // Correct tap advances: new prompt rises, takes focus, dots follow.
+  await page.getByRole("button", { name: words[2] as string, exact: true }).click();
+  const prompt7 = page.getByText("Tap word 7");
+  await expect(prompt7).toBeVisible();
+  await expect(prompt7).toBeFocused();
+  await expect(page.getByText("Word 2 of 3")).toBeVisible();
+  await expect(dots.nth(0)).toHaveClass(/w-confirm-dot-done/);
+  await expect(dots.nth(1)).toHaveClass(/w-confirm-dot-current/);
+  await expect(dots.nth(2)).not.toHaveClass(/w-confirm-dot-(done|current)/);
+
+  await page.getByRole("button", { name: words[6] as string, exact: true }).click();
+  const prompt11 = page.getByText("Tap word 11");
+  await expect(prompt11).toBeVisible();
+  await expect(prompt11).toBeFocused();
+  await expect(page.getByText("Word 3 of 3")).toBeVisible();
+});
+
 test("reload after setup lands on the wallet, never the reveal", async ({ page }) => {
   await unlock(page, uniqueEmail("wsetup"));
   await page.goto("/wallet");
@@ -142,6 +175,15 @@ test("reduced motion pins the mask and shake to state changes", async ({
       .locator(".w-confirm-grid")
       .evaluate((el) => getComputedStyle(el).animationName);
     expect(animation).toBe("none");
+    // The focus motion pins too: prompt, number pulse, current dot.
+    for (const sel of [".w-confirm-prompt", ".w-confirm-num", ".w-confirm-dot-current"]) {
+      const name = await page.locator(sel).evaluate((el) => getComputedStyle(el).animationName);
+      expect(name).toBe("none");
+    }
+    // ... but the state still advances: dots and focus follow the round.
+    await page.getByRole("button", { name: third, exact: true }).click();
+    await expect(page.getByText("Tap word 7")).toBeFocused();
+    await expect(page.getByText("Word 2 of 3")).toBeVisible();
   } finally {
     await context.close();
   }

@@ -792,15 +792,35 @@ function SeedConfirm({
 }) {
   const [round, setRound] = useState(0);
   const [doneIdx, setDoneIdx] = useState<number[]>([]);
+  const [hitIdx, setHitIdx] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const promptRef = useRef<HTMLParagraphElement>(null);
   const order = useMemo(() => shuffledIndices(words.length), [words.length]);
   const wantPos = SEED_CONFIRM_POSITIONS[round] as number;
+
+  // Land focus on each NEW prompt so keyboard and screen-reader users start
+  // the round on the instruction, not on the word they just tapped.
+  const firstRound = useRef(true);
+  useEffect(() => {
+    if (firstRound.current) {
+      firstRound.current = false;
+      return;
+    }
+    promptRef.current?.focus({ preventScroll: true });
+  }, [round]);
+
+  useEffect(() => {
+    if (hitIdx === null) return;
+    const t = window.setTimeout(() => setHitIdx(null), 350);
+    return () => window.clearTimeout(t);
+  }, [hitIdx]);
 
   function tap(i: number) {
     if (doneIdx.includes(i)) return;
     if (i === wantPos - 1) {
       setDoneIdx((done) => [...done, i]);
+      setHitIdx(i);
       setError(null);
       if (round === SEED_CONFIRM_POSITIONS.length - 1) onDone();
       else setRound(round + 1);
@@ -820,9 +840,29 @@ function SeedConfirm({
       <WalletTop />
       <h2 className="w-flow-title">Prove it</h2>
       <p className="w-flow-sub">Tap the words we ask for.</p>
-      <p className="w-confirm-prompt" aria-live="polite">
-        Tap word {wantPos}
+      <p
+        key={round}
+        ref={promptRef}
+        tabIndex={-1}
+        className="w-confirm-prompt w-prompt-in"
+        aria-live="polite"
+      >
+        Tap word <span className="w-confirm-num">{wantPos}</span>
       </p>
+      <div key={`dots-${round}`} className="w-confirm-dots" aria-hidden="true">
+        {SEED_CONFIRM_POSITIONS.map((_, d) => (
+          <span
+            key={d}
+            className={
+              d < round
+                ? "w-confirm-dot w-confirm-dot-done"
+                : d === round
+                  ? "w-confirm-dot w-confirm-dot-current"
+                  : "w-confirm-dot"
+            }
+          />
+        ))}
+      </div>
       <p className="w-confirm-progress">
         Word {round + 1} of {SEED_CONFIRM_POSITIONS.length}
       </p>
@@ -835,7 +875,7 @@ function SeedConfirm({
               type="button"
               disabled={spent}
               onClick={() => tap(i)}
-              className={`w-confirm-word${spent ? " w-confirm-spent" : ""}`}
+              className={`w-confirm-word${spent ? " w-confirm-spent" : ""}${hitIdx === i ? " w-confirm-hit" : ""}`}
             >
               {words[i]}
             </button>
