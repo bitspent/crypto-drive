@@ -14,6 +14,7 @@ import {
   FEE_TIERS,
   SEED_CONFIRM_POSITIONS,
   distributeRestoreWords,
+  explorerTxUrl,
   feeSatsForTier,
   formatBtcGrouped,
   formatBtcTrim,
@@ -26,6 +27,7 @@ import {
   type TxRecord,
   type WalletState,
 } from "@/lib/wallet";
+import type { BitcoinNetwork } from "@/lib/bitcoin/provider";
 
 const DEPOSIT_DELAY_MS = 3000;
 const TICK_MS = 4000;
@@ -220,7 +222,7 @@ function useDialogKeys(
       if (e.key !== "Tab" || !panelRef.current) return;
       const els = [
         ...panelRef.current.querySelectorAll<HTMLElement>(
-          "button, input, textarea, select",
+          "a[href], button, input, textarea, select",
         ),
       ].filter(
         (el) =>
@@ -1266,16 +1268,23 @@ function TxDetailRow({ label, children }: { label: string; children: ReactNode }
 function TxDetailsSheet({
   tx,
   threshold,
+  network,
   onClose,
 }: {
   tx: TxRecord;
   threshold: number;
+  network: BitcoinNetwork;
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const incoming = tx.direction === "in";
+  const explorerUrl = explorerTxUrl(
+    network,
+    tx.id,
+    process.env.NEXT_PUBLIC_ESPLORA_URL || undefined,
+  );
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -1336,7 +1345,22 @@ function TxDetailsSheet({
           </TxDetailRow>
           <TxDetailRow label="Transaction ID">
             <div className="w-tx-id-row">
-              <p className="w-tx-mono">{truncateMiddle(tx.id)}</p>
+              {explorerUrl ? (
+                <a
+                  href={explorerUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-tx-link"
+                  aria-label={`Open transaction ${tx.id} in the explorer (new tab)`}
+                >
+                  <span className="w-tx-mono">{truncateMiddle(tx.id)}</span>
+                  <span aria-hidden="true" className="w-tx-open">
+                    ↗
+                  </span>
+                </a>
+              ) : (
+                <p className="w-tx-mono">{truncateMiddle(tx.id)}</p>
+              )}
               <button
                 type="button"
                 className="w-copy-btn"
@@ -1485,7 +1509,13 @@ function EmptyState({
   );
 }
 
-export function WalletApp({ initial }: { initial: WalletState | null }) {
+export function WalletApp({
+  initial,
+  network,
+}: {
+  initial: WalletState | null;
+  network: BitcoinNetwork;
+}) {
   const [wallet, setWallet] = useState<WalletState | null>(initial);
   const [phase, setPhase] = useState<"home" | "reveal" | "confirm">("home");
   const [creating, setCreating] = useState(false);
@@ -1721,6 +1751,7 @@ export function WalletApp({ initial }: { initial: WalletState | null }) {
         <TxDetailsSheet
           tx={detailsTx}
           threshold={wallet.confirmedThreshold}
+          network={network}
           onClose={closeDetails}
         />
       ) : null}

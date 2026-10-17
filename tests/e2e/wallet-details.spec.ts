@@ -47,6 +47,8 @@ test("pending deposit opens details, copies the txid, and returns focus", async 
   const blockRow = dialog.locator(".w-tx-row", { hasText: "Block" });
   await expect(blockRow.getByText("Pending")).toBeVisible();
   await expect(dialog.getByText(/0\.005.*BTC/)).toBeVisible();
+  // Simulated txids are invented: no explorer link, copy chip only.
+  await expect(dialog.getByRole("link", { name: /explorer/ })).toHaveCount(0);
 
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await dialog.getByRole("button", { name: "Copy transaction ID" }).click();

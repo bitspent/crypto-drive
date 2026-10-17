@@ -79,6 +79,11 @@ infra-api on 8081 before booting; mine one block on a fresh Nigiri start
 so electrs leaves its sync wait; Nigiri's chopsticks wants port 3000 —
 if yours is taken, only chopsticks fails and nothing in our path uses it.
 Fees report nominal 1 sat/vB (regtest has no fee market by design).
+The wallet's tx-details sheet links each txid to an explorer: mempool.space
+on signet, the local Esplora UI (`NEXT_PUBLIC_ESPLORA_URL`, default
+`http://localhost:5000`) on regtest, and no link on simulated — those txids
+are invented. On macOS, :5000 is AirPlay by default: free it (System Settings
+→ AirPlay Receiver off) or the regtest link lands on a 403.
 
 ## Reaching the infra from Vercel
 

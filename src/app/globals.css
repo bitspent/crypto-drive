@@ -4656,6 +4656,31 @@ body {
   gap: 8px;
 }
 
+.w-tx-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--amber);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  border-radius: 8px;
+}
+
+.w-tx-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.w-tx-link:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.w-tx-open {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
 .w-signing {
   position: relative;
   overflow: hidden;

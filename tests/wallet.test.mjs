@@ -191,6 +191,25 @@ describe("wallet send", () => {
     assert.equal(third.wallet.history[0].blockHeight, 108);
   });
 
+  it("maps txids to explorer URLs per network, never for simulated", () => {
+    const txid = "a".repeat(64);
+    assert.equal(wallet.explorerTxUrl("simulated", txid), null);
+    assert.equal(
+      wallet.explorerTxUrl("signet", txid),
+      `https://mempool.space/signet/tx/${txid}`,
+    );
+    assert.equal(
+      wallet.explorerTxUrl("regtest", txid),
+      `http://localhost:5000/tx/${txid}`,
+    );
+    assert.equal(
+      wallet.explorerTxUrl("regtest", txid, "https://esplora.example.com/"),
+      `https://esplora.example.com/tx/${txid}`,
+    );
+    assert.equal(wallet.explorerTxUrl("signet", "not-a-txid"), null);
+    assert.equal(wallet.explorerTxUrl("regtest", ""), null);
+  });
+
   it("prices fee tiers at 140 / 700 / 2100 sats", () => {
     assert.equal(wallet.feeSatsForTier("economy"), 140);
     assert.equal(wallet.feeSatsForTier("standard"), 700);

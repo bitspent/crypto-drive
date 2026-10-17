@@ -6,6 +6,8 @@
  * seed. The wallet address IS the get-paid/address (same seed, same wallet).
  */
 
+import type { BitcoinNetwork } from "./bitcoin/provider";
+
 export type TxDirection = "in" | "out";
 export type TxStatus = "pending" | "confirmed";
 
@@ -263,6 +265,28 @@ export function advanceTx(wallet: WalletState, txid: string): AdvanceResult {
   );
   const balance = confirmed && tx.direction === "in" ? wallet.balance + tx.amount : wallet.balance;
   return { wallet: { ...wallet, history, balance }, confirmed };
+}
+
+/**
+ * Public explorer URL for a txid, or null when there is no chain to look at.
+ * Signet uses mempool.space; regtest uses the local Esplora UI (override
+ * with NEXT_PUBLIC_ESPLORA_URL when it does not run on localhost:5000).
+ * Simulated txids are invented — linking them anywhere would be a lie.
+ */
+export function explorerTxUrl(
+  network: BitcoinNetwork,
+  txid: string,
+  esploraBase = "http://localhost:5000",
+): string | null {
+  if (!/^[0-9a-f]{64}$/i.test(txid)) return null;
+  switch (network) {
+    case "signet":
+      return `https://mempool.space/signet/tx/${txid}`;
+    case "regtest":
+      return `${esploraBase.replace(/\/+$/, "")}/tx/${txid}`;
+    default:
+      return null;
+  }
 }
 
 /** True when the 12 entered words match the wallet seed (case-insensitive). */
