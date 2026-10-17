@@ -12,6 +12,8 @@
 #   --mode MODE                same as positional
 #   --app-port PORT            app port, jumps on conflict (default: $APP_PORT or 43127)
 #   --infra-port PORT          infra-api host port, regtest only (default: 8081)
+#   --pg-port PORT             postgres host port with --with-db, jumps on
+#                              conflict (default: 5433)
 #   --with-db                  also ensure crypto-drive-pg :5433 and run the app on Postgres
 #   --wait SEC                 how long to wait for services (default: 60)
 #   --yes, -y                  non-interactive: auto-jump, auto-start, never kill
@@ -23,21 +25,27 @@
 #   -h, --help                 this text
 #
 # Port policy:
-#   app + infra-api ports can JUMP (+1 until free) — except onto/away from our
-#   own `next dev`, which holds a repo lock (.next/dev/lock): a second dev
-#   server in this repo refuses to start on ANY port, so that case is
-#   restart-or-abort, never jump. Nigiri's ports are fixed (Nigiri owns them)
-#   — free them or abort. Chopsticks :3000 is soft: only chopsticks fails
-#   when it is taken, nothing in our path uses it, so the script warns and
-#   continues (jumping it would change nothing).
+#   app + infra-api + postgres ports can JUMP (+1 until free) — except
+#   onto/away from our own `next dev`, which holds a repo lock
+#   (.next/dev/lock): a second dev server in this repo refuses to start on
+#   ANY port, so that case is restart-or-abort, never jump. Nigiri's ports
+#   are fixed (Nigiri owns them) — free them or abort. Chopsticks :3000 is
+#   soft: only chopsticks fails when it is taken, nothing in our path uses
+#   it, so the script warns and continues (jumping it would change nothing).
+#   When a DOCKER container holds a port, the offer is `docker stop <name>`
+#   (killing the backend PID would be wrong); foreign containers are stopped
+#   only after asking, never with --yes.
 # Kill policy: our own stale app (cwd is this repo) may be restarted after
 # asking; anything foreign is only killed after an explicit second confirm,
-# and never with --yes.
+# and never with --yes. Safety rule: no prompt kills/stops on its DEFAULT
+# (Enter/EOF always lands on jump or abort), and unrecognized input re-asks
+# instead of falling through to anything destructive.
 set -uo pipefail
 
 MODE="simulated"
 APP_PORT="${APP_PORT:-43127}"
 INFRA_PORT="8081"
+PG_PORT="5433"
 WITH_DB=0
 WAIT_SECS=60
 YES=0
@@ -47,6 +55,7 @@ INTERACTIVE=0
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 JUMPED_APP=0
 JUMPED_INFRA=0
+JUMPED_PG=0
 
 usage() { sed -n '2,/^set -uo pipefail$/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//'; }
 
@@ -59,6 +68,8 @@ while [ $# -gt 0 ]; do
     --app-port=*) APP_PORT="${1#--app-port=}"; shift ;;
     --infra-port) INFRA_PORT="${2:?--infra-port needs a value}"; shift 2 ;;
     --infra-port=*) INFRA_PORT="${1#--infra-port=}"; shift ;;
+    --pg-port) PG_PORT="${2:?--pg-port needs a value}"; shift 2 ;;
+    --pg-port=*) PG_PORT="${1#--pg-port=}"; shift ;;
     --with-db) WITH_DB=1; shift ;;
     --wait) WAIT_SECS="${2:?--wait needs seconds}"; shift 2 ;;
     --wait=*) WAIT_SECS="${1#--wait=}"; shift ;;
@@ -138,12 +149,23 @@ questionnaire() {
     say "→ infra-api on :$INFRA_PORT"
   fi
 
-  # Q4 — postgres.
+  # Q4 — postgres (+ host port when yes).
   local def_db=n
   [ "$WITH_DB" = 1 ] && def_db=y
-  ans=$(ask "Q4/7 — also boot local Postgres (:5433) and run the app on it? (y)es / (n)o, file store otherwise" "$def_db") || exit 1
+  ans=$(ask "Q4/7 — also boot local Postgres and run the app on it? (y)es / (n)o, file store otherwise" "$def_db") || exit 1
   case "$ans" in y*) WITH_DB=1 ;; *) WITH_DB=0 ;; esac
-  [ "$WITH_DB" = 1 ] && say "→ Postgres on" || say "→ file store (.data/store.json)"
+  if [ "$WITH_DB" = 1 ]; then
+    while true; do
+      ans=$(ask "Q4/7 — postgres host port (jumped automatically if taken)" "$PG_PORT") || exit 1
+      case "$ans" in
+        ''|*[!0-9]*|0*) say "a port is a number 1–65535 — try again" ;;
+        *) PG_PORT="$ans"; break ;;
+      esac
+    done
+    say "→ Postgres on :$PG_PORT"
+  else
+    say "→ file store (.data/store.json)"
+  fi
 
   # Q5 — wait budget.
   while true; do
@@ -177,7 +199,7 @@ questionnaire() {
 
   # Q7 — confirm.
   echo "   ── plan ──"
-  echo "   mode=$MODE app-port=$APP_PORT$([ "$MODE" = "regtest" ] && echo " infra-port=$INFRA_PORT" || true)$([ "$WITH_DB" = 1 ] && echo " +postgres" || true) policy=$([ "$YES" = 1 ] && ([ "$KILL_OURS" = 1 ] && echo "auto+kill-ours" || echo "auto") || echo "ask")"
+  echo "   mode=$MODE app-port=$APP_PORT$([ "$MODE" = "regtest" ] && echo " infra-port=$INFRA_PORT" || true)$([ "$WITH_DB" = 1 ] && echo " +postgres:$PG_PORT" || true) policy=$([ "$YES" = 1 ] && ([ "$KILL_OURS" = 1 ] && echo "auto+kill-ours" || echo "auto") || echo "ask")"
   while true; do
     ans=$(ask "Q7/7 — boot with this plan? (y)es / (d)ry-run instead / (a)bort" "y") || exit 1
     case "$ans" in
@@ -220,6 +242,37 @@ our_container_on() {
         esac ;;
     esac
   done
+}
+
+# foreign_container_on <port>: any container publishing this port, ours or
+# not. Callers check our_container_on first, so a hit here is someone else's.
+foreign_container_on() {
+  local port=$1
+  have docker || return 1
+  docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null | while read -r name ports; do
+    case "$ports" in
+      *":$port->"*|*":$port,"*|*":$port-"*|*"-$port->"*) echo "$name" ;;
+    esac
+  done
+}
+
+# follow_pg_mapping: an existing crypto-drive-pg keeps its own host mapping
+# (a previous jump may have moved it) — PG_PORT follows the container, so
+# step 2 resolves the port we will actually use. No container: no-op.
+follow_pg_mapping() {
+  local state mapped
+  state=$(docker inspect crypto-drive-pg --format '{{.State.Running}}' 2>/dev/null || echo "missing")
+  if [ "$state" != "true" ] && [ "$state" != "false" ]; then return 0; fi
+  mapped=$(docker port crypto-drive-pg 5432 2>/dev/null | head -1 | sed 's/.*://')
+  case "$mapped" in
+    ''|*[!0-9]*) say "crypto-drive-pg has no 5432 mapping — keeping :$PG_PORT" ;;
+    *)
+      if [ "$mapped" != "$PG_PORT" ]; then
+        say "crypto-drive-pg is mapped to :$mapped — following the container (not :$PG_PORT)"
+        PG_PORT="$mapped"
+      fi
+      ;;
+  esac
 }
 
 # is_own_pid <pid>: true when the process runs with cwd == this repo.
@@ -287,6 +340,22 @@ kill_pid() {
   die "$desc survived SIGTERM — run 'kill -9 $pid' yourself, then re-run boot"
 }
 
+stop_container() {
+  local name=$1 i state
+  if [ "$DRY_RUN" = 1 ]; then
+    say "would run: docker stop $name"
+    return 0
+  fi
+  say "stopping container ${name}…"
+  docker stop "$name" >/dev/null 2>&1 || die "'docker stop $name' failed"
+  for i in $(seq 1 15); do
+    state=$(docker inspect "$name" --format '{{.State.Running}}' 2>/dev/null || echo missing)
+    if [ "$state" != "true" ]; then ok "container $name stopped"; return 0; fi
+    sleep 1
+  done
+  die "container $name would not stop — 'docker kill $name' yourself, then re-run boot"
+}
+
 # ── port resolution ───────────────────────────────────────────────────
 # resolve_jumpable <port-var> <label>: free/ours/jump/kill/abort. Sets the
 # variable to the final port. Returns 0, or dies on abort.
@@ -323,11 +392,14 @@ resolve_jumpable() {
         fi
         die "our own dev server holds the repo lock — re-run with --kill-ours or stop pid $pid"
       fi
-      ans=$(ask ":$port busy (our dev server) — (r)estart it, (a)bort" "r") || exit 1
-      case "$ans" in
-        a*) die "aborted by you" ;;
-        *) say "restarting our own dev server"; kill_pid "$pid" "pid $pid ($cmd)"; DEVLOCK_PID=""; DEVLOCK_PORT=""; return 0 ;;
-      esac
+      while true; do
+        ans=$(ask ":$port busy (our dev server) — (r)estart it, (a)bort" "a") || exit 1
+        case "$ans" in
+          r*) say "restarting our own dev server"; kill_pid "$pid" "pid $pid ($cmd)"; DEVLOCK_PID=""; DEVLOCK_PORT=""; return 0 ;;
+          a*) die "aborted by you" ;;
+          *) say "answer r or a" ;;
+        esac
+      done
     fi
     warn ":$port ($label) is held by OUR OWN previous boot (pid $pid $cmd)"
     if [ "$YES" = 1 ]; then
@@ -338,33 +410,69 @@ resolve_jumpable() {
       fi
       say "--yes: jumping our stale $label :$port → :$target"
     else
-      ans=$(ask ":$port busy (ours) — (r)estart it, (j)ump to :$target, (a)bort" "r") || exit 1
-      case "$ans" in
-        j*) say "jumping :$port → :$target" ;;
-        a*) die "aborted by you" ;;
-        *) say "restarting our own $label"; kill_pid "$pid" "pid $pid ($cmd)"; return 0 ;;
-      esac
+      while true; do
+        ans=$(ask ":$port busy (ours) — (r)estart it, (j)ump to :$target, (a)bort" "j") || exit 1
+        case "$ans" in
+          r*) say "restarting our own $label"; kill_pid "$pid" "pid $pid ($cmd)"; return 0 ;;
+          j*) say "jumping :$port → :$target"; break ;;
+          a*) die "aborted by you" ;;
+          *) say "answer r, j, or a" ;;
+        esac
+      done
     fi
   else
-    warn ":$port ($label) is held by a FOREIGN process (pid $pid $cmd)"
-    if [ "$YES" = 1 ]; then
-      say "--yes: never kills foreign PIDs — jumping :$port → :$target"
+    local foreign
+    foreign=$(foreign_container_on "$port" | head -1)
+    if [ -n "$foreign" ]; then
+      # A container holds it: `docker stop` is the clean kill — never signal
+      # the backend PID. Foreign containers are stopped only after asking.
+      warn ":$port ($label) is held by FOREIGN container $foreign"
+      if [ "$YES" = 1 ]; then
+        say "--yes: never touches foreign containers — jumping :$port → :$target"
+      else
+        while true; do
+          ans=$(ask ":$port busy (container $foreign) — (j)ump to :$target, (s)top container, (a)bort" "j") || exit 1
+          case "$ans" in
+            s*)
+              ans=$(ask "really stop FOREIGN container $foreign? type 'stop' to confirm" "no") || exit 1
+              [ "$ans" = "stop" ] || die "aborted by you"
+              stop_container "$foreign"
+              return 0
+              ;;
+            j*) say "jumping :$port → :$target"; break ;;
+            a*) die "aborted by you" ;;
+            *) say "answer j, s, or a" ;;
+          esac
+        done
+      fi
     else
-      ans=$(ask ":$port busy (foreign) — (j)ump to :$target, (k)ill pid $pid, (a)bort" "j") || exit 1
-      case "$ans" in
-        k*)
-          ans=$(ask "really kill FOREIGN pid $pid ($cmd)? type 'kill' to confirm" "no") || exit 1
-          [ "$ans" = "kill" ] || die "aborted by you"
-          kill_pid "$pid" "pid $pid ($cmd)"
-          return 0
-          ;;
-        a*) die "aborted by you" ;;
-        *) say "jumping :$port → :$target" ;;
-      esac
+      warn ":$port ($label) is held by a FOREIGN process (pid $pid $cmd)"
+      if [ "$YES" = 1 ]; then
+        say "--yes: never kills foreign PIDs — jumping :$port → :$target"
+      else
+        while true; do
+          ans=$(ask ":$port busy (foreign) — (j)ump to :$target, (k)ill pid $pid, (a)bort" "j") || exit 1
+          case "$ans" in
+            k*)
+              ans=$(ask "really kill FOREIGN pid $pid ($cmd)? type 'kill' to confirm" "no") || exit 1
+              [ "$ans" = "kill" ] || die "aborted by you"
+              kill_pid "$pid" "pid $pid ($cmd)"
+              return 0
+              ;;
+            j*) say "jumping :$port → :$target"; break ;;
+            a*) die "aborted by you" ;;
+            *) say "answer j, k, or a" ;;
+          esac
+        done
+      fi
     fi
   fi
   printf -v "$var" '%s' "$target"
-  if [ "$var" = "APP_PORT" ]; then JUMPED_APP=1; else JUMPED_INFRA=1; fi
+  case "$var" in
+    APP_PORT) JUMPED_APP=1 ;;
+    INFRA_PORT) JUMPED_INFRA=1 ;;
+    *) JUMPED_PG=1 ;;
+  esac
 }
 
 # resolve_fixed <port> <label> <hint>: Nigiri/PG ports cannot jump.
@@ -383,19 +491,44 @@ resolve_fixed() {
   fi
   pid=$(echo "$found" | head -1 | cut -d'|' -f1)
   cmd=$(echo "$found" | head -1 | cut -d'|' -f2)
+  local foreign
+  foreign=$(foreign_container_on "$port" | head -1)
+  if [ -n "$foreign" ]; then
+    warn ":$port ($label) is held by FOREIGN container $foreign — this port is FIXED ($hint)"
+    if [ "$YES" = 1 ]; then
+      die "--yes never touches foreign containers — 'docker stop $foreign' to free :$port, then re-run"
+    fi
+    while true; do
+      ans=$(ask ":$port fixed (container $foreign) — (s)top container, (a)bort" "a") || exit 1
+      case "$ans" in
+        s*)
+          ans=$(ask "really stop FOREIGN container $foreign? type 'stop' to confirm" "no") || exit 1
+          [ "$ans" = "stop" ] || die "aborted by you"
+          stop_container "$foreign"
+          return 0
+          ;;
+        a*) die "aborted by you (hint: $hint)" ;;
+        *) say "answer s or a" ;;
+      esac
+    done
+  fi
   warn ":$port ($label) is held by pid $pid ($cmd) — this port is FIXED ($hint)"
   if [ "$YES" = 1 ]; then
     die "--yes never kills, and :$port cannot jump — free it and re-run"
   fi
-  ans=$(ask ":$port fixed — (k)ill pid $pid, (a)bort" "a") || exit 1
-  case "$ans" in
-    k*)
-      ans=$(ask "really kill pid $pid ($cmd)? type 'kill' to confirm" "no") || exit 1
-      [ "$ans" = "kill" ] || die "aborted by you"
-      kill_pid "$pid" "pid $pid ($cmd)"
-      ;;
-    *) die "aborted by you (hint: $hint)" ;;
-  esac
+  while true; do
+    ans=$(ask ":$port fixed — (k)ill pid $pid, (a)bort" "a") || exit 1
+    case "$ans" in
+      k*)
+        ans=$(ask "really kill pid $pid ($cmd)? type 'kill' to confirm" "no") || exit 1
+        [ "$ans" = "kill" ] || die "aborted by you"
+        kill_pid "$pid" "pid $pid ($cmd)"
+        return 0
+        ;;
+      a*) die "aborted by you (hint: $hint)" ;;
+      *) say "answer k or a" ;;
+    esac
+  done
 }
 
 note_soft() {
@@ -462,15 +595,19 @@ if [ -n "$DEVLOCK_PID" ] && [ "$DEVLOCK_PORT" != "$APP_PORT" ]; then
       die "our own dev server holds the repo lock — re-run with --kill-ours or stop pid $DEVLOCK_PID"
     fi
   else
-    ans=$(ask "dev server on :$DEVLOCK_PORT — (r)estart it on :$APP_PORT, (a)bort" "r") || exit 1
-    case "$ans" in
-      a*) die "aborted by you" ;;
-      *)
-        say "restarting our own dev server on :$APP_PORT"
-        kill_pid "$DEVLOCK_PID" "pid $DEVLOCK_PID (dev server :$DEVLOCK_PORT)"
-        DEVLOCK_PID=""; DEVLOCK_PORT=""
-        ;;
-    esac
+    while true; do
+      ans=$(ask "dev server on :$DEVLOCK_PORT — (r)estart it on :$APP_PORT, (a)bort" "a") || exit 1
+      case "$ans" in
+        r*)
+          say "restarting our own dev server on :$APP_PORT"
+          kill_pid "$DEVLOCK_PID" "pid $DEVLOCK_PID (dev server :$DEVLOCK_PORT)"
+          DEVLOCK_PID=""; DEVLOCK_PORT=""
+          break
+          ;;
+        a*) die "aborted by you" ;;
+        *) say "answer r or a" ;;
+      esac
+    done
   fi
 fi
 if [ "$MODE" = "regtest" ]; then
@@ -484,7 +621,8 @@ if [ "$MODE" = "regtest" ]; then
   say ":5000 (Esplora UI) is skipped by design — macOS AirPlay owns it, nothing in our path uses it"
 fi
 if [ "$WITH_DB" = 1 ]; then
-  resolve_fixed 5433 "crypto-drive-pg" "change the recipe in tests/e2e/README.md if you must move it"
+  follow_pg_mapping
+  resolve_jumpable PG_PORT "postgres"
 fi
 
 # ── [3/6] nigiri ──────────────────────────────────────────────────────
@@ -503,8 +641,14 @@ if [ "$MODE" = "regtest" ]; then
       say "would run: nigiri start"
     else
       if [ "$YES" = 0 ]; then
-        ans=$(ask "start Nigiri now? (y)es / (a)bort" "y") || exit 1
-        case "$ans" in y*|s*) ;; *) die "aborted by you" ;; esac
+        while true; do
+          ans=$(ask "start Nigiri now? (y)es / (a)bort" "y") || exit 1
+          case "$ans" in
+            y*) break ;;
+            a*) die "aborted by you" ;;
+            *) say "answer y or a" ;;
+          esac
+        done
       else
         say "--yes: starting Nigiri"
       fi
@@ -540,8 +684,14 @@ if [ "$MODE" = "regtest" ]; then
       say "would run: INFRA_API_PORT=$INFRA_PORT docker compose -f docker-compose.infra-api.yml up -d --build"
     else
       if [ "$YES" = 0 ]; then
-        ans=$(ask "start infra-api now? (y)es / (a)bort" "y") || exit 1
-        case "$ans" in y*|s*) ;; *) die "aborted by you" ;; esac
+        while true; do
+          ans=$(ask "start infra-api now? (y)es / (a)bort" "y") || exit 1
+          case "$ans" in
+            y*) break ;;
+            a*) die "aborted by you" ;;
+            *) say "answer y or a" ;;
+          esac
+        done
       else
         say "--yes: starting infra-api"
       fi
@@ -563,26 +713,26 @@ fi
 # ── [5/6] postgres ────────────────────────────────────────────────────
 
 if [ "$WITH_DB" = 1 ]; then
-  step "5/6" "postgres (crypto-drive-pg :5433)"
+  step "5/6" "postgres (crypto-drive-pg :$PG_PORT)"
   state=$(docker inspect crypto-drive-pg --format '{{.State.Running}}' 2>/dev/null || echo "missing")
   if [ "$state" = "true" ]; then
-    ok "crypto-drive-pg already running — reusing"
+    ok "crypto-drive-pg already running on :$PG_PORT — reusing"
   elif [ "$state" = "false" ]; then
     say "crypto-drive-pg exists but is stopped"
     if [ "$DRY_RUN" = 1 ]; then
       say "would run: docker start crypto-drive-pg"
     else
       docker start crypto-drive-pg >/dev/null || die "'docker start crypto-drive-pg' failed"
-      ok "crypto-drive-pg started"
+      ok "crypto-drive-pg started on :$PG_PORT"
     fi
   else
     say "crypto-drive-pg does not exist — creating it (recipe from tests/e2e/README.md)"
     if [ "$DRY_RUN" = 1 ]; then
-      say "would run: docker run -d --name crypto-drive-pg -p 5433:5432 -e POSTGRES_PASSWORD=postgres postgres:16"
+      say "would run: docker run -d --name crypto-drive-pg -p $PG_PORT:5432 -e POSTGRES_PASSWORD=postgres postgres:16"
     else
-      docker run -d --name crypto-drive-pg -p 5433:5432 \
+      docker run -d --name crypto-drive-pg -p "$PG_PORT:5432" \
         -e POSTGRES_PASSWORD=postgres postgres:16 >/dev/null || die "postgres container failed to start"
-      ok "crypto-drive-pg created and running"
+      ok "crypto-drive-pg created and running on :$PG_PORT"
     fi
   fi
 fi
@@ -598,11 +748,12 @@ if [ "$MODE" = "regtest" ]; then
   export ADMIN_MINE_TOKEN=dev
 fi
 if [ "$WITH_DB" = 1 ]; then
-  export DATABASE_URL="postgres://postgres:postgres@127.0.0.1:5433/postgres"
+  export DATABASE_URL="postgres://postgres:postgres@127.0.0.1:${PG_PORT}/postgres"
 fi
-echo "   env: BITCOIN_MODE=$MODE APP_PORT=$APP_PORT$([ "$MODE" = "regtest" ] && echo " INFRA_BASE_URL=$INFRA_BASE_URL" || true)$([ "$WITH_DB" = 1 ] && echo " DATABASE_URL=pg:5433" || true)"
+echo "   env: BITCOIN_MODE=$MODE APP_PORT=$APP_PORT$([ "$MODE" = "regtest" ] && echo " INFRA_BASE_URL=$INFRA_BASE_URL" || true)$([ "$WITH_DB" = 1 ] && echo " DATABASE_URL=pg:$PG_PORT" || true)"
 [ "$JUMPED_APP" = 1 ] && warn "app port jumped — the app will NOT be on :43127"
 [ "$JUMPED_INFRA" = 1 ] && warn "infra-api port jumped — INFRA_BASE_URL points at :$INFRA_PORT"
+[ "$JUMPED_PG" = 1 ] && warn "postgres port jumped — DATABASE_URL points at :$PG_PORT"
 echo "   open:  http://localhost:${APP_PORT}/wallet   (after unlock at /unlock)"
 if [ "$DRY_RUN" = 1 ]; then
   say "would exec: next dev --port $APP_PORT"

@@ -13,12 +13,13 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const boot = join(root, "scripts/boot.sh");
 
-function run(args, input = undefined) {
+function run(args, input = undefined, env = {}) {
   try {
     const stdout = execFileSync("bash", [boot, ...args], {
       cwd: root,
       input,
       encoding: "utf8",
+      env: { ...process.env, ...env },
       stdio: ["pipe", "pipe", "pipe"],
     });
     return { status: 0, stdout };
@@ -59,7 +60,7 @@ describe("boot.sh", () => {
   it("--help explains every flag", () => {
     const r = run(["--help"]);
     assert.equal(r.status, 0);
-    for (const flag of ["--mode", "--app-port", "--infra-port", "--with-db", "--wait", "--yes", "--kill-ours", "--interactive", "--dry-run"]) {
+    for (const flag of ["--mode", "--app-port", "--infra-port", "--pg-port", "--with-db", "--wait", "--yes", "--kill-ours", "--interactive", "--dry-run"]) {
       assert.match(r.stdout, new RegExp(flag), `missing ${flag}`);
     }
   });
@@ -120,7 +121,7 @@ describe("boot.sh", () => {
   // Real interactive paths, driven through a pty via script(1). macOS and
   // Linux both ship it; the pipe stays open around the answer so the child
   // never reads EOF before the keystroke lands.
-  function runPty(args, answers) {
+  function runPty(args, answers, extraEnv = {}) {
     const list = Array.isArray(answers) ? answers : [answers];
     const port = args[args.indexOf("--app-port") + 1];
     const feed = list.map((a) => `printf '${a}\\n';`).join(" ");
@@ -129,7 +130,7 @@ describe("boot.sh", () => {
       const stdout = execFileSync("bash", ["-c", cmd], {
         cwd: root,
         encoding: "utf8",
-        env: { ...process.env, TERM: "xterm" },
+        env: { ...process.env, TERM: "xterm", ...extraEnv },
       });
       return { status: 0, stdout: stdout.replaceAll("\r", ""), port };
     } catch (e) {
@@ -194,7 +195,7 @@ describe("boot.sh", () => {
     const had = fs.existsSync(lockFile) ? fs.readFileSync(lockFile, "utf8") : null;
     fs.writeFileSync(lockFile, JSON.stringify({ pid: sleeper.pid, port }));
     try {
-      return await fn();
+      return await fn({ pid: sleeper.pid });
     } finally {
       if (had === null) fs.rmSync(lockFile, { force: true });
       else fs.writeFileSync(lockFile, had);
@@ -255,6 +256,199 @@ describe("boot.sh", () => {
       assert.match(r.stdout, /mode=regtest app-port=43995 infra-port=8081 policy=auto/);
       assert.match(r.stdout, /aborted by you/);
     });
+  });
+
+  // Canned docker/lsof/nigiri on PATH: deterministic container conflicts
+  // without running (or touching) any real container.
+  function writeFakeBin(tools) {
+    const dir = fs.mkdtempSync(join(os.tmpdir(), "boot-fake-"));
+    for (const [name, content] of Object.entries(tools)) {
+      fs.writeFileSync(join(dir, name), content, { mode: 0o755 });
+    }
+    return dir;
+  }
+
+  const FAKE_DOCKER = `#!/usr/bin/env bash
+# ps -> $FAKE_PS; inspect -> $FAKE_INSPECT (unset = missing); port -> $FAKE_PORT.
+case "$1" in
+  ps) if [ -n "\${FAKE_PS:-}" ]; then printf '%s\n' "\$FAKE_PS"; fi; exit 0 ;;
+  inspect) if [ -n "\${FAKE_INSPECT:-}" ]; then printf '%s' "$FAKE_INSPECT"; exit 0; else exit 1; fi ;;
+  port) if [ -n "\${FAKE_PORT:-}" ]; then printf '%s' "$FAKE_PORT"; exit 0; else exit 1; fi ;;
+  *) exit 0 ;;
+esac
+`;
+
+  async function freePort() {
+    return new Promise((resolve) => {
+      const s = net.createServer();
+      s.listen(0, "127.0.0.1", () => {
+        const p = s.address().port;
+        s.close(() => resolve(p));
+      });
+    });
+  }
+
+  it("--yes jumps a foreign container on the pg port, never stops it", async () => {
+    const held = await holdPort();
+    const fakebin = writeFakeBin({ docker: FAKE_DOCKER });
+    try {
+      await withNoLock(() => {
+        const env = {
+          PATH: `${fakebin}:${process.env.PATH}`,
+          FAKE_PS: `intruder 0.0.0.0:${held.port}->${held.port}/tcp`,
+        };
+        const r = run(
+          ["--mode", "simulated", "--with-db", "--pg-port", String(held.port), "--app-port", "43981", "--yes", "--dry-run"],
+          undefined,
+          env,
+        );
+        assert.equal(r.status, 0);
+        assert.match(r.stdout, new RegExp(`:${held.port} \\(postgres\\) is held by FOREIGN container intruder`));
+        assert.match(r.stdout, /never touches foreign containers — jumping/);
+        assert.match(r.stdout, new RegExp(`docker run -d --name crypto-drive-pg -p ${held.port + 1}:5432`));
+        assert.match(r.stdout, new RegExp(`DATABASE_URL=pg:${held.port + 1}`));
+      });
+    } finally {
+      held.close();
+      fs.rmSync(fakebin, { recursive: true, force: true });
+    }
+  });
+
+  it("answering 's' + 'stop' stops the foreign container (dry-run)", async () => {
+    const held = await holdPort();
+    const fakebin = writeFakeBin({ docker: FAKE_DOCKER });
+    try {
+      await withNoLock(() => {
+        const env = {
+          PATH: `${fakebin}:${process.env.PATH}`,
+          FAKE_PS: `intruder 0.0.0.0:${held.port}->${held.port}/tcp`,
+        };
+        const r = runPty(
+          ["--mode", "simulated", "--with-db", "--pg-port", String(held.port), "--app-port", "43981", "--dry-run"],
+          ["s", "stop"],
+          env,
+        );
+        assert.equal(r.status, 0);
+        assert.match(r.stdout, /would run: docker stop intruder/);
+      });
+    } finally {
+      held.close();
+      fs.rmSync(fakebin, { recursive: true, force: true });
+    }
+  });
+
+  it("an existing pg container on another mapping is followed", async () => {
+    const mapped = await freePort();
+    const fakebin = writeFakeBin({ docker: FAKE_DOCKER });
+    try {
+      await withNoLock(() => {
+        const env = {
+          PATH: `${fakebin}:${process.env.PATH}`,
+          FAKE_PS: "",
+          FAKE_INSPECT: "false",
+          FAKE_PORT: `0.0.0.0:${mapped}`,
+        };
+        const r = run(
+          ["--mode", "simulated", "--with-db", "--pg-port", "5433", "--app-port", "43981", "--yes", "--dry-run"],
+          undefined,
+          env,
+        );
+        assert.equal(r.status, 0);
+        assert.match(r.stdout, new RegExp(`mapped to :${mapped} — following the container`));
+        assert.match(r.stdout, /would run: docker start crypto-drive-pg/);
+        assert.match(r.stdout, new RegExp(`DATABASE_URL=pg:${mapped}`));
+      });
+    } finally {
+      fs.rmSync(fakebin, { recursive: true, force: true });
+    }
+  });
+
+  it("--yes on a fixed port held by a container dies with the stop hint", async () => {
+    const fakebin = writeFakeBin({
+      docker: FAKE_DOCKER,
+      lsof: `#!/usr/bin/env bash
+for a in "$@"; do
+  case "$a" in
+    -iTCP:18443) printf 'p99999\\nccom.docker.backend\\n'; exit 0 ;;
+  esac
+done
+exit 0
+`,
+      nigiri: `#!/usr/bin/env bash\necho "nigiri fake 0.0"\n`,
+    });
+    try {
+      await withNoLock(() => {
+        const env = {
+          PATH: `${fakebin}:${process.env.PATH}`,
+          FAKE_PS: "intruder 0.0.0.0:18443->18443/tcp",
+        };
+        const r = run(
+          ["regtest", "--app-port", "43981", "--infra-port", "43982", "--yes", "--dry-run"],
+          undefined,
+          env,
+        );
+        assert.equal(r.status, 1);
+        assert.match(r.stdout, /FOREIGN container intruder/);
+        assert.match(r.stdout, /docker stop intruder/);
+      });
+    } finally {
+      fs.rmSync(fakebin, { recursive: true, force: true });
+    }
+  });
+
+  it("empty answer on the dev-lock prompt aborts without killing", async () => {
+    await withFakeLock(43990, async ({ pid }) => {
+      const r = runPty(["--mode", "simulated", "--app-port", "43991", "--dry-run"], [""]);
+      assert.equal(r.status, 1);
+      assert.match(r.stdout, /aborted by you/);
+      assert.doesNotMatch(r.stdout, /restarting/);
+      assert.doesNotThrow(() => process.kill(pid, 0), "fake server must survive");
+    });
+  });
+
+  it("junk answers re-ask instead of falling through to kill", async () => {
+    const held = await holdPort();
+    try {
+      await withNoLock(() => {
+        const r = runPty(
+          ["--mode", "simulated", "--app-port", String(held.port), "--dry-run"],
+          ["bogus", "a"],
+        );
+        assert.equal(r.status, 1);
+        assert.match(r.stdout, /answer j, k, or a/);
+        assert.match(r.stdout, /aborted by you/);
+      });
+    } finally {
+      held.close();
+    }
+  });
+
+  it("empty answer on our own stale app jumps (never kills on default)", async () => {
+    // In-process holder: cwd is the repo, so it counts as our own boot.
+    const server = net.createServer();
+    const port = await new Promise((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve(server.address().port));
+    });
+    try {
+      await withNoLock(() => {
+        const r = runPty(["--mode", "simulated", "--app-port", String(port), "--dry-run"], [""]);
+        assert.equal(r.status, 0);
+        assert.match(r.stdout, /OUR OWN previous boot/);
+        assert.match(r.stdout, new RegExp(`jumping :${port} → :${port + 1}`));
+      });
+    } finally {
+      server.close();
+    }
+  });
+
+  it("shell vars before multibyte chars are always braced", () => {
+    // Unbraced $var… breaks under non-UTF-8 locales (bash misparses the
+    // name); ${var}… is safe everywhere.
+    for (const f of ["scripts/boot.sh", "scripts/check-ports.sh", "scripts/status.sh"]) {
+      const src = fs.readFileSync(join(root, f), "utf8");
+      const bad = src.split("\n").filter((l) => /\$[A-Za-z_][A-Za-z0-9_]*[…—→]/.test(l));
+      assert.deepEqual(bad, [], `${f} has unbraced vars before multibyte chars`);
+    }
   });
 
   it("dry-run regtest narrates the full stack", async () => {
