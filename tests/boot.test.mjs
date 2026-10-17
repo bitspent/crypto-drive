@@ -238,24 +238,135 @@ describe("boot.sh", () => {
   });
 
   it("-i walks all 7 questions, re-asks on invalid input, aborts at confirm", async () => {
-    await withNoLock(() => {
-      // r=regtest, bogus port (re-asked) then 43995, default infra, no db,
-      // default wait, f=auto-fix, a=abort at the confirm.
-      const r = runPty(["-i", "--dry-run"], ["r", "bogus", "43995", "", "n", "", "f", "a"]);
-      assert.equal(r.status, 1);
-      for (const q of ["Q1/7", "Q2/7", "Q3/7", "Q4/7", "Q5/7", "Q6/7", "Q7/7"]) {
-        assert.match(r.stdout, new RegExp(q), `missing ${q}`);
-      }
-      assert.match(r.stdout, /try again/);
-      assert.match(r.stdout, /→ mode=regtest/);
-      assert.match(r.stdout, /→ app on :43995/);
-      assert.match(r.stdout, /→ infra-api on :8081/);
-      assert.match(r.stdout, /→ file store/);
-      assert.match(r.stdout, /→ wait 60s per service/);
-      assert.match(r.stdout, /→ auto-fix, never kills/);
-      assert.match(r.stdout, /mode=regtest app-port=43995 infra-port=8081 policy=auto/);
-      assert.match(r.stdout, /aborted by you/);
+    // Silent lsof: :3000 looks free, so Q6b stays quiet and the answer tape
+    // below stays aligned in every environment.
+    const fakebin = writeFakeBin({ lsof: `#!/usr/bin/env bash\nexit 0\n` });
+    const env = { PATH: `${fakebin}:${process.env.PATH}` };
+    try {
+      await withNoLock(() => {
+        // r=regtest, bogus port (re-asked) then 43995, default infra, no db,
+        // default wait, f=auto-fix, a=abort at the confirm.
+        const r = runPty(["-i", "--dry-run"], ["r", "bogus", "43995", "", "n", "", "f", "a"], env);
+        assert.equal(r.status, 1);
+        for (const q of ["Q1/7", "Q2/7", "Q3/7", "Q4/7", "Q5/7", "Q6/7", "Q7/7"]) {
+          assert.match(r.stdout, new RegExp(q), `missing ${q}`);
+        }
+        assert.match(r.stdout, /try again/);
+        assert.match(r.stdout, /→ mode=regtest/);
+        assert.match(r.stdout, /→ app on :43995/);
+        assert.match(r.stdout, /→ infra-api on :8081/);
+        assert.match(r.stdout, /→ file store/);
+        assert.match(r.stdout, /→ wait 60s per service/);
+        assert.match(r.stdout, /→ auto-fix, never kills/);
+        assert.match(r.stdout, /mode=regtest app-port=43995 infra-port=8081 policy=auto/);
+        assert.match(r.stdout, /aborted by you/);
+      });
+    } finally {
+      fs.rmSync(fakebin, { recursive: true, force: true });
+    }
+  });
+
+  it("Q6b offers the chopsticks fix in auto mode and runs it", async () => {
+    const fakebin = writeFakeBin({
+      docker: FAKE_DOCKER,
+      lsof: `#!/usr/bin/env bash
+for a in "$@"; do
+  case "$a" in
+    -iTCP:3000) printf 'p99999\\ncnode\\n'; exit 0 ;;
+  esac
+done
+exit 0
+`,
     });
+    const env = { PATH: `${fakebin}:${process.env.PATH}`, FAKE_PS: "" };
+    try {
+      await withNoLock(() => {
+        const r = runPty(
+          ["-i", "--dry-run"],
+          ["r", "43981", "", "n", "", "f", "f", "kill", "d"],
+          env,
+        );
+        assert.equal(r.status, 0);
+        assert.match(r.stdout, /Q6b/);
+        assert.match(r.stdout, /will free :3000/);
+        assert.match(r.stdout, /\+chopfix/);
+        assert.match(r.stdout, /would kill pid 99999/);
+        assert.match(r.stdout, /would run: docker start chopsticks/);
+      });
+    } finally {
+      fs.rmSync(fakebin, { recursive: true, force: true });
+    }
+  });
+
+  it("Q6b stays quiet in ask mode; the step-2 menu asks instead", async () => {
+    const fakebin = writeFakeBin({
+      docker: FAKE_DOCKER,
+      lsof: `#!/usr/bin/env bash
+for a in "$@"; do
+  case "$a" in
+    -iTCP:3000) printf 'p99999\\ncnode\\n'; exit 0 ;;
+  esac
+done
+exit 0
+`,
+    });
+    const env = { PATH: `${fakebin}:${process.env.PATH}`, FAKE_PS: "" };
+    try {
+      await withNoLock(() => {
+        const r = runPty(["-i", "--dry-run"], ["r", "43981", "", "n", "", "a", "d", "s"], env);
+        assert.equal(r.status, 0);
+        assert.doesNotMatch(r.stdout, /Q6b/);
+        assert.match(r.stdout, /:3000 busy/);
+        assert.match(r.stdout, /skipping chopsticks/);
+      });
+    } finally {
+      fs.rmSync(fakebin, { recursive: true, force: true });
+    }
+  });
+
+  it("Q6b stays quiet when :3000 is free; the free port cold-starts it", async () => {
+    const fakebin = writeFakeBin({
+      docker: FAKE_DOCKER,
+      lsof: `#!/usr/bin/env bash\nexit 0\n`,
+    });
+    const env = { PATH: `${fakebin}:${process.env.PATH}`, FAKE_PS: "" };
+    try {
+      await withNoLock(() => {
+        const r = runPty(["-i", "--dry-run"], ["r", "43981", "", "n", "", "f", "d"], env);
+        assert.equal(r.status, 0);
+        assert.doesNotMatch(r.stdout, /Q6b/);
+        assert.match(r.stdout, /would run: docker start chopsticks/);
+      });
+    } finally {
+      fs.rmSync(fakebin, { recursive: true, force: true });
+    }
+  });
+
+  it("Q6b declined skips without a trace of the fix", async () => {
+    const fakebin = writeFakeBin({
+      docker: FAKE_DOCKER,
+      lsof: `#!/usr/bin/env bash
+for a in "$@"; do
+  case "$a" in
+    -iTCP:3000) printf 'p99999\\ncnode\\n'; exit 0 ;;
+  esac
+done
+exit 0
+`,
+    });
+    const env = { PATH: `${fakebin}:${process.env.PATH}`, FAKE_PS: "" };
+    try {
+      await withNoLock(() => {
+        const r = runPty(["-i", "--dry-run"], ["r", "43981", "", "n", "", "f", "s", "d"], env);
+        assert.equal(r.status, 0);
+        assert.match(r.stdout, /Q6b/);
+        assert.match(r.stdout, /skipping chopsticks/);
+        assert.doesNotMatch(r.stdout, /would kill/);
+        assert.doesNotMatch(r.stdout, /chopfix/);
+      });
+    } finally {
+      fs.rmSync(fakebin, { recursive: true, force: true });
+    }
   });
 
   // Canned docker/lsof/nigiri on PATH: deterministic container conflicts

@@ -69,6 +69,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 JUMPED_APP=0
 JUMPED_INFRA=0
 JUMPED_PG=0
+CHOP_FIX=""
 
 usage() { sed -n '2,/^set -uo pipefail$/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//'; }
 
@@ -212,9 +213,45 @@ questionnaire() {
     say "→ ask each time"
   fi
 
+  # Q6b — chopsticks fix, offered only in auto modes (ask mode gets the menu
+  # at step 2 instead) and only when :3000 is actually foreign-held. The
+  # typed confirm here IS the consent: step 2 then acts without re-asking.
+  if [ "$YES" = 1 ] && [ "$MODE" = "regtest" ]; then
+    local cfound cours cpid ccmd cforeign
+    cfound=$(listeners 3000)
+    cours=$(our_container_on 3000 | head -1)
+    if [ -n "$cfound" ] && [ -z "$cours" ]; then
+      cpid=$(echo "$cfound" | head -1 | cut -d'|' -f1)
+      ccmd=$(echo "$cfound" | head -1 | cut -d'|' -f2)
+      cforeign=$(foreign_container_on 3000 | head -1)
+      if [ -n "$cforeign" ]; then
+        say "Q6b — :3000 is held by FOREIGN container $cforeign (chopsticks can't start)"
+      else
+        say "Q6b — :3000 is held by FOREIGN process (pid $cpid $ccmd) (chopsticks can't start)"
+      fi
+      while true; do
+        ans=$(ask "Q6b — free :3000 for chopsticks? (f)ree it / (s)kip" "s") || exit 1
+        case "$ans" in
+          f*) break ;;
+          s*) say "→ skipping chopsticks"; break ;;
+          *) say "answer f or s" ;;
+        esac
+      done
+      if [[ "$ans" == f* ]]; then
+        if [ -n "$cforeign" ]; then
+          ans=$(ask "really stop FOREIGN container $cforeign? type 'stop' to confirm" "no") || exit 1
+          if [ "$ans" = "stop" ]; then CHOP_FIX="container:$cforeign"; say "→ will stop $cforeign for chopsticks"; else say "→ skipping chopsticks"; fi
+        else
+          ans=$(ask "really kill FOREIGN pid $cpid ($ccmd)? type 'kill' to confirm" "no") || exit 1
+          if [ "$ans" = "kill" ]; then CHOP_FIX="pid:$cpid"; say "→ will free :3000 for chopsticks"; else say "→ skipping chopsticks"; fi
+        fi
+      fi
+    fi
+  fi
+
   # Q7 — confirm.
   echo "   ── plan ──"
-  echo "   mode=$MODE app-port=$APP_PORT$([ "$MODE" = "regtest" ] && echo " infra-port=$INFRA_PORT" || true)$([ "$WITH_DB" = 1 ] && echo " +postgres:$PG_PORT" || true) policy=$([ "$YES" = 1 ] && ([ "$KILL_OURS" = 1 ] && echo "auto+kill-ours" || echo "auto") || echo "ask")"
+  echo "   mode=$MODE app-port=$APP_PORT$([ "$MODE" = "regtest" ] && echo " infra-port=$INFRA_PORT" || true)$([ "$WITH_DB" = 1 ] && echo " +postgres:$PG_PORT" || true) policy=$([ "$YES" = 1 ] && ([ "$KILL_OURS" = 1 ] && echo "auto+kill-ours" || echo "auto") || echo "ask")$([ -n "$CHOP_FIX" ] && echo " +chopfix" || true)"
   while true; do
     ans=$(ask "Q7/7 — boot with this plan? (y)es / (d)ry-run instead / (a)bort" "y") || exit 1
     case "$ans" in
@@ -594,6 +631,7 @@ resolve_chopsticks() {
   found=$(listeners "$port")
   if [ -z "$found" ]; then
     ok ":$port ($label) is free"
+    start_chopsticks
     return 0
   fi
   ours=$(our_container_on "$port" | head -1)
@@ -611,6 +649,15 @@ resolve_chopsticks() {
   fi
   say "chopsticks is optional: nothing in our path uses it"
   if [ "$YES" = 1 ]; then
+    if [ -n "$CHOP_FIX" ]; then
+      say "guided fix confirmed at Q6b — freeing :3000"
+      case "$CHOP_FIX" in
+        container:*) stop_container "${CHOP_FIX#container:}" ;;
+        pid:*) kill_pid "${CHOP_FIX#pid:}" "pid ${CHOP_FIX#pid:} ($cmd)" ;;
+      esac
+      start_chopsticks
+      return 0
+    fi
     say "--yes: skipping chopsticks"
     return 0
   fi

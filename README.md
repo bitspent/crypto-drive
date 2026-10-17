@@ -46,8 +46,9 @@ default), starts Nigiri and the infra-api when they are down, then execs the
 dev server. Flags: `--app-port`, `--infra-port`, `--pg-port`, `--esplora-port`,
 `--with-db` (also boot local Postgres), `--yes` (non-interactive),
 `--kill-ours`, `--dry-run`, and `-i`
-(guided 7-question setup first — mode, ports, db, conflict policy, confirm;
-flags you pass become the defaults).
+(guided 7-question setup first — mode, ports, db, conflict policy, confirm,
+plus a chopsticks fix offer when :3000 is taken; flags you pass become the
+defaults).
 `npm run boot -- --help` prints the full policy. The older
 `npm run dev:regtest` still works as a fail-fast variant (it refuses to boot
 unless bitcoind answers on `localhost:18443` and the infra-api on
