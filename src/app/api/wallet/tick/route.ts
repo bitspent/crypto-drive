@@ -10,7 +10,7 @@ import {
   rateLimitedResponse,
 } from "@/lib/ratelimit";
 import { getClientIp } from "@/lib/request-ip";
-import { advanceTx, applyTxStatus } from "@/lib/wallet";
+import { advanceTx, applyTxStatus, shouldPollChain } from "@/lib/wallet";
 import { getBitcoinProvider, pollRegtestTx, providerFailure } from "@/lib/bitcoin";
 
 function err(message: string, status: number) {
@@ -18,8 +18,10 @@ function err(message: string, status: number) {
 }
 
 /**
- * Regtest mode polls the real tx status; every other mode advances one
- * simulated confirmation (unchanged behavior). Confirms at the threshold.
+ * Regtest mode polls the real tx status for on-chain txs (faucet funds);
+ * invented txids (sends, never broadcast) advance one simulated
+ * confirmation instead — polling them 404s forever. Every other mode
+ * advances (unchanged behavior). Confirms at the threshold.
  */
 export async function POST(req: Request) {
   try {
@@ -44,7 +46,10 @@ export async function POST(req: Request) {
     const body = (await req.json().catch(() => ({}))) as { txid?: string };
     if (typeof body.txid !== "string" || !body.txid) return err("Missing txid.", 400);
     const provider = getBitcoinProvider();
-    if (provider.network === "regtest") {
+    const target = wallet.history.find((t) => t.id === body.txid);
+    // Unknown ids keep the old path (poll → chain 404); known off-chain
+    // txs (sends, never broadcast) advance instead of 404ing forever.
+    if (provider.network === "regtest" && (!target || shouldPollChain(provider.network, target))) {
       let status: { confirmations: number };
       try {
         status = await pollRegtestTx(provider, body.txid, wallet.confirmedThreshold);

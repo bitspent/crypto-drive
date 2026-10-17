@@ -210,6 +210,55 @@ describe("wallet send", () => {
     assert.equal(wallet.explorerTxUrl("regtest", ""), null);
   });
 
+  it("marks sends off-chain and honors the deposit flag", () => {
+    const w = { ...freshWallet(), balance: 500000 };
+    const sent = wallet.applySend(w, {
+      txid: "e".repeat(64),
+      to: ADDR,
+      amountSats: 100000,
+      feeTier: "economy",
+      timestamp: "2026-10-15T00:00:00.000Z",
+    });
+    assert.equal(sent.history[0].onChain, false);
+    const invented = wallet.applyDeposit(freshWallet(), {
+      txid: "c".repeat(64),
+      from: ADDR,
+      amountSats: 500000,
+      timestamp: "2026-10-15T00:00:00.000Z",
+    });
+    assert.equal(invented.history[0].onChain, false);
+    const funded = wallet.applyDeposit(freshWallet(), {
+      txid: "d".repeat(64),
+      from: wallet.REGTEST_FAUCET_LABEL,
+      amountSats: 500000,
+      timestamp: "2026-10-15T00:00:00.000Z",
+      onChain: true,
+    });
+    assert.equal(funded.history[0].onChain, true);
+  });
+
+  it("isOnChainTx trusts the flag, backfills pre-flag faucet rows", () => {
+    assert.equal(wallet.isOnChainTx({ onChain: true, counterparty: "x" }), true);
+    assert.equal(wallet.isOnChainTx({ onChain: false, counterparty: wallet.REGTEST_FAUCET_LABEL }), false);
+    assert.equal(
+      wallet.isOnChainTx({ counterparty: wallet.REGTEST_FAUCET_LABEL }),
+      true,
+      "legacy real fund",
+    );
+    assert.equal(wallet.isOnChainTx({ counterparty: ADDR }), false, "legacy invented tx");
+  });
+
+  it("shouldPollChain polls only regtest txs that exist on the chain", () => {
+    const on = { onChain: true, counterparty: wallet.REGTEST_FAUCET_LABEL };
+    const off = { onChain: false, counterparty: ADDR };
+    const legacyFund = { counterparty: wallet.REGTEST_FAUCET_LABEL };
+    assert.equal(wallet.shouldPollChain("regtest", on), true);
+    assert.equal(wallet.shouldPollChain("regtest", off), false);
+    assert.equal(wallet.shouldPollChain("regtest", legacyFund), true);
+    assert.equal(wallet.shouldPollChain("simulated", on), false);
+    assert.equal(wallet.shouldPollChain("signet", on), false);
+  });
+
   it("prices fee tiers at 140 / 700 / 2100 sats", () => {
     assert.equal(wallet.feeSatsForTier("economy"), 140);
     assert.equal(wallet.feeSatsForTier("standard"), 700);

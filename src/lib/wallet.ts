@@ -21,6 +21,12 @@ export type TxRecord = {
   confirmations: number;
   /** Block height the tx confirmed in; null while pending or simulated. */
   blockHeight?: number | null;
+  /**
+   * True when the txid exists on a real chain (regtest faucet fund). Sends
+   * are recorded, never broadcast, and simulated deposits are invented, so
+   * both stay false. Absent on rows written before the flag existed.
+   */
+  onChain?: boolean;
   /** Fee in sats, outgoing only. */
   fee?: number;
   timestamp: string;
@@ -41,6 +47,8 @@ export type WalletState = {
 };
 
 export const WALLET_CONFIRMED_THRESHOLD = 3;
+/** Counterparty label stored on real regtest faucet funds (see deposit route). */
+export const REGTEST_FAUCET_LABEL = "regtest faucet";
 /** Fixed simulated deposit per receive flow, in sats (0.005 BTC). */
 export const WALLET_DEPOSIT_SATS = 500_000;
 /** Assumed tx size for fee estimates. Static simulation, not a live read. */
@@ -194,6 +202,7 @@ export function applySend(
     counterparty: args.to.trim(),
     status: "pending",
     confirmations: 0,
+    onChain: false,
     fee,
     timestamp: args.timestamp,
     ...(args.memo?.trim() ? { memo: args.memo.trim() } : {}),
@@ -208,7 +217,13 @@ export function applySend(
 /** Prepend a pending incoming tx. Balance credits when it confirms. */
 export function applyDeposit(
   wallet: WalletState,
-  args: { txid: string; from: string; amountSats: number; timestamp: string },
+  args: {
+    txid: string;
+    from: string;
+    amountSats: number;
+    timestamp: string;
+    onChain?: boolean;
+  },
 ): WalletState {
   const tx: TxRecord = {
     id: args.txid,
@@ -217,9 +232,30 @@ export function applyDeposit(
     counterparty: args.from,
     status: "pending",
     confirmations: 0,
+    onChain: args.onChain ?? false,
     timestamp: args.timestamp,
   };
   return { ...wallet, history: [tx, ...wallet.history] };
+}
+
+/**
+ * True when the txid exists on a real chain and can be polled/linked.
+ * Pre-flag rows carry no marker; all real funds were labeled with
+ * REGTEST_FAUCET_LABEL, so that label backfills them exactly.
+ */
+export function isOnChainTx(tx: TxRecord): boolean {
+  if (typeof tx.onChain === "boolean") return tx.onChain;
+  return tx.counterparty === REGTEST_FAUCET_LABEL;
+}
+
+/**
+ * True when tick should poll the chain instead of advancing simulated
+ * confirmations: regtest mode AND a txid that exists on the chain.
+ * Polling an invented txid 404s forever, so sends (never broadcast)
+ * always advance, in every mode.
+ */
+export function shouldPollChain(network: BitcoinNetwork, tx: TxRecord): boolean {
+  return network === "regtest" && isOnChainTx(tx);
 }
 
 export type AdvanceResult = { wallet: WalletState; confirmed: boolean };
@@ -271,7 +307,8 @@ export function advanceTx(wallet: WalletState, txid: string): AdvanceResult {
  * Public explorer URL for a txid, or null when there is no chain to look at.
  * Signet uses mempool.space; regtest uses the local Esplora UI (override
  * with ESPLORA_PUBLIC_URL when it does not run on localhost:5000).
- * Simulated txids are invented — linking them anywhere would be a lie.
+ * Callers must gate on isOnChainTx first: invented txids (sends in every
+ * mode, simulated deposits) 404 on any explorer, so linking them is a lie.
  */
 export function explorerTxUrl(
   network: BitcoinNetwork,

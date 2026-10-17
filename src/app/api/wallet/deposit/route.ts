@@ -10,7 +10,7 @@ import {
   rateLimitedResponse,
 } from "@/lib/ratelimit";
 import { getClientIp } from "@/lib/request-ip";
-import { applyDeposit, WALLET_DEPOSIT_SATS } from "@/lib/wallet";
+import { applyDeposit, REGTEST_FAUCET_LABEL, WALLET_DEPOSIT_SATS } from "@/lib/wallet";
 import { getBitcoinProvider, providerFailure } from "@/lib/bitcoin";
 import { walletCounterparty, walletTxid } from "@/lib/practice-samples";
 
@@ -53,9 +53,10 @@ export async function POST(req: Request) {
       }
       const next = applyDeposit(wallet, {
         txid,
-        from: "regtest faucet",
+        from: REGTEST_FAUCET_LABEL,
         amountSats: WALLET_DEPOSIT_SATS,
         timestamp: new Date().toISOString(),
+        onChain: true,
       });
       await saveWalletForSession(sessionId, next);
       return NextResponse.json({ tx: next.history[0], wallet: next });

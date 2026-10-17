@@ -15,6 +15,7 @@ import {
   SEED_CONFIRM_POSITIONS,
   distributeRestoreWords,
   explorerTxUrl,
+  isOnChainTx,
   feeSatsForTier,
   formatBtcGrouped,
   formatBtcTrim,
@@ -1282,7 +1283,7 @@ function TxDetailsSheet({
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const incoming = tx.direction === "in";
-  const explorerUrl = explorerTxUrl(network, tx.id, esploraBase);
+  const explorerUrl = isOnChainTx(tx) ? explorerTxUrl(network, tx.id, esploraBase) : null;
 
   useEffect(() => {
     closeRef.current?.focus();
