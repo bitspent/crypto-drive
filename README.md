@@ -124,6 +124,7 @@ without it). `DATABASE_URL` unset means the dev-only file store.
 | `npm run dev:regtest` | Dev server on local regtest (needs Nigiri + infra-api) |
 | `npm run boot -- [mode]` | Interactive full-stack boot: ports, Nigiri, infra-api, app (`--help` for flags) |
 | `bash scripts/check-ports.sh [mode]` | Diagnose port conflicts without changing anything |
+| `npm run status [-- --json\|--watch N]` | Full-stack report: app, heights, faucet, db counts, warnings |
 | `npm run build` | Production build |
 | `npm start` | Production server on **43127** |
 | `npm run lint` | ESLint |

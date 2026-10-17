@@ -7,6 +7,7 @@
     "dev:signet": "BITCOIN_MODE=signet next dev --port 43127",
     "dev:regtest": "bash scripts/dev-regtest.sh",
     "boot": "bash scripts/boot.sh",
+    "status": "bash scripts/status.sh",
     "build": "next build",
     "start": "next start --port 43127",
     "lint": "eslint",
