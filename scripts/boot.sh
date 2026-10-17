@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Full local boot: checks every dependency, resolves every port conflict
 # (jump / kill / abort), starts Nigiri + infra-api (+ Postgres on request),
-# then execs the Next.js dev server. Interactive by default; --yes for CI.
+# then execs the Next.js dev server. Prompts on conflict; --yes for CI,
+# -i for a guided questionnaire first.
 #
 # Probing here deliberately overlaps scripts/check-ports.sh: that script only
 # diagnoses (never kills, never starts), this one resolves and boots.
@@ -15,6 +16,9 @@
 #   --wait SEC                 how long to wait for services (default: 60)
 #   --yes, -y                  non-interactive: auto-jump, auto-start, never kill
 #   --kill-ours                with --yes: also kill OUR OWN stale app instead of jumping
+#   -i, --interactive          guided questionnaire first (mode, ports, db,
+#                              conflict policy), then boot. Flags you already
+#                              passed become the defaults. Needs a TTY.
 #   --dry-run                  probe + print the plan, start/kill/exec nothing
 #   -h, --help                 this text
 #
@@ -39,6 +43,7 @@ WAIT_SECS=60
 YES=0
 KILL_OURS=0
 DRY_RUN=0
+INTERACTIVE=0
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 JUMPED_APP=0
 JUMPED_INFRA=0
@@ -59,6 +64,7 @@ while [ $# -gt 0 ]; do
     --wait=*) WAIT_SECS="${1#--wait=}"; shift ;;
     --yes|-y) YES=1; shift ;;
     --kill-ours) KILL_OURS=1; shift ;;
+    -i|--interactive) INTERACTIVE=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1 (see --help)" >&2; exit 2 ;;
@@ -68,6 +74,10 @@ case "$MODE" in
   simulated|signet|regtest) ;;
   *) echo "bad --mode: $MODE (simulated|signet|regtest)" >&2; exit 2 ;;
 esac
+if [ "$INTERACTIVE" = 1 ] && [ "$YES" = 1 ]; then
+  echo "-i/--interactive and --yes contradict each other (guided vs non-interactive)" >&2
+  exit 2
+fi
 
 step() { echo "── [$1] $2 ──"; }
 say() { echo "   $1"; }
@@ -76,8 +86,111 @@ warn() { echo "   warn: $1"; }
 die() { echo "   ABORT: $1" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
-echo "crypto-drive boot — mode=$MODE app-port=$APP_PORT$([ "$DRY_RUN" = 1 ] && echo " (DRY RUN)" || true)"
-echo "repo: $REPO"
+# ── guided questionnaire (-i) ─────────────────────────────────────────
+# Runs before everything else. Flags already passed on the command line
+# become the defaults, so `boot.sh regtest -i` only asks the rest.
+
+questionnaire() {
+  step "0/6" "guided setup"
+  say "7 questions, then the boot. Defaults are in [brackets] — Enter accepts."
+  local ans
+
+  # Q1 — mode (BITCOIN_MODE seeds the default when it names a valid mode).
+  local def_mode="$MODE"
+  case "${BITCOIN_MODE:-}" in
+    simulated|signet|regtest)
+      def_mode="$BITCOIN_MODE"
+      say "default mode comes from BITCOIN_MODE=$BITCOIN_MODE"
+      ;;
+  esac
+  local def_letter=s
+  case "$def_mode" in signet) def_letter=g ;; regtest) def_letter=r ;; esac
+  while true; do
+    ans=$(ask "Q1/7 — mode: (s)imulated play money, si(g)net live testnet, (r)egtest local stack" "$def_letter") || exit 1
+    case "$ans" in
+      s*|simulated) MODE=simulated; break ;;
+      g*|signet) MODE=signet; break ;;
+      r*|regtest) MODE=regtest; break ;;
+      *) say "answer s, g, or r (or the full mode name)" ;;
+    esac
+  done
+  say "→ mode=$MODE"
+
+  # Q2 — app port.
+  while true; do
+    ans=$(ask "Q2/7 — app port" "$APP_PORT") || exit 1
+    case "$ans" in
+      ''|*[!0-9]*|0*) say "a port is a number 1–65535 — try again" ;;
+      *) APP_PORT="$ans"; break ;;
+    esac
+  done
+  say "→ app on :$APP_PORT"
+
+  # Q3 — infra port (regtest only).
+  if [ "$MODE" = "regtest" ]; then
+    while true; do
+      ans=$(ask "Q3/7 — infra-api port (jumped automatically if taken)" "$INFRA_PORT") || exit 1
+      case "$ans" in
+        ''|*[!0-9]*|0*) say "a port is a number 1–65535 — try again" ;;
+        *) INFRA_PORT="$ans"; break ;;
+      esac
+    done
+    say "→ infra-api on :$INFRA_PORT"
+  fi
+
+  # Q4 — postgres.
+  local def_db=n
+  [ "$WITH_DB" = 1 ] && def_db=y
+  ans=$(ask "Q4/7 — also boot local Postgres (:5433) and run the app on it? (y)es / (n)o, file store otherwise" "$def_db") || exit 1
+  case "$ans" in y*) WITH_DB=1 ;; *) WITH_DB=0 ;; esac
+  [ "$WITH_DB" = 1 ] && say "→ Postgres on" || say "→ file store (.data/store.json)"
+
+  # Q5 — wait budget.
+  while true; do
+    ans=$(ask "Q5/7 — seconds to wait for each service to come up" "$WAIT_SECS") || exit 1
+    case "$ans" in
+      ''|*[!0-9]*|0*) say "a positive number of seconds — try again" ;;
+      *) WAIT_SECS="$ans"; break ;;
+    esac
+  done
+  say "→ wait ${WAIT_SECS}s per service"
+
+  # Q6 — conflict policy.
+  local def_pol=a
+  if [ "$YES" = 1 ]; then
+    if [ "$KILL_OURS" = 1 ]; then def_pol=k; else def_pol=f; fi
+  fi
+  while true; do
+    ans=$(ask "Q6/7 — when a port is busy or a service is down: (a)sk each time, auto-(f)ix without killing, auto-fix + (k)ill our own" "$def_pol") || exit 1
+    case "$ans" in
+      a*) YES=0; KILL_OURS=0; break ;;
+      f*) YES=1; KILL_OURS=0; break ;;
+      k*) YES=1; KILL_OURS=1; break ;;
+      *) say "answer a, f, or k" ;;
+    esac
+  done
+  if [ "$YES" = 1 ]; then
+    [ "$KILL_OURS" = 1 ] && say "→ auto-fix, may restart our own processes" || say "→ auto-fix, never kills"
+  else
+    say "→ ask each time"
+  fi
+
+  # Q7 — confirm.
+  echo "   ── plan ──"
+  echo "   mode=$MODE app-port=$APP_PORT$([ "$MODE" = "regtest" ] && echo " infra-port=$INFRA_PORT" || true)$([ "$WITH_DB" = 1 ] && echo " +postgres" || true) policy=$([ "$YES" = 1 ] && ([ "$KILL_OURS" = 1 ] && echo "auto+kill-ours" || echo "auto") || echo "ask")"
+  while true; do
+    ans=$(ask "Q7/7 — boot with this plan? (y)es / (d)ry-run instead / (a)bort" "y") || exit 1
+    case "$ans" in
+      y*) say "→ booting"; break ;;
+      d*) DRY_RUN=1; say "→ dry run (nothing will start)"; break ;;
+      a*) die "aborted by you" ;;
+      *) say "answer y, d, or a" ;;
+    esac
+  done
+}
+
+# NOTE: the questionnaire *call* lives just before step 1, not here — bash
+# executes streaming, so calling it here would run before ask() is defined.
 
 # ── listeners / ownership probes ──────────────────────────────────────
 
@@ -150,7 +263,7 @@ next_free_port() {
 ask() {
   local prompt=$1 default=$2 ans
   if [ ! -t 0 ]; then
-    echo "   ABORT: no TTY for '$prompt' — re-run with --yes/--dry-run or free the port first" >&2
+    echo "   ABORT: no TTY for '$prompt' — answer on a terminal, or re-run with --yes" >&2
     return 1
   fi
   printf '   %s [%s]: ' "$prompt" "$default" >&2
@@ -300,6 +413,13 @@ note_soft() {
 }
 
 # ── [1/6] tooling ─────────────────────────────────────────────────────
+
+if [ "$INTERACTIVE" = 1 ]; then
+  questionnaire
+fi
+
+echo "crypto-drive boot — mode=$MODE app-port=$APP_PORT$([ "$DRY_RUN" = 1 ] && echo " (DRY RUN)" || true)"
+echo "repo: $REPO"
 
 step "1/6" "tooling"
 have node || die "node not found — install Node 20+ first"

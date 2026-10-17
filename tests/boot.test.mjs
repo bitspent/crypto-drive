@@ -59,7 +59,7 @@ describe("boot.sh", () => {
   it("--help explains every flag", () => {
     const r = run(["--help"]);
     assert.equal(r.status, 0);
-    for (const flag of ["--mode", "--app-port", "--infra-port", "--with-db", "--wait", "--yes", "--kill-ours", "--dry-run"]) {
+    for (const flag of ["--mode", "--app-port", "--infra-port", "--with-db", "--wait", "--yes", "--kill-ours", "--interactive", "--dry-run"]) {
       assert.match(r.stdout, new RegExp(flag), `missing ${flag}`);
     }
   });
@@ -67,6 +67,13 @@ describe("boot.sh", () => {
   it("rejects unknown args and bad modes", () => {
     assert.equal(run(["--nope"]).status, 2);
     assert.equal(run(["--mode", "mainnet"]).status, 2);
+  });
+
+  it("refuses -i together with --yes, and -i without a TTY", () => {
+    assert.equal(run(["-i", "--yes"]).status, 2);
+    const r = run(["--interactive", "--dry-run"], "s\n");
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /no TTY/);
   });
 
   it("dry-runs a free app port end to end without side effects", async () => {
@@ -113,9 +120,11 @@ describe("boot.sh", () => {
   // Real interactive paths, driven through a pty via script(1). macOS and
   // Linux both ship it; the pipe stays open around the answer so the child
   // never reads EOF before the keystroke lands.
-  function runPty(args, answer) {
+  function runPty(args, answers) {
+    const list = Array.isArray(answers) ? answers : [answers];
     const port = args[args.indexOf("--app-port") + 1];
-    const cmd = `{ sleep 1; printf '${answer}\\n'; sleep 2; } | script -q /dev/null bash ${boot} ${args.join(" ")}`;
+    const feed = list.map((a) => `printf '${a}\\n';`).join(" ");
+    const cmd = `{ sleep 1; ${feed} sleep 2; } | script -q /dev/null bash ${boot} ${args.join(" ")}`;
     try {
       const stdout = execFileSync("bash", ["-c", cmd], {
         cwd: root,
@@ -225,6 +234,27 @@ describe("boot.sh", () => {
       },
       true,
     );
+  });
+
+  it("-i walks all 7 questions, re-asks on invalid input, aborts at confirm", async () => {
+    await withNoLock(() => {
+      // r=regtest, bogus port (re-asked) then 43995, default infra, no db,
+      // default wait, f=auto-fix, a=abort at the confirm.
+      const r = runPty(["-i", "--dry-run"], ["r", "bogus", "43995", "", "n", "", "f", "a"]);
+      assert.equal(r.status, 1);
+      for (const q of ["Q1/7", "Q2/7", "Q3/7", "Q4/7", "Q5/7", "Q6/7", "Q7/7"]) {
+        assert.match(r.stdout, new RegExp(q), `missing ${q}`);
+      }
+      assert.match(r.stdout, /try again/);
+      assert.match(r.stdout, /→ mode=regtest/);
+      assert.match(r.stdout, /→ app on :43995/);
+      assert.match(r.stdout, /→ infra-api on :8081/);
+      assert.match(r.stdout, /→ file store/);
+      assert.match(r.stdout, /→ wait 60s per service/);
+      assert.match(r.stdout, /→ auto-fix, never kills/);
+      assert.match(r.stdout, /mode=regtest app-port=43995 infra-port=8081 policy=auto/);
+      assert.match(r.stdout, /aborted by you/);
+    });
   });
 
   it("dry-run regtest narrates the full stack", async () => {
