@@ -4,7 +4,7 @@ export const refundDoc: LegalDoc = {
   slug: "refund",
   title: "Refund Policy",
   description:
-    "A 14-day money-back guarantee on every tier. One email, no forms, no questions asked.",
+    "A 7-day money-back guarantee on every tier. One email, no forms, no questions asked.",
   updated: LEGAL_UPDATED,
   sections: [
     {
@@ -12,16 +12,16 @@ export const refundDoc: LegalDoc = {
       blocks: [
         {
           type: "paragraph",
-          text: "Every purchase — Starter, Certified, and VIP — carries a 14-day money-back guarantee from the date of purchase. If the course is not for you, for any reason or no reason, you get a full refund.",
+          text: "Every purchase — Starter, Certified, and VIP — carries a 7-day money-back guarantee from the date of purchase. If the course is not for you, for any reason or no reason, you get a full refund.",
         },
       ],
     },
     {
-      heading: "After 14 days",
+      heading: "After 7 days",
       blocks: [
         {
           type: "paragraph",
-          text: "Purchases older than 14 days are not eligible for refunds. If something in the course is broken — a step that cannot be completed, a certificate that will not issue — tell us and we will fix the defect promptly, regardless of purchase date.",
+          text: "Purchases older than 7 days are not eligible for refunds. If something in the course is broken — a step that cannot be completed, a certificate that will not issue — tell us and we will fix the defect promptly, regardless of purchase date.",
         },
       ],
     },

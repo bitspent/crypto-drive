@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { SESSION_COOKIE } from "@/lib/session";
+import { SESSION_COOKIE, SESSION_MAX_AGE } from "@/lib/session";
 import { isValidLicense, REVOKED_ERROR, unlockStudent } from "@/lib/store";
 import { resolveLicenseKind } from "@/lib/license";
 import { unlockWithLicense } from "@/lib/unlock";
@@ -14,9 +14,10 @@ function sessioned(tier: string, sessionId: string) {
   const response = NextResponse.json({ ok: true, tier });
   response.cookies.set(SESSION_COOKIE, sessionId, {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 14,
+    maxAge: SESSION_MAX_AGE,
   });
   return response;
 }

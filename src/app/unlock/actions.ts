@@ -2,7 +2,7 @@
 
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE } from "@/lib/session";
+import { SESSION_COOKIE, SESSION_MAX_AGE } from "@/lib/session";
 import { isValidLicense, REVOKED_ERROR, unlockStudent } from "@/lib/store";
 import { resolveLicenseKind } from "@/lib/license";
 import { unlockWithLicense } from "@/lib/unlock";
@@ -59,9 +59,10 @@ export async function unlockAction(
     const jar = await cookies();
     jar.set(SESSION_COOKIE, result.sessionId, {
       httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24 * 30,
+      maxAge: SESSION_MAX_AGE,
     });
     redirect("/course");
   }
@@ -78,9 +79,10 @@ export async function unlockAction(
     const jar = await cookies();
     jar.set(SESSION_COOKIE, sessionId, {
       httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24 * 30,
+      maxAge: SESSION_MAX_AGE,
     });
   } catch (e) {
     if (e instanceof Error && e.message === REVOKED_ERROR) {

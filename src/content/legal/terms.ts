@@ -91,7 +91,7 @@ export const termsDoc: LegalDoc = {
       blocks: [
         {
           type: "paragraph",
-          text: "Every purchase carries a 14-day money-back guarantee: one email, no forms, no questions asked. The full policy lives on the Refund Policy page.",
+          text: "Every purchase carries a 7-day money-back guarantee: one email, no forms, no questions asked. The full policy lives on the Refund Policy page.",
         },
       ],
     },

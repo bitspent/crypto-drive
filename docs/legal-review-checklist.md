@@ -22,15 +22,13 @@ content files, not the renderer.
 - [ ] **Governing jurisdiction.** The terms page currently says the
   jurisdiction "will be confirmed during legal review." Pick one and write
   it in.
-- [ ] **Refund enforceability.** 14-day full refund, one email, processed via
+- [ ] **Refund enforceability + window.** 7-day full refund — confirm the 7-day window itself with counsel before publishing. One email, processed via
   Gumroad in 5–10 business days. Confirm this matches Gumroad's seller terms
   and the card networks' rules in the chosen jurisdiction.
 - [ ] **Cookie classification.** We set one cookie (`cd_session`, httpOnly,
-  30-day expiry, strictly necessary for sign-in). Confirm no banner is
-  required under GDPR/ePrivacy, and confirm the wording on the privacy page.
-- [ ] **Secure cookie flag.** The session cookie is currently not flagged
-  `Secure` (it must also work over plain HTTP in local dev). Confirm whether
-  production must set `Secure`, and whether `SameSite=Lax` suffices.
+  `Secure` in production, 14-day expiry, `SameSite=Lax`, strictly necessary
+  for sign-in). Confirm no banner is required under GDPR/ePrivacy, and
+  confirm the wording on the privacy page.
 - [ ] **GDPR DPA language.** Our subprocessors are Supabase (Postgres, US
   region), Resend (email), and Gumroad (payments). Confirm whether customer
   DPAs with each are needed, and whether the US-region storage needs a
@@ -38,7 +36,7 @@ content files, not the renderer.
 - [ ] **Retention periods.** Account data: lifetime + 12 months. Certificate
   records (id, name, milestone, hash): indefinite, for verify-link
   permanence. Confirm both survive a deletion-request challenge.
-- [ ] **Marketing claims.** "14-day money-back guarantee," "no sale of data
+- [ ] **Marketing claims.** "7-day money-back guarantee," "no sale of data
   — ever," "education, not financial advice." Confirm each is defensible as
   written wherever it appears (legal pages, footer, Gumroad listings).
 - [ ] **Certificate disclaimer.** The certificate is described as a record of

@@ -14,7 +14,7 @@ export const privacyDoc: LegalDoc = {
           type: "list",
           items: [
             "Your email address, provided at unlock.",
-            "Your licence key and tier.",
+            "Your licence key hash and tier (we store a one-way hash, never the key itself).",
             "Purchase metadata from Gumroad: product, price, currency, and date.",
             "Your course progress: steps completed, answers submitted, certificates earned.",
             "Your practice wallet state: simulated balances and transaction history.",
@@ -56,7 +56,7 @@ export const privacyDoc: LegalDoc = {
       blocks: [
         {
           type: "paragraph",
-          text: "Course data is stored in Supabase (Postgres, US region). Transactional email is sent through Resend. Payments are processed by Gumroad. These three providers are our only subprocessors, named here so your procurement or compliance team can review them directly.",
+          text: "Course data is stored in Supabase (Postgres, US region). The app itself runs on Vercel. Transactional email is sent through Resend. Payments are processed by Gumroad. These four providers are our only subprocessors, named here so your procurement or compliance team can review them directly.",
         },
       ],
     },
@@ -96,7 +96,7 @@ export const privacyDoc: LegalDoc = {
       blocks: [
         {
           type: "paragraph",
-          text: "We set exactly one cookie: cd_session, an httpOnly session identifier with a 30-day expiry that keeps you signed in. It is strictly necessary for the course to function. There are no tracking cookies, no third-party cookies, and no cookie-based analytics — which is why you see no cookie banner.",
+          text: "We set exactly one cookie: cd_session, an httpOnly session identifier with a 14-day expiry that keeps you signed in. It carries the Secure flag in production. It is strictly necessary for the course to function. There are no tracking cookies, no third-party cookies, and no cookie-based analytics — which is why you see no cookie banner.",
         },
       ],
     },
