@@ -6,7 +6,7 @@ Rate limit: 60 req/min per IP (Caddy). 429 on exceed.
 
 ## GET /api/health
 
-Response 200: `{ ok: true, bitcoind_ready: bool, electrs_ready: bool, faucet_balance: number }`
+Response 200: `{ ok: true, bitcoind_ready: bool, electrs_ready: bool, wallet_ready: bool, faucet_balance: number }` (`wallet_ready` = faucet wallet loaded; fund+mine 503 without it)
 
 ## POST /api/address/fund
 

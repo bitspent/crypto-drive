@@ -836,14 +836,17 @@ fi
 
 # ── [4/6] infra-api ───────────────────────────────────────────────────
 
-infra_health() {
-  curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer dev" \
-    --max-time 3 "http://localhost:${INFRA_PORT}/api/health" 2>/dev/null || echo "000"
+infra_ready() {
+  # A bare 200 lies: /api/health always 200s and puts readiness in the
+  # flags. fund+mine need bitcoind AND the faucet wallet (electrs stays
+  # soft — a fresh chain needs a mined block before it leaves sync wait).
+  curl -s -H "Authorization: Bearer dev" --max-time 3 \
+    "http://localhost:${INFRA_PORT}/api/health" 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const j=JSON.parse(s);process.exit(j.bitcoind_ready===true&&j.wallet_ready===true?0:1)}catch{process.exit(1)}})"
 }
 
 if [ "$MODE" = "regtest" ]; then
   step "4/6" "infra-api (:$INFRA_PORT)"
-  if [ "$(infra_health)" = "200" ]; then
+  if infra_ready; then
     faucet=$(curl -s -H "Authorization: Bearer dev" --max-time 3 \
       "http://localhost:${INFRA_PORT}/api/health" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).faucet_balance)}catch{console.log('?')}})")
     ok "infra-api already healthy (faucet $faucet sats) — reusing"
@@ -870,10 +873,10 @@ if [ "$MODE" = "regtest" ]; then
       ) || die "infra-api compose failed"
       say "waiting for infra-api health (up to ${WAIT_SECS}s)…"
       for _ in $(seq 1 "$WAIT_SECS"); do
-        [ "$(infra_health)" = "200" ] && break
+        infra_ready && break
         sleep 1
       done
-      [ "$(infra_health)" = "200" ] || die "infra-api never turned healthy — 'docker logs crypto-drive-infra-api-1'"
+      infra_ready || die "infra-api never turned healthy — 'docker logs crypto-drive-infra-api-1'"
       ok "infra-api healthy on :$INFRA_PORT"
     fi
   fi

@@ -581,6 +581,7 @@ exit 0
 
   it("chopsticks: --yes skips a taken :3000 without asking", async () => {
     const fakebin = writeFakeBin({
+      docker: FAKE_DOCKER,
       lsof: `#!/usr/bin/env bash
 for a in "$@"; do
   case "$a" in
@@ -609,6 +610,7 @@ exit 0
 
   it("chopsticks: 's' skips, 'f'+'kill' frees, declining skips (never aborts)", async () => {
     const fakebin = writeFakeBin({
+      docker: FAKE_DOCKER,
       lsof: `#!/usr/bin/env bash
 for a in "$@"; do
   case "$a" in
@@ -644,6 +646,7 @@ exit 0
 
   it("chopsticks: piped stdin (no TTY) skips instead of refusing", async () => {
     const fakebin = writeFakeBin({
+      docker: FAKE_DOCKER,
       lsof: `#!/usr/bin/env bash
 for a in "$@"; do
   case "$a" in
@@ -678,5 +681,94 @@ exit 0
       assert.match(r.stdout, /:5000 \(Nigiri Esplora\) is skipped — macOS AirPlay owns it/);
       assert.match(r.stdout, /INFRA_BASE_URL=http:\/\/localhost:43983/);
     });
+  });
+
+  // The step-4 gate reads the health FLAGS, not the HTTP code: /api/health
+  // always 200s, so a bare 200 reuses a broken infra-api (observed live:
+  // wallet unloaded after a bitcoind restart, fund+mine 503, boot said
+  // "healthy"). The fake below is classified as our own container via a
+  // faked `docker ps` line; fake lsof hides every other port for env
+  // independence (live Nigiri or bare CI behave the same).
+  // Fake /api/health in a CHILD process: run() blocks the event loop with
+  // execFileSync, so an in-process server could never answer.
+  async function spawnFakeInfra(body) {
+    const port = await freePort();
+    const code = `const http=require("http");const body=${JSON.stringify(JSON.stringify(body))};http.createServer((q,s)=>{if(q.url==="/api/health"){s.writeHead(200,{"content-type":"application/json"});s.end(body)}else{s.writeHead(404);s.end()}}).listen(${port},"127.0.0.1")`;
+    const child = spawn(process.execPath, ["-e", code], {
+      cwd: os.tmpdir(),
+      stdio: "ignore",
+    });
+    for (let i = 0; i < 50; i++) {
+      const up = await new Promise((resolve) => {
+        const sock = net.connect(port, "127.0.0.1");
+        sock.on("connect", () => { sock.destroy(); resolve(true); });
+        sock.on("error", () => resolve(false));
+      });
+      if (up) return { port, close: () => child.kill() };
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    child.kill();
+    throw new Error("fake infra-api never bound");
+  }
+
+  it("step 4 restarts infra-api when 200 but wallet_ready is false", async () => {
+    const fake = await spawnFakeInfra({
+      ok: true, bitcoind_ready: true, electrs_ready: true,
+      wallet_ready: false, faucet_balance: 0,
+    });
+    const fakebin = writeFakeBin({
+      docker: FAKE_DOCKER,
+      lsof: `#!/usr/bin/env bash\nfor a in "$@"; do\n  case "$a" in\n    -iTCP:${fake.port}) printf 'p12345\\ncnode\\n'; exit 0 ;;\n  esac\ndone\nexit 0\n`,
+    });
+    try {
+      await withNoLock(() => {
+        const env = {
+          PATH: `${fakebin}:${process.env.PATH}`,
+          FAKE_PS: `crypto-drive-infra-api-1 0.0.0.0:${fake.port}->8081/tcp`,
+        };
+        const r = run(
+          ["regtest", "--app-port", "43981", "--infra-port", String(fake.port), "--yes", "--dry-run"],
+          undefined,
+          env,
+        );
+        assert.equal(r.status, 0);
+        assert.match(r.stdout, new RegExp(`:${fake.port} \\(infra-api\\) is ours already`));
+        assert.match(r.stdout, /infra-api is not healthy on/);
+        assert.match(r.stdout, /would run: .*up -d --build infra-api/);
+        assert.doesNotMatch(r.stdout, /already healthy/);
+      });
+    } finally {
+      fake.close();
+      fs.rmSync(fakebin, { recursive: true, force: true });
+    }
+  });
+
+  it("step 4 reuses infra-api when the ready flags are true", async () => {
+    const fake = await spawnFakeInfra({
+      ok: true, bitcoind_ready: true, electrs_ready: true,
+      wallet_ready: true, faucet_balance: 1000,
+    });
+    const fakebin = writeFakeBin({
+      docker: FAKE_DOCKER,
+      lsof: `#!/usr/bin/env bash\nfor a in "$@"; do\n  case "$a" in\n    -iTCP:${fake.port}) printf 'p12345\\ncnode\\n'; exit 0 ;;\n  esac\ndone\nexit 0\n`,
+    });
+    try {
+      await withNoLock(() => {
+        const env = {
+          PATH: `${fakebin}:${process.env.PATH}`,
+          FAKE_PS: `crypto-drive-infra-api-1 0.0.0.0:${fake.port}->8081/tcp`,
+        };
+        const r = run(
+          ["regtest", "--app-port", "43981", "--infra-port", String(fake.port), "--yes", "--dry-run"],
+          undefined,
+          env,
+        );
+        assert.equal(r.status, 0);
+        assert.match(r.stdout, /already healthy \(faucet 1000 sats\) — reusing/);
+      });
+    } finally {
+      fake.close();
+      fs.rmSync(fakebin, { recursive: true, force: true });
+    }
   });
 });

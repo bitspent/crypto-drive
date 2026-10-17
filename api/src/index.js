@@ -7,6 +7,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { timingSafeEqual } from "node:crypto";
+import { formatBitcoindError } from "./bitcoind-error.js";
 
 const {
   BITCOIN_RPC_URL,
@@ -63,36 +64,35 @@ async function rpc(method, params = [], wallet = false) {
     body: JSON.stringify({ jsonrpc: "1.0", id: "infra", method, params }),
     signal: AbortSignal.timeout(15000),
   });
-  if (!res.ok) throw new Error(`bitcoind http ${res.status}`);
-  const body = await res.json();
-  if (body.error) throw new Error(`bitcoind: ${body.error.message ?? body.error.code}`);
+  // Read the body BEFORE checking status: bitcoind puts the reason for a
+  // 500 in body.error, and ensureWallet() matches on it. Throwing on the
+  // status alone would swallow "already exists" / "already loaded" and 503
+  // fund+mine forever after a bitcoind restart.
+  const body = await res.json().catch(() => null);
+  if (!res.ok || body == null || body.error) {
+    throw new Error(formatBitcoindError(res.status, body));
+  }
   return body.result;
 }
 
-let walletReady = null;
-// Load (creating on first run) the faucet wallet. Cached: one init per boot.
-function ensureWallet() {
-  if (!walletReady) {
-    walletReady = (async () => {
-      const wallets = await rpc("listwallets");
-      if (!wallets.includes(WALLET)) {
-        try {
-          await rpc("createwallet", [WALLET]);
-        } catch (e) {
-          if (!String(e).includes("already exists")) throw e;
-        }
-        try {
-          await rpc("loadwallet", [WALLET]);
-        } catch (e) {
-          if (!String(e).includes("already loaded")) throw e;
-        }
-      }
-    })().catch((e) => {
-      walletReady = null;
-      throw e;
-    });
+// Load (creating on first run) the faucet wallet. Checked on EVERY call,
+// never cached: bitcoind forgets loaded wallets on restart and anything
+// can unload at runtime, so a cached "ready" goes stale and 503s fund+mine
+// until the container restarts. listwallets is one cheap local RPC;
+// concurrent create/load races are absorbed by the idempotency catches.
+async function ensureWallet() {
+  const wallets = await rpc("listwallets");
+  if (wallets.includes(WALLET)) return;
+  try {
+    await rpc("createwallet", [WALLET]);
+  } catch (e) {
+    if (!String(e).includes("already exists")) throw e;
   }
-  return walletReady;
+  try {
+    await rpc("loadwallet", [WALLET]);
+  } catch (e) {
+    if (!String(e).includes("already loaded")) throw e;
+  }
 }
 
 async function electrs(path) {
@@ -111,6 +111,7 @@ function toSats(btc) {
 app.get("/api/health", async (c) => {
   let bitcoindReady = false;
   let electrsReady = false;
+  let walletLoaded = false;
   let faucetBalance = 0;
   try {
     await rpc("getblockcount");
@@ -127,8 +128,10 @@ app.get("/api/health", async (c) => {
   if (bitcoindReady) {
     try {
       await ensureWallet();
+      walletLoaded = true;
       faucetBalance = toSats(await rpc("getbalance", [], true));
     } catch {
+      walletLoaded = false;
       faucetBalance = 0;
     }
   }
@@ -136,6 +139,7 @@ app.get("/api/health", async (c) => {
     ok: true,
     bitcoind_ready: bitcoindReady,
     electrs_ready: electrsReady,
+    wallet_ready: walletLoaded,
     faucet_balance: faucetBalance,
   });
 });
