@@ -39,6 +39,35 @@ branches on `provider.network`.
 - Use for: enterprise cohorts where each learner drives a real (valueless)
   chain.
 
+## Which mode am I in?
+
+Three signals, strongest first:
+
+1. The wallet address prefix: `bc1q…` simulated, `tb1…` signet, `bcrt1…`
+   regtest. (Drive lesson addresses stay `bc1q…` in every mode; only the
+   wallet follows the provider.)
+2. `GET /api/health` → the `bitcoin` field (`simulated` | `signet` |
+   `regtest`) and the `db` field (`file` | `postgres`).
+3. `/api/wallet/regtest/*` returns 404 in every mode except regtest.
+
+## Local regtest dev (Nigiri)
+
+Production regtest is self-hosted infra behind Caddy + TLS. Local dev
+replaces the Bitcoin layer with Nigiri and runs only the `api/` service
+from this repo:
+
+```bash
+nigiri start                                        # bitcoind, electrs, Esplora
+docker compose -f docker-compose.infra-api.yml up -d  # api/ → Nigiri's ports
+npm run dev:regtest                                 # app with BITCOIN_MODE=regtest
+```
+
+Notes from running it: `dev:regtest` probes bitcoind on 18443 and the
+infra-api on 8081 before booting; mine one block on a fresh Nigiri start
+so electrs leaves its sync wait; Nigiri's chopsticks wants port 3000 —
+if yours is taken, only chopsticks fails and nothing in our path uses it.
+Fees report nominal 1 sat/vB (regtest has no fee market by design).
+
 ## Reaching the infra from Vercel
 
 The regtest stack is self-hosted; Vercel only needs outbound HTTPS to

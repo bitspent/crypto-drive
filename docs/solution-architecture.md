@@ -1,5 +1,12 @@
 # Crypto Drive — Solution Architecture
 
+> **Status note (Oct 2026):** §§1–7 describe the slice-1 baseline
+> (file store, mock commerce) and predate the shipped Supabase, Gumroad,
+> revocation, hashing, rate-limit, and Bitcoin-provider work. They are kept
+> as design history. For the system as it runs today, read §§8–10 plus
+> `docs/deployment-modes.md`, `docs/infra-contract.md`,
+> `docs/deploy-vercel.md`, and `docs/charge-ready-checklist.md`.
+
 Whole-system map for the licensed learner loop: ads → Gumroad → unlock → six drives → capstone cert → verify → share. Aligned with locked brand, Gumroad-only commerce, pro “learn to drive” positioning, **simulated milestones**, and **off-chain certs**.
 
 ---
@@ -283,7 +290,7 @@ only the certificate is tier-gated.
 | Suite | Command | Covers |
 | --- | --- | --- |
 | Unit | `node --test --test-concurrency=1 tests/` | Practice determinism + grading (incl. capstone rubric), content shape (24 steps, idea panels, cert target), tier flags, module redirects, `CERT_HASH_SECRET` production gate, wallet lib (formatting, send/deposit/restore, fee tiers), commerce + revocation + hashing (serial: file-store writers race across files) |
-| E2E | `npm run build` then `npx playwright test` (once: `npx playwright install chromium`) | Full 24-step walk on desktop + mobile viewports, layout contract, keyboard drive, reduced-motion, no-WebGL, mobile smoke, wallet sandbox flows (setup, deposit, send, backup/restore/reset). Config: `playwright.config.ts`; specs: `tests/e2e/` |
+| E2E | `npm run build` then `npx playwright test` (once: `npx playwright install chromium`) | Full 24-step walk on desktop + mobile viewports, layout contract, keyboard drive, reduced-motion, no-WebGL, mobile smoke, wallet sandbox flows (setup, deposit, send, backup/restore/reset), legal pages, health, bitcoin modes — in file-store and Postgres modes (`E2E_DATABASE_URL`, see `tests/e2e/README.md`). Config: `playwright.config.ts`; specs: `tests/e2e/` |
 
 Both suites must pass before any charge-readiness review. Pre-launch
 blockers live in `docs/charge-ready-checklist.md`.

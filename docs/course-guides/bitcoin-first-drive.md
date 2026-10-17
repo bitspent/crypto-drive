@@ -152,7 +152,7 @@ New interactions: clipboard swap, fee control, key-contrast animation, three roa
 2. Step route and the screen shell: coach line, live picture, one button, pocket card after success.
 3. Stop 1 (taps only), then Get paid, then Send, then Guard, then Road test.
 4. Point the certificate at the road test. Starter finishes the drive without one. (Done, then superseded: the cert moved to the capstone in the prove-it drive.)
-5. Rewrite `bitcoin.md`, README, and landing / course copy. Run `node --test tests/` and walk Certified and Starter in the browser.
+5. Rewrite `bitcoin.md`, README, and landing / course copy. Run `node --test --test-concurrency=1 tests/` and walk Certified and Starter in the browser.
 
 ---
 
