@@ -536,6 +536,12 @@ export async function issueCertificate(input: {
     return existing;
   }
 
+  // The cert step (final exam) must be passed: without this, a direct POST
+  // mints a certificate with no work done. Re-issues above stay idempotent.
+  if (!student.modulesPassed[input.moduleSlug]) {
+    throw new Error("Pass the final exam first — the certificate issues there.");
+  }
+
   student.name = name;
   student.modulesPassed[input.moduleSlug] = new Date().toISOString();
 
@@ -624,6 +630,12 @@ async function pgIssueCertificate(input: {
       })
       .where(eq(students.id, student.id));
     return existing;
+  }
+
+  // The cert step (final exam) must be passed: without this, a direct POST
+  // mints a certificate with no work done. Re-issues above stay idempotent.
+  if (!student.modulesPassed[input.moduleSlug]) {
+    throw new Error("Pass the final exam first — the certificate issues there.");
   }
 
   const id = newId("cert");
