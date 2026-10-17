@@ -78,6 +78,9 @@ Notes from running it: `dev:regtest` probes bitcoind on 18443 and the
 infra-api on 8081 before booting; mine one block on a fresh Nigiri start
 so electrs leaves its sync wait; Nigiri's chopsticks wants port 3000 —
 if yours is taken, only chopsticks fails and nothing in our path uses it.
+If chopsticks flap-loops with "Requested wallet does not exist", bitcoind
+has no default wallet (our faucet uses a named one) — create it once:
+`curl --user admin1:123 --data-binary '{"jsonrpc":"1.0","method":"createwallet","params":[""]}' -H 'content-type: text/plain' http://127.0.0.1:18443/`.
 Fees report nominal 1 sat/vB (regtest has no fee market by design).
 The wallet's tx-details sheet links each regtest txid to our own Esplora UI
 (the `esplora-ui` service in `docker-compose.infra-api.yml`, default
