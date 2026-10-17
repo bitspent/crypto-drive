@@ -1,131 +1,80 @@
 # Deploy to Vercel
 
-Step-by-step from this repo to a live production deploy. Vercel is the
-documented default host; the app is a standard Next.js project and will run
-anywhere Next.js runs, but these steps assume Vercel.
+Step-by-step from this repo to a live production deploy. The app is a
+standard Next.js project; these steps assume Vercel.
 
-## 0. Before you start
+## Prerequisites
 
-- The P0 rows in `docs/charge-ready-checklist.md` that are marked **code**
-  are done; the rows marked **human** below are not — most of this doc is
-  executing them.
-- You need: a Vercel account, a Supabase project (pooler URL + password), a
-  Gumroad account with three tier products, a Resend API key, and a domain.
-- Launch target: `BITCOIN_MODE=simulated`. Regtest is an enterprise upgrade;
-  nothing below requires the self-hosted infra except step 6, which is
-  optional for launch.
+- Vercel Pro account (Hobby forbids commercial use)
+- Supabase project created
+- Gumroad products created (3 tiers)
+- Resend account + verified sending domain
+- Domain DNS access
 
-## 1. Connect the repo
+## Steps
 
-1. Push `main` (it should already be there — every prompt ships pushed).
-2. Vercel → Add New → Project → Import `bitspent/crypto-drive`.
-3. Framework preset: Next.js. Root directory: `./`. Build command and output
-   directory: leave the defaults (`next build`).
-4. Do **not** deploy yet — set environment variables first (step 2).
+1. **Create the Supabase project, run migrations, get the pooler string.**
+   Apply `db/migrations/*.sql` in order against the new database (Supabase
+   SQL editor or psql). If the database already holds raw `license_key`
+   values (pre-3.5b staging data), run `scripts/hash-licenses.mjs` between
+   0004 and 0005 — see the 0004 header. Fresh databases apply all files
+   together. Copy the transaction pooler connection string (port 6543).
 
-## 2. Set environment variables
+2. **Connect the GitHub repo to Vercel.** Import `bitspent/crypto-drive`,
+   framework Next.js, root `./`, defaults for build/output. Do not deploy
+   yet.
 
-Project Settings → Environment Variables. Set each for **Production** and
-**Preview** unless noted. Never commit real values — `.env.example`
-documents every variable with comments.
+3. **Set every env var** in Project Settings → Environment Variables
+   (Production + Preview; never in git). The full list with comments is
+   `.env.example`: `CERT_HASH_SECRET` (`openssl rand -hex 32`),
+   `LICENSE_PEPPER` (`openssl rand -hex 32`), `DATABASE_URL` (step 1),
+   `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_GUMROAD_URL`, `NEXT_PUBLIC_VIP_*`
+   (when fulfillment exists), `GUMROAD_*` (5), `RESEND_*` (2),
+   `BITCOIN_MODE=simulated`. Do **not** set `ALLOW_DEMO_LICENSES`
+   anywhere — it re-enables demo keys.
 
-| Variable | Where from | Notes |
-|---|---|---|
-| `CERT_HASH_SECRET` | `openssl rand -hex 32` | Required: builds refuse to boot without it. Production and Preview can share or differ; Rotation invalidates practice seeds and cert hashes. |
-| `DATABASE_URL` | Supabase → Connect → Transaction pooler (port 6543) | Required in production. Unset means the `.data/` file store — local dev only, data lost on redeploy. |
-| `NEXT_PUBLIC_APP_URL` | Your domain, e.g. `https://crypto-drive.example.com` | Baked into the client at build time. Email links, legal contacts, canonicals. |
-| `NEXT_PUBLIC_GUMROAD_URL` | Your Gumroad storefront link | Placeholder fallback is `gumroad.com/l/crypto-drive` — replace before launch. |
-| `NEXT_PUBLIC_VIP_CALL_URL` | Scheduling link (e.g. Cal.com) | No fallback; VIP blocks hide when unset. |
-| `NEXT_PUBLIC_VIP_QA_URL` | Private Q&A lane | No fallback; VIP blocks hide when unset. |
-| `GUMROAD_WEBHOOK_SECRET` | Gumroad Settings → Advanced → Ping | Register the Ping URL as `https://<domain>/api/webhooks/gumroad?secret=<value>` (step 7). |
-| `GUMROAD_PRODUCT_STARTER` | Gumroad product id | Env-only, never in git. |
-| `GUMROAD_PRODUCT_CERTIFIED` | Gumroad product id | |
-| `GUMROAD_PRODUCT_VIP` | Gumroad product id | |
-| `GUMROAD_ACCESS_TOKEN` | Gumroad (optional) | Bearer for the license-verify fallback; the endpoint also answers unauthenticated. |
-| `RESEND_API_KEY` | resend.com | Without it, sales still provision; the email step logs and continues. |
-| `RESEND_FROM_EMAIL` | e.g. `Crypto Drive <hello@yourdomain.com>` | Must be a verified sender in Resend. |
-| `BITCOIN_MODE` | `simulated` | Launch target. `signet` for live fees; `regtest` only with infra (step 6). |
-| `INFRA_BASE_URL` | Your infra URL | Regtest only. |
-| `INFRA_SHARED_SECRET` | `openssl rand -hex 32` | Regtest only. |
-| `ADMIN_MINE_TOKEN` | `openssl rand -hex 32` | Regtest mining + the rate-limit admin bypass header. |
+4. **Set the custom domain; wait for DNS + TLS.** Then redeploy:
+   `NEXT_PUBLIC_*` values bake in at build time.
 
-Do **not** set `ALLOW_DEMO_LICENSES` anywhere in Vercel. It exists only for
-the Playwright harness. A stray Preview value would re-enable demo keys.
+5. **Run first migration against the production DB** (if step 1 targeted a
+   staging database): same files, same order, same 0004/0005 caution.
 
-## 3. Configure the domain
+6. **Deploy.** The build fails loudly without `CERT_HASH_SECRET`, so a
+   misconfigured deploy cannot slip through silently.
 
-1. Vercel → Settings → Domains → add your domain, point DNS at Vercel.
-2. Set `NEXT_PUBLIC_APP_URL` to the apex domain (step 2) and redeploy —
-   `NEXT_PUBLIC_*` values bake in at build time, so domain changes need a
-   rebuild.
-3. Confirm `https://<domain>/unlock` loads.
+7. **Smoke test: `/unlock` with a real license key.** Walk one step,
+   confirm progress saves and survives a reload. Open `/terms`, `/privacy`,
+   `/refund` on desktop and mobile widths.
 
-## 4. Confirm Supabase works from Vercel
+8. **Register the Gumroad webhook URL:**
+   `https://<domain>/api/webhooks/gumroad?secret=<GUMROAD_WEBHOOK_SECRET>`
+   (Gumroad → Settings → Advanced → Ping).
 
-After the first deploy, before anything else:
+9. **Send a Gumroad test ping; confirm 200 in Vercel logs**, then check the
+   database: one row in `webhook_events` per ping. No row → the URL or
+   secret is wrong.
 
-```bash
-curl -s https://<domain>/api/health
-# {"ok":true,"db":"postgres","bitcoin":"simulated"}
-```
-
-- `"db":"postgres"` — the pooler connection works from Vercel. Proceed.
-- `"db":"file"` — `DATABASE_URL` is unset or empty in this environment.
-  Fix it; never run production on the file store.
-- `"db":"unreachable"` (HTTP 503) — the URL is set but wrong, the pooler
-  is down, or the password rotated. Check the Supabase dashboard.
-
-## 5. Set `CERT_HASH_SECRET` (if you skipped it)
-
-`openssl rand -hex 32`, paste into Production + Preview, redeploy. The build
-fails loudly without it, so you cannot deploy past this step by accident —
-but confirm the value appears nowhere in the repo, logs, or screenshots.
-
-## 6. Regtest reachability (optional for launch)
-
-Only if you run the self-hosted infra (`docs/infra-contract.md`):
-
-1. In a **Preview** deploy, set `BITCOIN_MODE=regtest` plus the three
-   `INFRA_*` / `ADMIN_*` vars.
-2. Unlock the preview, then:
-   ```bash
-   curl -s -X POST https://<preview>/api/wallet/regtest/fund \
-     -H "Cookie: cd_session=<session>" -d '{"amountSats":500000}'
-   ```
-3. Expect a `txid`. If the wallet shows "Regtest infrastructure is
-   offline", the app cannot reach `INFRA_BASE_URL` from Vercel — check the
-   tunnel (Cloudflare Tunnel or Tailscale notes in
-   `docs/deployment-modes.md`).
-4. Leave Production on `simulated` until the Preview path is green twice.
-
-## 7. Register the Gumroad webhook
-
-1. Gumroad → Settings → Advanced → Ping → URL:
-   `https://<domain>/api/webhooks/gumroad?secret=<GUMROAD_WEBHOOK_SECRET>`.
-2. Send Gumroad's test ping. Then check the database:
-   ```sql
-   SELECT id, source, processed_at FROM webhook_events ORDER BY processed_at DESC LIMIT 1;
-   ```
-   One row per ping. No row → the URL or secret is wrong.
-3. Buy your own Certified tier with a real card ($20). Confirm: 200 on the
-   webhook, one `students` row with a populated `license_key`, one email in
-   Resend, unlock with the emailed key works, progress and wallet persist.
-4. Repeat for Starter and VIP. See the commerce rows in
-   `docs/charge-ready-checklist.md` — the manual verification is a launch
-   gate, not a suggestion.
-
-## 8. Smoke test after the first deploy
-
-1. Unlock (paid key after step 7, demo key only on Preview-with-override —
-   never Production).
-2. Walk one full step; confirm progress saves and survives a reload.
-3. Receive a test webhook event (step 7) and confirm the student row.
-4. Open `/terms`, `/privacy`, `/refund` on desktop and mobile widths.
-5. Confirm `https://<domain>/api/health` still reports `postgres`.
+10. **Buy your own product; confirm end-to-end.** Certified tier ($20):
+    webhook 200 → `students` row with a populated `license_key_hash` →
+    Resend email → unlock with the emailed key through the form → progress
+    and wallet persist. Repeat for Starter and VIP. Then refund it via the
+    Gumroad dashboard and confirm the student row shows `revoked_at` and
+    unlock is refused.
 
 ## Rollback
 
-Every deploy is a Vercel deployment: Instant Rollback in the dashboard
-reverts code in one click. Data is never rolled back (Supabase is outside
-Vercel) — migrations under `db/migrations/` are additive, so old code
-keeps working against the current schema.
+- Vercel → Deployments → previous → Promote.
+- DB migrations are forward-only; roll back the app first, then the DB
+  manually if the schema changed. Migrations in this repo are additive
+  (0005 drops a column the new code no longer reads), so old code keeps
+  working against the current schema in every case so far.
+
+## Health checks
+
+- `GET /api/health` → `{"ok":true,"db":"postgres","bitcoin":"simulated"}`.
+  `"db":"file"` means `DATABASE_URL` is unset; `"db":"unreachable"` (503)
+  means the pooler URL, password, or network is wrong.
+- Put an uptime monitor on `/unlock` (200, no session needed).
+- After any regtest infra change (enterprise path, Preview only):
+  unlock the preview and fund the wallet; expect a txid, not the offline
+  message. Leave Production on `simulated`.

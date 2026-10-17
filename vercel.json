@@ -1,18 +1,21 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "regions": ["iad1"],
   "functions": {
-    "src/app/api/og/route.tsx": { "runtime": "nodejs20.x" }
+    "src/app/api/og/route.tsx": { "runtime": "nodejs" },
+    "src/app/api/webhooks/gumroad/route.ts": { "maxDuration": 30 }
   },
   "redirects": [
     {
-      "source": "/module",
-      "destination": "/course",
-      "permanent": false
+      "source": "/module/1",
+      "destination": "/track/bitcoin/what-is/satoshi",
+      "permanent": true
     },
     {
-      "source": "/module/:path*",
-      "destination": "/course",
-      "permanent": false
+      "source": "/module/:slug",
+      "destination": "/track/bitcoin/what-is/satoshi",
+      "permanent": true
     }
   ]
 }
