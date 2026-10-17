@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ClipboardEvent,
   type ReactNode,
@@ -1659,6 +1660,9 @@ function SeedScene({
   );
   const [picked, setPicked] = useState<number[]>(review ? words.map((_, i) => i) : []);
   const [recallAt, setRecallAt] = useState(0);
+  const [hitIdx, setHitIdx] = useState<number | null>(null);
+  const promptRef = useRef<HTMLParagraphElement>(null);
+  const focusedRound = useRef(-1);
 
   useEffect(() => {
     publish("seed-picked", review ? 12 : picked.length);
@@ -1667,6 +1671,20 @@ function SeedScene({
   const [localError, setLocalError] = useState<string | null>(null);
   const [miss, setMiss] = useState(false);
   const shuffled = useMemo(() => [5, 2, 8, 0, 11, 3, 6, 1, 9, 4, 7, 10], []);
+
+  // Land focus on each recall prompt — entering the phase and every advance —
+  // so keyboard and screen-reader users start the round on the instruction.
+  useEffect(() => {
+    if (phase !== "recall" || focusedRound.current === recallAt) return;
+    focusedRound.current = recallAt;
+    promptRef.current?.focus({ preventScroll: true });
+  }, [phase, recallAt]);
+
+  useEffect(() => {
+    if (hitIdx === null) return;
+    const t = window.setTimeout(() => setHitIdx(null), 350);
+    return () => window.clearTimeout(t);
+  }, [hitIdx]);
 
   function tapWrite(index: number) {
     if (index !== picked.length) {
@@ -1688,6 +1706,7 @@ function SeedScene({
       return;
     }
     setLocalError(null);
+    setHitIdx(index);
     if (recallAt === recall.length - 1) {
       onCommit({
         recallWords: recall.map((n) => words[n - 1]),
@@ -1804,10 +1823,41 @@ function SeedScene({
       ) : null}
 
       {phase === "recall" ? (
-        <Frame title={`WORD ${recall[recallAt]} — THE CARD IS HIDDEN`}>
-          <div className="flex flex-wrap gap-2">
+        <Frame title="THE CARD IS HIDDEN">
+          <p
+            key={recallAt}
+            ref={promptRef}
+            tabIndex={-1}
+            className="d-recall-prompt d-prompt-in"
+            aria-live="polite"
+          >
+            Tap word <span className="d-recall-num">{recall[recallAt]}</span>
+          </p>
+          <div key={`dots-${recallAt}`} className="d-recall-dots" aria-hidden="true">
+            {recall.map((_, d) => (
+              <span
+                key={d}
+                className={
+                  d < recallAt
+                    ? "d-recall-dot d-recall-dot-done"
+                    : d === recallAt
+                      ? "d-recall-dot d-recall-dot-current"
+                      : "d-recall-dot"
+                }
+              />
+            ))}
+          </div>
+          <p className="d-recall-progress">
+            Word {recallAt + 1} of {recall.length}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
             {shuffled.map((index) => (
-              <Button key={words[index]} variant="secondary" onClick={() => tapRecall(index)}>
+              <Button
+                key={words[index]}
+                variant="secondary"
+                className={hitIdx === index ? "d-recall-hit" : undefined}
+                onClick={() => tapRecall(index)}
+              >
                 {words[index]}
               </Button>
             ))}
@@ -2089,14 +2139,27 @@ function CompareScene({
   const [expanded, setExpanded] = useState<string[]>(review ? [...CUSTODY_MODELS] : []);
   const [pick, setPick] = useState(review ? "multi-sig" : "");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [spotlight, setSpotlight] = useState<string | null>(null);
+  const toggleRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  useEffect(() => {
+    if (spotlight === null) return;
+    const t = window.setTimeout(() => setSpotlight(null), 700);
+    return () => window.clearTimeout(t);
+  }, [spotlight]);
 
   function toggle(id: string) {
     setExpanded((e) => (e.includes(id) ? e.filter((x) => x !== id) : [...e, id]));
   }
 
   function submit() {
-    if (!CUSTODY_MODELS.every((m) => expanded.includes(m))) {
+    const missing = CUSTODY_MODELS.find((m) => !expanded.includes(m));
+    if (missing) {
       setLocalError("Expand all four models first.");
+      // Pull eye and keyboard to the next needed card: ring it once and
+      // focus its toggle (focus scrolls it into view when below the fold).
+      setSpotlight(missing);
+      toggleRefs.current[missing]?.focus();
       return;
     }
     if (pick !== "multi-sig") {
@@ -2149,10 +2212,13 @@ function CompareScene({
             {CUSTODY_CARDS.map((m) => (
               <div
                 key={m.id}
-                className="rounded-2xl border border-[var(--lane)] bg-[var(--cabin)]"
+                className={`rounded-2xl border border-[var(--lane)] bg-[var(--cabin)]${spotlight === m.id ? " d-focus-ring" : ""}`}
               >
                 <button
                   type="button"
+                  ref={(el) => {
+                    toggleRefs.current[m.id] = el;
+                  }}
                   aria-expanded={expanded.includes(m.id)}
                   aria-controls={`custody-${m.id}`}
                   onClick={() => toggle(m.id)}

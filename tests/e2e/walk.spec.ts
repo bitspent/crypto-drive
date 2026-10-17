@@ -139,14 +139,14 @@ test("walks unlock to verified certificate across all 24 steps", async ({ page }
   await page.getByRole("button", { name: "Refuse" }).click();
   let prevTitle = "";
   for (let round = 0; round < 5; round++) {
-    // Race-free: each round waits for EITHER the next WORD title OR the
-    // Continue link (WORD 9 persists after the final commit by design).
+    // Race-free: each round waits for EITHER the next Tap-word prompt OR
+    // the Continue link (the last prompt persists after commit by design).
     const got = await page.waitForFunction(
       (prev: string) => {
         const links = [...document.querySelectorAll("a")];
         if (links.some((a) => (a.textContent ?? "").trim() === "Continue")) return "done";
         const el = [...document.querySelectorAll("p")].find((p) =>
-          /WORD \d+/.test(p.textContent ?? ""),
+          /Tap word \d+/.test(p.textContent ?? ""),
         );
         return el && el.textContent !== prev ? el.textContent : false;
       },
@@ -154,13 +154,13 @@ test("walks unlock to verified certificate across all 24 steps", async ({ page }
       { polling: 100, timeout: 30000 },
     );
     if ((await got.jsonValue()) === "done") break;
-    const title = await page.locator("p", { hasText: /WORD \d+/ }).first().innerText();
+    const title = await page.locator("p", { hasText: /Tap word \d+/ }).first().innerText();
     prevTitle = title;
-    const nm = title.match(/WORD (\d+)/);
-    expect(nm, `unexpected recall title: ${title}`).not.toBeNull();
+    const nm = title.match(/Tap word (\d+)/);
+    expect(nm, `unexpected recall prompt: ${title}`).not.toBeNull();
     const n = Number(nm?.[1] ?? "0");
     const recallFrame = page
-      .locator("p", { hasText: /WORD \d+/ })
+      .locator("p", { hasText: /Tap word \d+/ })
       .first()
       .locator("xpath=..");
     await recallFrame.getByRole("button", { name: words[n - 1] ?? "", exact: true }).click();

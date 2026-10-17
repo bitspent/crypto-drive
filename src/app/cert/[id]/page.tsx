@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CopyChip } from "@/components/copy-chip";
 import { ShareButtons } from "@/components/share-buttons";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -46,30 +47,75 @@ export default async function CertPage({ params }: Props) {
           Certificate ready, {cert.studentName.split(" ")[0]}.
         </h1>
         <p className="mt-4 max-w-2xl text-[var(--fog)]">
-          {cert.module} — {cert.milestone}. Issued {issued}. Share the verify
-          link so anyone can check it.
+          Share the verify link so anyone can check it.
         </p>
 
-        <div className="mt-10 overflow-hidden rounded-xl border border-[var(--lane)] bg-[var(--cabin)]">
-          <Image
-            src={`/api/og?id=${encodeURIComponent(cert.id)}`}
-            alt={`Certificate for ${cert.studentName}`}
-            width={1200}
-            height={630}
-            className="h-auto w-full"
-            unoptimized
-            priority
-          />
+        <div className="d-cert-in mt-10 rounded-2xl border-2 border-[var(--amber)] bg-[var(--cabin)] p-2 sm:p-3">
+          <div className="overflow-hidden rounded-xl border border-[var(--lane)]">
+            <Image
+              src={`/api/og?id=${encodeURIComponent(cert.id)}`}
+              alt={`Certificate for ${cert.studentName}`}
+              width={1200}
+              height={630}
+              className="h-auto w-full"
+              unoptimized
+              priority
+            />
+          </div>
         </div>
 
-        <div className="mt-8 space-y-3">
-          <p className="text-sm text-[var(--mute)]">
-            Public verify URL:{" "}
-            <Link href={`/verify/${cert.id}`} className="text-[var(--amber)] break-all">
+        <dl className="mt-8 grid gap-x-8 gap-y-4 sm:grid-cols-2">
+          <div>
+            <dt className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
+              TRACK
+            </dt>
+            <dd className="mt-1 text-[var(--paper)]">{cert.module}</dd>
+          </div>
+          <div>
+            <dt className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
+              MILESTONE
+            </dt>
+            <dd className="mt-1 text-[var(--paper)]">{cert.milestone}</dd>
+          </div>
+          <div>
+            <dt className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
+              ISSUED
+            </dt>
+            <dd className="mt-1 text-[var(--paper)]">{issued}</dd>
+          </div>
+          <div>
+            <dt className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
+              TIER
+            </dt>
+            <dd className="mt-1 text-[var(--paper)]">
+              {cert.tier.charAt(0).toUpperCase() + cert.tier.slice(1)}
+            </dd>
+          </div>
+        </dl>
+
+        <div className="mt-8 space-y-5">
+          <div>
+            <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
+              PUBLIC VERIFY URL
+            </p>
+            <Link
+              href={`/verify/${cert.id}`}
+              className="mt-1 block text-[var(--amber)] break-all"
+            >
               {verifyUrl}
             </Link>
-          </p>
-          <p className="font-mono text-xs text-[var(--mute)]">Hash {cert.hash}</p>
+            <div className="mt-2 max-w-xl">
+              <CopyChip value={verifyUrl} label="Verify URL" />
+            </div>
+          </div>
+          <div>
+            <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
+              CERTIFICATE HASH
+            </p>
+            <div className="mt-2 max-w-xl">
+              <CopyChip value={cert.hash} label="Certificate hash" />
+            </div>
+          </div>
         </div>
 
         <div className="mt-8">
