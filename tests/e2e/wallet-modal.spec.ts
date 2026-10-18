@@ -46,6 +46,10 @@ test("rail opens the wallet in place, setup works, close returns focus", async (
     );
     expect(veilFilter).toContain("blur(");
 
+    // Compact default cap (undragged class rule) + slim scrollbars.
+    expect(await modal.evaluate((el) => getComputedStyle(el).maxHeight)).toBe("640px");
+    expect(await modal.evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe("thin");
+
     // Draggable by the header on desktop: stays in the viewport.
     const before = await modal.boundingBox();
     const head = modal.locator(".wallet-modal-head");
@@ -59,6 +63,21 @@ test("rail opens the wallet in place, setup works, close returns focus", async (
     expect((after?.y ?? 0) - (before?.y ?? 0)).toBeGreaterThan(50);
     expect(after?.x ?? 0).toBeGreaterThanOrEqual(0);
     expect((after?.x ?? 0) + (after?.width ?? 0)).toBeLessThanOrEqual(1440);
+
+    // Corner grip resizes both dimensions.
+    const grown = await modal.boundingBox();
+    await page.mouse.move(
+      (grown?.x ?? 0) + (grown?.width ?? 0) - 6,
+      (grown?.y ?? 0) + (grown?.height ?? 0) - 6,
+    );
+    await page.mouse.down();
+    await page.mouse.move((grown?.x ?? 0) + (grown?.width ?? 0) + 74, (grown?.y ?? 0) + (grown?.height ?? 0) + 54, {
+      steps: 8,
+    });
+    await page.mouse.up();
+    const resized = await modal.boundingBox();
+    expect((resized?.width ?? 0) - (grown?.width ?? 0)).toBeGreaterThan(60);
+    expect((resized?.height ?? 0) - (grown?.height ?? 0)).toBeGreaterThan(40);
 
     // Full setup ceremony inside the modal.
     await modal.getByRole("button", { name: "Create your wallet" }).click();

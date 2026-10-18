@@ -84,6 +84,26 @@ body {
   color: #ffffff;
 }
 
+/* Slim scrollbars everywhere: thin trackless bars in the theme lane color. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--lane) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--lane);
+  border-radius: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .road-atmosphere {
   /* Viewport units keep washes from shearing when the document is taller than 100vh. */
   background-color: var(--asphalt);
@@ -859,13 +879,24 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
 
 .wallet-modal {
   width: min(440px, 100%);
-  max-height: calc(100dvh - 2rem);
+  /* Compact default: tall content scrolls inside; the grip can grow it. */
+  max-height: min(640px, calc(100dvh - 2rem));
   overflow-y: auto;
   background: var(--cabin);
   border: 1px solid var(--lane);
   border-radius: 1rem;
   padding: 1rem 1rem 1.25rem;
   box-shadow: 0 24px 64px rgba(8, 10, 16, 0.28);
+}
+
+@media (min-width: 641px) {
+  /* Native grip: needs overflow != visible (set above), works on the
+     dragged fixed panel too. min-* keeps the header + QR usable. */
+  .wallet-modal {
+    resize: both;
+    min-width: 320px;
+    min-height: 280px;
+  }
 }
 
 .dark .wallet-modal {

@@ -126,10 +126,11 @@ export function WalletModal({
                 left: pos.left,
                 top: pos.top,
                 margin: 0,
-                // Pin the bottom inside the viewport: content that grows
-                // after a drag (setup phases) scrolls internally instead of
+                // Pin inside the viewport AND the compact cap: content that
+                // grows after a drag scrolls internally instead of
                 // stranding buttons below the fold.
-                maxHeight: `calc(100dvh - ${Math.round(pos.top)}px - 16px)`,
+                maxHeight: `min(640px, calc(100dvh - ${Math.round(pos.top)}px - 16px))`,
+                maxWidth: `calc(100vw - ${Math.round(pos.left)}px - 16px)`,
               }
             : undefined
         }
