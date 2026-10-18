@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { ExternalIcon } from "@/components/icons";
 import { WalletApp } from "@/components/wallet-app";
 import type { BitcoinNetwork } from "@/lib/bitcoin/provider";
 import type { WalletState } from "@/lib/wallet";
@@ -84,8 +85,14 @@ export function WalletModal({
       >
         <div className="wallet-modal-head">
           <p className="wallet-modal-title">Practice wallet</p>
-          <Link href="/wallet" className="wallet-modal-full">
-            Open full page
+          <Link
+            href="/wallet"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Open wallet in a new tab"
+            className="wallet-modal-popout"
+          >
+            <ExternalIcon />
           </Link>
           <button
             type="button"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CopyIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -51,14 +52,20 @@ export function CopyChip({
       </span>
       <span
         className={cn(
-          "mt-0.5 shrink-0 rounded-full border px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.06em] leading-none",
+          "mt-0.5 inline-flex shrink-0 items-center justify-center rounded-full border p-1.5 leading-none",
           copied
             ? "border-[var(--go)]/50 bg-[var(--go)]/15 text-[var(--go)]"
             : "border-[var(--amber)]/45 bg-[var(--amber)]/10 text-[var(--amber)]",
         )}
         aria-live="polite"
       >
-        {copied ? "Copied" : "Copy"}
+        {copied ? (
+          <span aria-hidden="true" className="text-sm font-bold leading-none">
+            ✓
+          </span>
+        ) : (
+          <CopyIcon size={14} />
+        )}
       </span>
     </button>
   );

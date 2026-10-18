@@ -880,11 +880,21 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   color: var(--mute);
 }
 
-.wallet-modal-full {
+.wallet-modal-popout {
   margin-left: auto;
-  font-size: 0.85rem;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--lane);
+  border-radius: 0.75rem;
+  color: var(--paper);
+}
+
+.wallet-modal-popout:hover {
   color: var(--amber);
-  white-space: nowrap;
+  border-color: var(--amber);
 }
 
 .wallet-modal-close {

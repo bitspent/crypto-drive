@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CopyIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
   instagramHelpUrl,
@@ -51,11 +52,18 @@ export function ShareButtons({ studentName, verifyUrl }: Props) {
             });
           }}
         >
-          Copy for Instagram
+          <CopyIcon size={16} /> for Instagram
         </Button>
       </a>
       <Button variant="outline" className="w-full sm:w-auto" onClick={() => void copyLink()}>
-        {copied ? "Copied" : "Copy share text"}
+        {copied ? (
+          <span aria-hidden="true" className="font-bold">
+            ✓
+          </span>
+        ) : (
+          <CopyIcon size={16} />
+        )}
+        {copied ? "Copied" : "Share text"}
       </Button>
     </div>
   );

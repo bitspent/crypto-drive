@@ -10,6 +10,7 @@ import {
   type RefObject,
 } from "react";
 import QRCode from "qrcode";
+import { CopyIcon } from "@/components/icons";
 import {
   FEE_TIERS,
   SEED_CONFIRM_POSITIONS,
@@ -77,25 +78,6 @@ function AnimatedBalance({ sats, reduced }: { sats: number; reduced: boolean }) 
       <p className="w-balance-unit">BTC</p>
       <p className="w-balance-sub">≈ {sats.toLocaleString("en-US")} sats</p>
     </>
-  );
-}
-
-function CopyIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 18 18"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="6" y="6" width="9" height="9" rx="2" />
-      <path d="M12 6V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h1" />
-    </svg>
   );
 }
 
