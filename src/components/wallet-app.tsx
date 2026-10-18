@@ -634,7 +634,7 @@ function GearIcon() {
   );
 }
 
-const DISCLOSURE = "Practice wallet · Play money · No real Bitcoin";
+const DISCLOSURE = "Play money · Not real bitcoin";
 
 function SettingsGear({
   onOpenSettings,
@@ -977,7 +977,7 @@ function SettingsMenu({
         {backupAt ? (
           <p className="w-menu-meta">Last backed up: {formatRelativeTime(backupAt)}</p>
         ) : null}
-        <p className="w-menu-meta">Practice wallet · Play money · No real Bitcoin</p>
+        <p className="w-menu-meta">{DISCLOSURE}</p>
       </div>
     </div>
   );

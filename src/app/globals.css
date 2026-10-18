@@ -855,8 +855,8 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   /* Glass over the lesson. backdrop-filter re-anchors fixed descendants to
      the veil — which is exactly viewport-sized, so the wallet's own fixed
      sheets keep identical geometry. */
-  -webkit-backdrop-filter: blur(10px) saturate(1.25);
-  backdrop-filter: blur(10px) saturate(1.25);
+  -webkit-backdrop-filter: blur(3px) saturate(1.1);
+  backdrop-filter: blur(3px) saturate(1.1);
   display: flex;
   align-items: center;
   justify-content: center;
