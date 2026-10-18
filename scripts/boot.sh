@@ -822,7 +822,17 @@ if [ "$MODE" = "regtest" ]; then
         say "--yes: starting Nigiri"
       fi
       export PATH="$HOME/.local/bin:$PATH"
-      nigiri start || die "'nigiri start' failed"
+      # `nigiri start` fails hard when chopsticks can't bind (e.g. a foreign
+      # :3000 holder) even though bitcoind + electrs came up fine. Since
+      # chopsticks is optional, a failed start followed by a live bitcoind
+      # is success-with-skip, not an abort.
+      if ! nigiri start; then
+        if nigiri_up; then
+          warn "'nigiri start' reported failure but bitcoind answers — continuing without chopsticks"
+        else
+          die "'nigiri start' failed"
+        fi
+      fi
       say "waiting for bitcoind RPC (up to ${WAIT_SECS}s)…"
       for _ in $(seq 1 "$WAIT_SECS"); do
         nigiri_up && break
