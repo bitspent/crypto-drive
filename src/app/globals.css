@@ -724,12 +724,17 @@ body {
   margin: 0 0 0.25rem;
 }
 
-.drive-tools a {
+.drive-tools a,
+.drive-tools button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   color: var(--fog);
   font-size: 0.85rem;
 }
 
-.drive-tools a:hover {
+.drive-tools a:hover,
+.drive-tools button:hover {
   color: var(--amber);
 }
 
@@ -740,12 +745,6 @@ body {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  color: var(--fog);
-  font-size: 0.85rem;
-}
-
-.drive-tools button:hover {
-  color: var(--amber);
 }
 
 /* One prose cap, used by coach + idea panel. Interactive scenes stay full width. */
@@ -903,6 +902,22 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   padding: 2rem 1rem;
   text-align: center;
   color: var(--mute);
+}
+
+/* Bare mode in the course modal: the dialog header already says
+   "Practice wallet", so the wallet's own title eyebrow hides (the gear
+   and the disclosure strip stay). display:none also drops the duplicate
+   from the accessibility tree. */
+.wallet-modal .w-topbar > span {
+  display: none;
+}
+
+.wallet-modal .w-topbar:not(:has(button)) {
+  display: none;
+}
+
+.wallet-modal .w-topbar {
+  justify-content: flex-end;
 }
 
 @media (max-width: 640px) {

@@ -30,10 +30,15 @@ test("rail opens the wallet in place, setup works, close returns focus", async (
     const trigger = page
       .locator(".drive-layout > nav.drive-rail")
       .getByRole("button", { name: "Practice wallet" });
+    const triggerBox = await trigger.boundingBox();
+    expect(triggerBox?.height).toBeGreaterThanOrEqual(44);
     await trigger.click();
     const modal = page.getByRole("dialog", { name: "Practice wallet" });
     await expect(modal).toBeVisible();
     await expect(page).toHaveURL(/\/what-is\/satoshi/);
+    // Bare mode: no duplicate wallet title, disclosure always visible.
+    await expect(modal.locator(".w-topbar > span")).toBeHidden();
+    await expect(modal.locator(".w-disclosure").first()).toBeVisible();
 
     // Full setup ceremony inside the modal.
     await modal.getByRole("button", { name: "Create your wallet" }).click();
