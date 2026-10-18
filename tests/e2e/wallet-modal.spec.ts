@@ -36,7 +36,8 @@ test("rail opens the wallet in place, setup works, close returns focus", async (
     const modal = page.getByRole("dialog", { name: "Practice wallet" });
     await expect(modal).toBeVisible();
     await expect(page).toHaveURL(/\/what-is\/satoshi/);
-    // Bare mode: disclosure row, no duplicate wallet title.
+    // Title carries the bitcoin mark; bare mode, no duplicate wallet title.
+    await expect(modal.locator(".wallet-modal-title")).toContainText("₿");
     await expect(modal.locator(".w-topbar-bare")).toBeVisible();
     await expect(modal.locator(".w-topbar-bare .w-disclosure")).toBeVisible();
     await expect(modal.locator(".w-topbar-bare > span")).toHaveCount(0);
@@ -136,6 +137,11 @@ test("Escape closes a nested wallet sheet before the modal, focus stays trapped"
     // would pass on the base centered strip.
     expect(await note.evaluate((el) => getComputedStyle(el).textAlign)).toBe("left");
     expect(await note.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("0px");
+    // Balance and unit share one row (vertical overlap).
+    const balBox = await modal.locator(".w-balance").boundingBox();
+    const unitBox = await modal.locator(".w-balance-unit").boundingBox();
+    expect(balBox?.y ?? 1).toBeLessThan((unitBox?.y ?? 0) + (unitBox?.height ?? 0));
+    expect(unitBox?.y ?? 1).toBeLessThan((balBox?.y ?? 0) + (balBox?.height ?? 0));
 
     // Trap: tabbing never leaves the modal.
     for (let i = 0; i < 25; i++) {

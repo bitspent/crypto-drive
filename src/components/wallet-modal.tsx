@@ -160,7 +160,9 @@ export function WalletModal({
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
         >
-          <p className="wallet-modal-title">Practice wallet</p>
+          <p className="wallet-modal-title">
+            <span aria-hidden="true">₿ · </span>Practice wallet
+          </p>
           <Link
             href="/wallet"
             target="_blank"

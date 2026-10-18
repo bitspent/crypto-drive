@@ -1770,6 +1770,9 @@ export function WalletApp({
       {wallet.history.length === 0 ? (
         <CoachNote text="Receive first. That's how wallets get money." />
       ) : null}
+      {incoming.length > 0 ? (
+        <CoachNote text="Those first sats came from the faucet — free practice coins. On a real wallet, someone has to send them." />
+      ) : null}
       {sawFirstConfirmation ? (
         <CoachNote text="Confirmations make a payment harder to reverse." />
       ) : null}

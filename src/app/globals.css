@@ -1245,6 +1245,16 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   text-align: left;
 }
 
+/* Modal balance row: amount and unit share one line. */
+.wallet-modal .w-balance-block {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 20px 0 4px;
+}
+
 .w-balance-block {
   text-align: center;
   padding: 28px 0 8px;

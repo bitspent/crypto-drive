@@ -1889,7 +1889,7 @@ function QuickCheckView({ check }: { check: QuickCheck }) {
             aria-checked={picked === i}
             onClick={() => setPicked(i)}
             className={cn(
-              "w-full rounded-xl border px-3.5 py-2.5 text-left text-sm transition-colors",
+              "flex w-full items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left text-sm transition-colors",
               picked === i && i === check.answerIndex &&
                 "border-[var(--go)]/60 bg-[var(--go)]/10 text-[var(--paper)]",
               picked === i && i !== check.answerIndex &&
@@ -1901,7 +1901,18 @@ function QuickCheckView({ check }: { check: QuickCheck }) {
                 "border-[var(--lane)] bg-[var(--cabin)] text-[var(--mute)]",
             )}
           >
-            {opt}
+            {picked === i ? (
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "shrink-0 text-base font-bold leading-none",
+                  i === check.answerIndex ? "text-[var(--go)]" : "text-[var(--danger)]",
+                )}
+              >
+                {i === check.answerIndex ? "✓" : "✗"}
+              </span>
+            ) : null}
+            <span>{opt}</span>
           </button>
         ))}
       </div>
@@ -2769,6 +2780,12 @@ function ExamScene({
                     ? "Real faucet funds on your dev chain."
                     : "Simulated faucet funds."}{" "}
                   Set up first.
+                </p>
+                <p className="mt-2 text-xs leading-relaxed text-[var(--fog)]">
+                  A faucet is a free-coins tap for test networks — it hands out
+                  small amounts so students can practice without real money.
+                  These sats become the first coins in your practice wallet:
+                  open it and you will see the same balance there.
                 </p>
               </div>
             )}

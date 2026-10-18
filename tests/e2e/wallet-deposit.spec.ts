@@ -72,6 +72,7 @@ test("deposit arrives after close and ticks 0/3 to confirmed", async ({ page }) 
   await expect(page.getByText("+0.005 000 00 BTC")).toBeVisible();
   await expect(page.locator(".w-history-row")).toHaveCount(1);
 
+  await expect(page.getByText("Those first sats came from the faucet")).toBeVisible();
   await expect(
     page.getByText("Confirmations make a payment harder to reverse."),
   ).toBeVisible({ timeout: 10000 });

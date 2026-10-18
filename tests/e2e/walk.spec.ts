@@ -189,6 +189,17 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
 
   // finality: coffee 0, laptop 3, house 6.
   await expectLayoutContract(page, "prove-it/finality");
+  // quick check: wrong pick shows ✗, right pick shows ✓ on the option.
+  const wrongOpt = page.getByRole("radio", {
+    name: "The coffee — small payments reverse more easily",
+  });
+  await wrongOpt.click();
+  await expect(wrongOpt).toContainText("✗");
+  const rightOpt = page.getByRole("radio", {
+    name: "The house deposit — higher amount, higher reversal cost",
+  });
+  await rightOpt.click();
+  await expect(rightOpt).toContainText("✓");
   await page.getByRole("radio", { name: "Coffee, $4, in person: 0 confirmations" }).check();
   await page
     .getByRole("radio", { name: "Laptop, $1,800, shipped to a new customer: 3 confirmations" })
@@ -262,6 +273,7 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
   await expect(page.getByText("Wallet ready")).toBeVisible();
 
   // task 2: receive from the faucet, polled to confirmed by the scene.
+  await expect(page.getByText("A faucet is a free-coins tap")).toBeVisible();
   await page.getByRole("button", { name: "Receive from faucet" }).click();
   await expect(page.getByText(/sats confirmed/)).toBeVisible({ timeout: 60000 });
 
