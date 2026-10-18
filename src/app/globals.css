@@ -878,15 +878,21 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
 }
 
 .wallet-modal {
+  /* Relative by default (fixed once dragged): the offset parent that
+     contains the wallet's sheets. Relative alone never disturbs fixed
+     descendants; only transform/filter would. */
+  position: relative;
   width: min(440px, 100%);
   /* Compact default: tall content scrolls inside; the grip can grow it. */
   max-height: min(640px, calc(100dvh - 2rem));
   overflow-y: auto;
   background: var(--cabin);
-  border: 1px solid var(--lane);
+  border: 2px solid var(--lane);
   border-radius: 1rem;
   padding: 1rem 1rem 1.25rem;
-  box-shadow: 0 24px 64px rgba(8, 10, 16, 0.28);
+  box-shadow:
+    0 32px 80px rgba(8, 10, 16, 0.32),
+    0 4px 18px rgba(8, 10, 16, 0.22);
 }
 
 @media (min-width: 641px) {
@@ -900,7 +906,9 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
 }
 
 .dark .wallet-modal {
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  box-shadow:
+    0 32px 80px rgba(0, 0, 0, 0.6),
+    0 4px 18px rgba(0, 0, 0, 0.4);
 }
 
 .wallet-modal-head {
@@ -1206,6 +1214,20 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   text-align: center;
   font-size: 0.75rem;
   color: var(--mute);
+}
+
+/* Sheets contained in the course modal: they dim and live inside the
+   dialog, traveling with it when dragged. Lives after the base rules so
+   source order agrees with specificity. */
+.wallet-modal .w-overlay,
+.wallet-modal .w-menu-overlay {
+  position: absolute;
+  border-radius: inherit;
+  overflow-y: auto;
+}
+
+.wallet-modal .w-sheet {
+  margin-block: auto;
 }
 
 /* Bare wallet row (in-course modal): disclosure left, gear right. Lives

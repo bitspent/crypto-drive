@@ -73,6 +73,21 @@ export function WalletModal({
     setDragging(false);
   }
 
+  // Sheets are absolutely contained in the panel: reset its scroll when one
+  // opens, so inset:0 always covers exactly the visible box.
+  useEffect(() => {
+    if (!open) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    const reset = () => {
+      if (panel.querySelector(".w-overlay, .w-menu-overlay")) panel.scrollTop = 0;
+    };
+    reset();
+    const mo = new MutationObserver(reset);
+    mo.observe(panel, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, [open ]);
+
   useEffect(() => {
     if (!open) return;
     panelRef.current?.querySelector<HTMLElement>("button")?.focus();

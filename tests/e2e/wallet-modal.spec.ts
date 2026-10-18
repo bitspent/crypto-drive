@@ -46,9 +46,10 @@ test("rail opens the wallet in place, setup works, close returns focus", async (
     );
     expect(veilFilter).toContain("blur(");
 
-    // Compact default cap (undragged class rule) + slim scrollbars.
+    // Compact default cap (undragged class rule) + slim scrollbars + frame.
     expect(await modal.evaluate((el) => getComputedStyle(el).maxHeight)).toBe("640px");
     expect(await modal.evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe("thin");
+    expect(await modal.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("2px");
 
     // Draggable by the header on desktop: stays in the viewport.
     const before = await modal.boundingBox();
@@ -149,6 +150,17 @@ test("Escape closes a nested wallet sheet before the modal, focus stays trapped"
     await modal.getByRole("button", { name: "Receive" }).click();
     const sheet = modal.getByRole("dialog", { name: "Your address" });
     await expect(sheet).toBeVisible();
+    // Contained: the sheet overlay sits inside the modal box, not the viewport.
+    const overlayBox = await modal.locator(".w-overlay").boundingBox();
+    const modalBox = await modal.boundingBox();
+    expect(overlayBox?.x ?? -1).toBeGreaterThanOrEqual((modalBox?.x ?? 0) - 1);
+    expect(overlayBox?.y ?? -1).toBeGreaterThanOrEqual((modalBox?.y ?? 0) - 1);
+    expect((overlayBox?.x ?? 0) + (overlayBox?.width ?? 0)).toBeLessThanOrEqual(
+      (modalBox?.x ?? 0) + (modalBox?.width ?? 0) + 1,
+    );
+    expect((overlayBox?.y ?? 0) + (overlayBox?.height ?? 0)).toBeLessThanOrEqual(
+      (modalBox?.y ?? 0) + (modalBox?.height ?? 0) + 1,
+    );
     await page.keyboard.press("Escape");
     await expect(sheet).toBeHidden();
     await expect(modal).toBeVisible();
