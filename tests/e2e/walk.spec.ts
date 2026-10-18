@@ -39,8 +39,8 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
   await page.getByRole("link", { name: /Continue Bitcoin|Bitcoin road/ }).click();
   await page.waitForURL("**/what-is/satoshi");
 
-  // 2D-first: illustration toy present, 3D stage absent.
-  await page.waitForSelector(".toy-stage");
+  // 2D-first: rail layout present, 3D stage absent.
+  await page.waitForSelector(".drive-layout");
   expect(await page.locator(".journey-stage").count()).toBe(0);
 
   await clickAndWaitUrl(page, "Show me how scarce it is", "what-is/scarce");

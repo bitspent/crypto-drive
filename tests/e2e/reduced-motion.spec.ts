@@ -13,7 +13,7 @@ test("freezes animation and pins end poses", async ({ browser }: { browser: Brow
     await unlock(page, uniqueEmail("rm"));
     await page.goto("/track/bitcoin/what-is/satoshi", { waitUntil: "networkidle" });
     await page.waitForSelector("h1");
-    await page.waitForSelector(".toy-stage");
+    await page.waitForSelector(".drive-layout");
     await page.waitForTimeout(2500); // let anything still animated reveal itself
 
     expect(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(
@@ -23,7 +23,7 @@ test("freezes animation and pins end poses", async ({ browser }: { browser: Brow
 
     const offenders = await page.evaluate(() => {
       const bad: string[] = [];
-      document.querySelectorAll(".toy-stage *").forEach((el) => {
+      document.querySelectorAll(".drive-layout *").forEach((el) => {
         if (getComputedStyle(el).animationName !== "none") {
           bad.push(`${el.tagName}.${(el.getAttribute("class") ?? "").slice(0, 40)}`);
         }

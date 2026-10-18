@@ -1,6 +1,6 @@
-// Layout contract: the left column (and the illustration card inside it)
-// must not extend past the drive-head width. Runs once per project viewport
-// (desktop 1440x900, mobile 390x844), in both themes.
+// Layout contract: the rail is a narrow top-anchored column (desktop) or a
+// drawer trigger (mobile), and content never exceeds the drive-head width.
+// Runs once per project viewport (desktop 1440x900, mobile 390x844), in both themes.
 import { test, type Page } from "@playwright/test";
 import { expectLayoutContract, uniqueEmail, unlock } from "./helpers";
 
@@ -10,7 +10,7 @@ async function isDark(page: Page): Promise<boolean> {
   return page.evaluate(() => document.documentElement.classList.contains("dark"));
 }
 
-test("left column and illustration stay within the drive head", async ({ page }) => {
+test("rail stays top-anchored and content stays within the drive head", async ({ page }) => {
   await unlock(page, uniqueEmail("layout"));
   for (const theme of ["default", "toggled"] as const) {
     if (theme === "toggled") {

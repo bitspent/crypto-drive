@@ -1,6 +1,6 @@
 // Keyboard drive: Right advances, Left goes back, Up/Down rove focus,
 // and arrow keys never hijack typing in a field.
-import { expect, test } from "@playwright/test";
+import { expect, test, type Browser, type Page } from "@playwright/test";
 import { uniqueEmail, unlock } from "./helpers";
 
 test("arrow keys drive, rove focus, and leave typing alone", async ({ page }) => {
@@ -48,4 +48,70 @@ test("arrow keys drive, rove focus, and leave typing alone", async ({ page }) =>
   await page.keyboard.press("ArrowDown");
   expect(await page.inputValue("#cheques-total")).toBe("0.00");
   expect(page.url().endsWith("/cheques")).toBe(true);
+});
+
+async function focusZone(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const el = document.activeElement as HTMLElement | null;
+    if (!el || el === document.body) return "none";
+    if (el.closest(".drive-drawer")) return "drawer";
+    if (el.closest("nav.drive-rail")) return "rail";
+    if (el.closest(".drive-foot")) return "foot";
+    if (el.closest("header")) return "siteheader";
+    if (el.closest(".drive-head")) return "head";
+    if (el.closest("main .mb-3")) return "backlink";
+    if (el.closest("main")) return "content";
+    return "other";
+  });
+}
+
+test("tab order runs header, rail, content, footer", async ({ page }) => {
+  // The drive-head contributes no stops (progress dots are role=img); every
+  // other zone must appear in DOM order.
+  await unlock(page, uniqueEmail("kbtab"));
+  await page.goto("/track/bitcoin/what-is/satoshi", { waitUntil: "networkidle" });
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  const seen: string[] = [];
+  for (let i = 0; i < 60; i++) {
+    await page.keyboard.press("Tab");
+    seen.push(await focusZone(page));
+  }
+  const order = [...new Set(seen.filter((z) => z !== "none" && z !== "other"))];
+  expect(order).toEqual(["siteheader", "backlink", "rail", "content", "foot"]);
+});
+
+test("route drawer traps focus and returns it on close", async ({
+  browser,
+}: {
+  browser: Browser;
+}) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  try {
+    const page = await context.newPage();
+    await unlock(page, uniqueEmail("kbdrawer"));
+    await page.goto("/track/bitcoin/what-is/block", { waitUntil: "networkidle" });
+    const trigger = page.getByRole("button", { name: "Route" });
+    await expect(trigger).toBeVisible();
+    await expect(page.locator("nav.drive-rail")).toBeHidden();
+
+    await trigger.click();
+    const dialog = page.getByRole("dialog", { name: "Drive route" });
+    await expect(dialog).toBeVisible();
+    await expect(page.getByRole("button", { name: "Close route" })).toBeFocused();
+    for (let i = 0; i < 30; i++) await page.keyboard.press("Tab");
+    expect(await focusZone(page)).toBe("drawer");
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+
+    // Close-button path returns focus too.
+    await trigger.click();
+    await expect(dialog).toBeVisible();
+    await page.getByRole("button", { name: "Close route" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  } finally {
+    await context.close();
+  }
 });

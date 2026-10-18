@@ -19,7 +19,7 @@ test("renders the 2D path with no canvas", async ({}, testInfo) => {
       waitUntil: "domcontentloaded",
     });
     await page.waitForSelector("h1");
-    await page.waitForSelector(".toy-stage");
+    await page.waitForSelector(".drive-layout");
     expect(
       await page.evaluate(() => {
         const c = document.createElement("canvas");

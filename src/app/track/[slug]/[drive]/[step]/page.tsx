@@ -72,6 +72,16 @@ export default async function DriveStepPage({ params }: Props) {
   }
   const esploraBase = process.env.ESPLORA_PUBLIC_URL?.trim() || "http://localhost:5000";
 
+  // Rail route: every step in this drive with done/now/todo from passes.
+  const route = found.drive.steps.map((s) => ({
+    id: s.id,
+    job: s.job,
+    href: `/track/${track.slug}/${found.drive.slug}/${s.slug}`,
+    state: (
+      s.id === found.step.id ? "now" : student.modulesPassed[s.id] ? "done" : "todo"
+    ) as "done" | "now" | "todo",
+  }));
+
   return (
     <div className="flex min-h-full flex-col">
       <SiteHeader />
@@ -100,6 +110,7 @@ export default async function DriveStepPage({ params }: Props) {
           stepCount={found.drive.steps.length}
           network={network}
           esploraBase={esploraBase}
+          route={route}
         />
       </main>
     </div>

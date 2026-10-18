@@ -15,25 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CertifyForm } from "@/components/certify-form";
 import { CopyChip } from "@/components/copy-chip";
-import {
-  AddressToy,
-  BlockToy,
-  ChangeToy,
-  ChequesToy,
-  HalvingToy,
-  KeyContrastToy,
-  MismatchToy,
-  NetworkToy,
-  NoUndoToy,
-  ReceiptToy,
-  SatoshiToy,
-  SatsToy,
-  ScarceToy,
-  SeedToy,
-  SupportToy,
-  SwapToy,
-  TollToy,
-} from "@/components/drive-toys";
+import { DriveRail, RouteDrawer, type RailStep } from "@/components/drive-rail";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { publish } from "@/components/journey/journey-bus";
@@ -79,10 +61,17 @@ type Props = {
   stepCount: number;
   network: BitcoinNetwork;
   esploraBase: string;
+  route: RailStep[];
 };
 
 const FootPrimaryContext = createContext<(node: ReactNode) => void>(() => undefined);
 const BareContext = createContext(false);
+const RailContext = createContext<{
+  route: RailStep[];
+  driveLabel: string;
+  stepLabel: string;
+  explorerUrl: string;
+}>({ route: [], driveLabel: "", stepLabel: "", explorerUrl: "https://mempool.space" });
 
 function useFootPrimary(node: ReactNode, deps: unknown[]) {
   const setPrimary = useContext(FootPrimaryContext);
@@ -112,12 +101,26 @@ export function DriveStep({
   stepCount,
   network,
   esploraBase,
+  route,
 }: Props) {
   const router = useRouter();
   const [solved, setSolved] = useState(alreadyPassed);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [footPrimary, setFootPrimary] = useState<ReactNode>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const routeTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+  const railValue = useMemo(
+    () => ({
+      route,
+      driveLabel: `Drive ${driveIndex + 1} · ${driveTitle}`,
+      stepLabel: `Step ${stepIndex + 1} of ${stepCount}`,
+      explorerUrl:
+        step.action.type === "explorer-read" ? step.action.explorerUrl : "https://mempool.space",
+    }),
+    [route, driveIndex, driveTitle, stepIndex, stepCount, step.action],
+  );
 
   const done = solved || alreadyPassed;
   const continueLabel = nextHref === "/course" ? "Back to your course" : "Continue";
@@ -225,16 +228,26 @@ export function DriveStep({
           {step.objective || driveOutcome ? (
             <p className="drive-outcome">{step.objective ?? driveOutcome}</p>
           ) : null}
-          {immersive ? (
-            <div className="hud-dots" aria-hidden="true">
-              {Array.from({ length: stepCount }, (_, i) => (
-                <span
-                  key={i}
-                  className={cn("hud-dot", i < stepIndex && "is-done", i === stepIndex && "is-now")}
-                />
-              ))}
-            </div>
-          ) : null}
+          <div
+            className="hud-dots"
+            role="img"
+            aria-label={`Step ${stepIndex + 1} of ${stepCount}`}
+          >
+            {Array.from({ length: stepCount }, (_, i) => (
+              <span
+                key={i}
+                className={cn("hud-dot", i < stepIndex && "is-done", i === stepIndex && "is-now")}
+              />
+            ))}
+          </div>
+          <button
+            ref={routeTriggerRef}
+            type="button"
+            className="drive-route-trigger"
+            onClick={() => setDrawerOpen(true)}
+          >
+            Route
+          </button>
         </div>
 
         {error ? (
@@ -244,17 +257,28 @@ export function DriveStep({
         ) : null}
 
         {immersive ? <div className="hud-window" aria-hidden="true" /> : null}
-        <BareContext.Provider value={immersive}>
-          <Scene
-            step={step}
-            practice={practice}
-            review={done}
-            busy={busy}
-            onCommit={(answer) => void commit(answer)}
-            network={network}
-            esploraBase={esploraBase}
-          />
-        </BareContext.Provider>
+        <RailContext.Provider value={railValue}>
+          <BareContext.Provider value={immersive}>
+            <Scene
+              step={step}
+              practice={practice}
+              review={done}
+              busy={busy}
+              onCommit={(answer) => void commit(answer)}
+              network={network}
+              esploraBase={esploraBase}
+            />
+          </BareContext.Provider>
+        </RailContext.Provider>
+        <RouteDrawer
+          open={drawerOpen}
+          onClose={closeDrawer}
+          triggerRef={routeTriggerRef}
+          driveLabel={railValue.driveLabel}
+          stepLabel={railValue.stepLabel}
+          steps={railValue.route}
+          explorerUrl={railValue.explorerUrl}
+        />
 
         {done && step.pocketCard ? (
           <div className="success-burst rounded-2xl border border-[var(--go)]/40 bg-[var(--cabin)] px-5 py-4">
@@ -321,16 +345,9 @@ export function DriveStep({
   );
 }
 
-function Split({
-  left,
-  coach,
-  children,
-}: {
-  left: ReactNode;
-  coach: string;
-  children: ReactNode;
-}) {
+function Split({ coach, children }: { coach: string; children: ReactNode }) {
   const bare = useContext(BareContext);
+  const rail = useContext(RailContext);
   if (bare) {
     return (
       <div className="hud-stack">
@@ -347,15 +364,22 @@ function Split({
     );
   }
   return (
-    <div className="drive-split">
-      <div className="min-w-0">{left}</div>
+    <div className="drive-layout">
+      <DriveRail
+        driveLabel={rail.driveLabel}
+        stepLabel={rail.stepLabel}
+        steps={rail.route}
+        explorerUrl={rail.explorerUrl}
+      />
       <div className="min-w-0 space-y-5">
-        <p className="coach-cue text-lg leading-relaxed text-[var(--fog)] sm:text-xl">
-          <span className="mb-2 block font-[family-name:var(--font-display)] text-xs tracking-[0.2em] text-[var(--amber)]">
-            COACH
-          </span>
-          {coach}
-        </p>
+        <div className="drive-prose">
+          <p className="coach-cue text-lg leading-relaxed text-[var(--fog)] sm:text-xl">
+            <span className="mb-2 block font-[family-name:var(--font-display)] text-xs tracking-[0.2em] text-[var(--amber)]">
+              COACH
+            </span>
+            {coach}
+          </p>
+        </div>
         {children}
       </div>
     </div>
@@ -563,7 +587,7 @@ function IdeaPanel({
 }) {
   if (!step.ideaTitle && !step.ideaBody) return null;
   return (
-    <Frame title={step.ideaTitle ?? "THE IDEA"}>
+    <Frame title={step.ideaTitle ?? "THE IDEA"} className="drive-prose">
       {step.ideaBody ? (
         <p className="text-sm leading-relaxed text-[var(--fog)]">{step.ideaBody}</p>
       ) : null}
@@ -671,7 +695,6 @@ function ChequesIntro({
 }) {
   const [total, setTotal] = useState(review ? practice.chequesTotal : "");
   const [localError, setLocalError] = useState<string | null>(null);
-  const [miss, setMiss] = useState(false);
   const progress =
     total.trim().length > 0
       ? Math.min(1, total.trim().length / Math.max(practice.chequesTotal.length, 1))
@@ -690,8 +713,6 @@ function ChequesIntro({
           const got = total.trim();
           if (got !== practice.chequesTotal && Number(got) !== Number(practice.chequesTotal)) {
             setLocalError("Add the three cheques. That total is your balance.");
-            setMiss(true);
-            window.setTimeout(() => setMiss(false), 280);
             return;
           }
           setLocalError(null);
@@ -707,15 +728,6 @@ function ChequesIntro({
   return (
     <Split
       coach={coach}
-      left={
-        <ChequesToy
-          cheques={practice.cheques}
-          total={practice.chequesTotal}
-          typed={total}
-          miss={miss}
-          win={review}
-        />
-      }
     >
       <IdeaPanel step={step} />
       <Frame title="YOUR UNSPENT CHEQUES">
@@ -797,10 +809,7 @@ function ChangeIntro({
   );
 
   return (
-    <Split
-      coach={coach}
-      left={<ChangeToy practice={practice} spent={spent || review} win={review} />}
-    >
+    <Split coach={coach}>
       <IdeaPanel step={step} />
       <Frame title="ONE CHEQUE IN, TWO CHEQUES OUT">
         <dl className="space-y-3 text-sm">
@@ -847,17 +856,6 @@ function IdeaIntro({
   coach: string;
   onCommit: (answer?: StepAnswer) => void;
 }) {
-  const [won, setWon] = useState(review);
-  const IntroToy =
-    scene === "satoshi"
-      ? SatoshiToy
-      : scene === "scarce"
-        ? ScarceToy
-        : scene === "block"
-          ? BlockToy
-          : scene === "halving"
-            ? HalvingToy
-            : SatsToy;
 
   useFootPrimary(
     review ? null : (
@@ -865,7 +863,6 @@ function IdeaIntro({
         size="lg"
         disabled={busy}
         onClick={() => {
-          setWon(true);
           onCommit();
         }}
       >
@@ -902,7 +899,7 @@ function IdeaIntro({
     ) : null;
 
   return (
-    <Split coach={coach} left={<IntroToy win={won || review} />}>
+    <Split coach={coach}>
       <IdeaPanel step={step} extras={satoshiLinks} />
     </Split>
   );
@@ -987,23 +984,18 @@ function ExplorerReadScene({
   return (
     <Split
       coach={coach}
-      left={
-        <div className="toy-stage flex min-h-[16rem] flex-col justify-center gap-4 p-5">
-          <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
-            MAINNET TXID
-          </p>
-          <CopyChip value={txid} label="transaction id" className="text-left" />
-          <a
-            href={explorerUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex w-fit items-center rounded-xl bg-[var(--amber)] px-4 py-2.5 text-sm font-medium text-[var(--on-btc)] hover:opacity-90"
-          >
-            Open on mempool.space
-          </a>
-        </div>
-      }
     >
+      <Frame title="MAINNET TXID">
+        <CopyChip value={txid} label="transaction id" className="text-left" />
+        <a
+          href={explorerUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 inline-flex w-fit items-center rounded-xl bg-[var(--amber)] px-4 py-2.5 text-sm font-medium text-[var(--on-btc)] hover:opacity-90"
+        >
+          Open on mempool.space
+        </a>
+      </Frame>
       <IdeaPanel step={step} />
       <Frame title="READ ON THE EXPLORER">
         <ol className="list-decimal space-y-2 pl-5 text-sm text-[var(--fog)]">
@@ -1104,7 +1096,6 @@ function AddressScene({
   const [first4, setFirst4] = useState(review ? practice.address.slice(0, 4) : "");
   const [last4, setLast4] = useState(review ? practice.address.slice(-4) : "");
   const [localError, setLocalError] = useState<string | null>(null);
-  const [miss, setMiss] = useState(false);
   const headOk = first4.trim().toLowerCase() === practice.address.slice(0, 4);
   const tailOk = last4.trim().toLowerCase() === practice.address.slice(-4);
 
@@ -1119,14 +1110,10 @@ function AddressScene({
       last4.trim().toLowerCase() === practice.address.slice(-4);
     if (!copied) {
       setLocalError("Copy the address first, then check the ends.");
-      setMiss(true);
-      window.setTimeout(() => setMiss(false), 280);
       return;
     }
     if (!ok) {
       setLocalError("Match the first 4 and the last 4 on the wallet screen.");
-      setMiss(true);
-      window.setTimeout(() => setMiss(false), 280);
       return;
     }
     setLocalError(null);
@@ -1145,16 +1132,6 @@ function AddressScene({
   return (
     <Split
       coach={coach}
-      left={
-        <AddressToy
-          address={practice.address}
-          first4={first4}
-          last4={last4}
-          copied={copied}
-          miss={miss}
-          win={review}
-        />
-      }
     >
       <Frame title="SHARE THIS">
         <CopyChip
@@ -1292,14 +1269,6 @@ function ReceiptScene({
   return (
     <Split
       coach={coach}
-      left={
-        <ReceiptToy
-          found={found}
-          confirms={confirms}
-          amount={practice.receivedLabel}
-          win={review || (found && confirms >= 3)}
-        />
-      }
     >
       <Frame title="CLIENT'S RECEIPT">
         <CopyChip value={practice.txid} label="receipt transaction id" />
@@ -1394,14 +1363,6 @@ function SwapScene({
   return (
     <Split
       coach={coach}
-      left={
-        <SwapToy
-          pasted={pasted || review}
-          intendedEnd={intendedEnd}
-          pastedEnd={pastedEnd}
-          win={review}
-        />
-      }
     >
       <Frame title="SEND BACK TO">
         <CopyChip value={practice.dest} label="destination address" />
@@ -1465,7 +1426,7 @@ function FeeScene({
   );
 
   return (
-    <Split coach={coach} left={<TollToy pace={pace} win={review} />}>
+    <Split coach={coach}>
       <Frame title="THE SEND">
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
@@ -1562,10 +1523,7 @@ function SendScene({
   );
 
   return (
-    <Split
-      coach={coach}
-      left={<NoUndoToy sent={sent || review} win={review || (sent && confirms >= 3)} />}
-    >
+    <Split coach={coach}>
       <Frame title="RECEIPT">
         <dl className="space-y-3 text-sm">
           <div>
@@ -1637,13 +1595,6 @@ function KeyScene({
   return (
     <Split
       coach={coach}
-      left={
-        <KeyContrastToy
-          sharedAddress={sharedAddress}
-          sharedKey={sharedKey}
-          win={review}
-        />
-      }
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <Frame title="SHARE THE ADDRESS">
@@ -1700,7 +1651,6 @@ function SeedScene({
     publish("seed-phase", review ? "ready" : phase);
   }, [review, picked.length, phase]);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [miss, setMiss] = useState(false);
   const shuffled = useMemo(() => [5, 2, 8, 0, 11, 3, 6, 1, 9, 4, 7, 10], []);
 
   // Land focus on each recall prompt — entering the phase and every advance —
@@ -1720,8 +1670,6 @@ function SeedScene({
   function tapWrite(index: number) {
     if (index !== picked.length) {
       setLocalError(`Order matters. Next is word ${picked.length + 1}.`);
-      setMiss(true);
-      window.setTimeout(() => setMiss(false), 280);
       return;
     }
     setLocalError(null);
@@ -1732,8 +1680,6 @@ function SeedScene({
     const want = recall[recallAt] - 1;
     if (index !== want) {
       setLocalError(`That's not word ${recall[recallAt]}.`);
-      setMiss(true);
-      window.setTimeout(() => setMiss(false), 280);
       return;
     }
     setLocalError(null);
@@ -1775,15 +1721,6 @@ function SeedScene({
   return (
     <Split
       coach={coach}
-      left={
-        <SeedToy
-          words={words}
-          picked={picked}
-          phase={phase}
-          miss={miss}
-          win={review || phase === "ready"}
-        />
-      }
     >
       {phase === "ready" || review ? (
         <Frame title="PAPER CARD">
@@ -1843,8 +1780,6 @@ function SeedScene({
               variant="secondary"
               onClick={() => {
                 setLocalError("Refuse. Those words are the wallet.");
-                setMiss(true);
-                window.setTimeout(() => setMiss(false), 280);
               }}
             >
               Send word 3
@@ -2030,24 +1965,6 @@ function PolicyScene({
   return (
     <Split
       coach={step.coachLine}
-      left={
-        <div className="toy-stage flex min-h-[16rem] flex-col justify-center gap-4 p-5">
-          <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
-            THREE PAYMENTS
-          </p>
-          <ul className="space-y-2 text-sm text-[var(--fog)]">
-            {POLICY_SCENARIOS.map((s) => (
-              <li key={s.id} className="flex items-baseline justify-between gap-3">
-                <span>{s.label}</span>
-                <span className="font-mono text-[var(--paper)]">
-                  {threshold(s.id) ?? "–"}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="text-sm text-[var(--mute)]">One dial per payment.</p>
-        </div>
-      }
     >
       <IdeaPanel step={step} />
       <Frame title="YOUR POLICY">
@@ -2213,22 +2130,6 @@ function CompareScene({
   return (
     <Split
       coach={step.coachLine}
-      left={
-        <div className="toy-stage flex min-h-[16rem] flex-col justify-center gap-4 p-5">
-          <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
-            FOUR MODELS
-          </p>
-          <ul className="space-y-2 text-sm text-[var(--fog)]">
-            {CUSTODY_CARDS.map((m) => (
-              <li key={m.id} className="flex items-baseline justify-between gap-3">
-                <span>{m.name}</span>
-                <span className="text-[var(--mute)]">{expanded.includes(m.id) ? "open" : "—"}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="text-sm text-[var(--mute)]">{expanded.length} of 4 expanded.</p>
-        </div>
-      }
     >
       <IdeaPanel step={step} />
       {review ? (
@@ -2357,22 +2258,6 @@ function FeeStrategyScene({
   return (
     <Split
       coach={step.coachLine}
-      left={
-        <div className="toy-stage flex min-h-[16rem] flex-col justify-center gap-4 p-5">
-          <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
-            TWO SENDS
-          </p>
-          <ul className="space-y-2 text-sm text-[var(--fog)]">
-            {FEE_SCENARIOS.map((s) => (
-              <li key={s.id} className="flex items-baseline justify-between gap-3">
-                <span>{s.label}</span>
-                <span className="text-[var(--paper)]">{picks[s.id] || "–"}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="text-sm text-[var(--mute)]">Match the fee to the clock.</p>
-        </div>
-      }
     >
       <IdeaPanel step={step} />
       <Frame title="YOUR STRATEGY">
@@ -2482,24 +2367,14 @@ function RestoreScene({
   );
 
   return (
-    <Split
-      coach={step.coachLine}
-      left={
-        <div className="toy-stage flex min-h-[16rem] flex-col justify-center gap-4 p-5">
-          <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
-            FRESH WALLET
-          </p>
-          <p className="font-mono text-2xl text-[var(--paper)]">
-            {review ? practice.receivedLabel : "0.000 BTC"}
-          </p>
-          <p className="text-sm text-[var(--mute)]">
-            {review ? "Same words, same wallet." : `${filled} of 12 words entered.`}
-          </p>
-        </div>
-      }
-    >
+    <Split coach={step.coachLine}>
       <IdeaPanel step={step} />
       <Frame title="TWELVE WORDS, IN ORDER">
+        {!review ? (
+          <p className="mb-3 text-sm text-[var(--mute)]" aria-live="polite">
+            {filled} of 12 words entered.
+          </p>
+        ) : null}
         {review ? (
           <p className="text-sm text-[var(--go)]">
             Wallet restored. Balance back: {practice.receivedLabel}.
@@ -2572,18 +2447,7 @@ function ExplainScene({
   );
 
   return (
-    <Split
-      coach={step.coachLine}
-      left={
-        <div className="toy-stage flex min-h-[16rem] flex-col justify-center gap-4 p-5">
-          <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
-            THREE SENTENCES
-          </p>
-          <p className="text-sm text-[var(--fog)]">Settlement · Scarcity · Custody</p>
-          <p className="text-sm text-[var(--mute)]">No price. No hype.</p>
-        </div>
-      }
-    >
+    <Split coach={step.coachLine}>
       <IdeaPanel step={step} />
       <Frame title="YOUR ANSWER">
         {review ? (
@@ -2803,43 +2667,16 @@ function ExamScene({
     [review, busy, loading, step.button, readiness, claim],
   );
 
-  const tasks = [
-    { id: "setup", label: "Set up the wallet", done: review || readiness.setup },
-    { id: "receive", label: "Receive from the faucet", done: review || readiness.receive },
-    { id: "send", label: "Send a payment", done: review || readiness.send },
-    { id: "restore", label: "Restore from 12 words", done: review || readiness.restore },
-    { id: "readback", label: "Read the chain back", done: review },
-  ];
+  const doneCount = review
+    ? 5
+    : [readiness.setup, readiness.receive, readiness.send, readiness.restore].filter(Boolean)
+        .length;
 
   return (
-    <Split
-      coach={step.coachLine}
-      left={
-        <div className="toy-stage flex min-h-[16rem] flex-col justify-center gap-4 p-5">
-          <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.16em] text-[var(--mute)]">
-            FIVE TASKS
-          </p>
-          <ul className="space-y-2 text-sm">
-            {tasks.map((t) => (
-              <li key={t.id} className="flex items-baseline gap-3">
-                <span
-                  aria-hidden="true"
-                  className={t.done ? "text-[var(--go)]" : "text-[var(--mute)]"}
-                >
-                  {t.done ? "✓" : "○"}
-                </span>
-                <span className={t.done ? "text-[var(--fog)]" : "text-[var(--mute)]"}>
-                  {t.label}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="text-sm text-[var(--mute)]">
-            {tasks.filter((t) => t.done).length} of 5 done.
-          </p>
-        </div>
-      }
-    >
+    <Split coach={step.coachLine}>
+      <p className="text-sm text-[var(--mute)]" aria-live="polite">
+        {doneCount} of 5 tasks done.
+      </p>
       <IdeaPanel step={step} />
       {loading ? (
         <Frame title="EXAM">
@@ -3088,7 +2925,6 @@ function SupportRoad({
   onCommit: (answer?: StepAnswer) => void;
 }) {
   const [localError, setLocalError] = useState<string | null>(null);
-  const [miss, setMiss] = useState(false);
 
   useFootPrimary(
     review ? null : (
@@ -3100,7 +2936,7 @@ function SupportRoad({
   );
 
   return (
-    <Split coach={coach} left={<SupportToy closed={review} miss={miss} />}>
+    <Split coach={coach}>
       <Frame title="DIRECT MESSAGE">
         <p className="text-[var(--paper)]">
           Support: paste your 12 words so we can unlock the account.
@@ -3118,8 +2954,6 @@ function SupportRoad({
               variant="secondary"
               onClick={() => {
                 setLocalError("Close it. Those words are the wallet.");
-                setMiss(true);
-                window.setTimeout(() => setMiss(false), 280);
               }}
             >
               Paste the words
@@ -3164,7 +2998,7 @@ function NetworkRoad({
   );
 
   return (
-    <Split coach={coach} left={<NetworkToy bitcoin={bitcoin || review} win={review} />}>
+    <Split coach={coach}>
       <Frame title="DEPOSIT BITCOIN">
         <p className="text-sm text-[var(--fog)]">
           Network selected:{" "}
@@ -3194,7 +3028,6 @@ function MismatchRoad({
   onCommit: (answer?: StepAnswer) => void;
 }) {
   const [localError, setLocalError] = useState<string | null>(null);
-  const [miss, setMiss] = useState(false);
 
   useFootPrimary(
     review ? null : (
@@ -3208,14 +3041,6 @@ function MismatchRoad({
   return (
     <Split
       coach={coach}
-      left={
-        <MismatchToy
-          destEnd={practice.dest.slice(-4)}
-          swappedEnd={practice.swapped.slice(-4)}
-          stopped={review}
-          miss={miss}
-        />
-      }
     >
       <Frame title="READY TO SEND">
         <p className="text-sm text-[var(--mute)]">You meant</p>
@@ -3238,8 +3063,6 @@ function MismatchRoad({
               variant="secondary"
               onClick={() => {
                 setLocalError("The ending does not match. Stop.");
-                setMiss(true);
-                window.setTimeout(() => setMiss(false), 280);
               }}
             >
               Send anyway
