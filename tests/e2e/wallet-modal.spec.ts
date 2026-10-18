@@ -36,9 +36,29 @@ test("rail opens the wallet in place, setup works, close returns focus", async (
     const modal = page.getByRole("dialog", { name: "Practice wallet" });
     await expect(modal).toBeVisible();
     await expect(page).toHaveURL(/\/what-is\/satoshi/);
-    // Bare mode: no duplicate wallet title, disclosure always visible.
-    await expect(modal.locator(".w-topbar > span")).toBeHidden();
-    await expect(modal.locator(".w-disclosure").first()).toBeVisible();
+    // Bare mode: disclosure row, no duplicate wallet title.
+    await expect(modal.locator(".w-topbar-bare")).toBeVisible();
+    await expect(modal.locator(".w-topbar-bare .w-disclosure")).toBeVisible();
+    await expect(modal.locator(".w-topbar-bare > span")).toHaveCount(0);
+    // Light glass backdrop.
+    const veilFilter = await page.evaluate(
+      () => getComputedStyle(document.querySelector(".wallet-modal-veil") as Element).backdropFilter,
+    );
+    expect(veilFilter).toContain("blur(");
+
+    // Draggable by the header on desktop: stays in the viewport.
+    const before = await modal.boundingBox();
+    const head = modal.locator(".wallet-modal-head");
+    const headBox = await head.boundingBox();
+    await page.mouse.move((headBox?.x ?? 0) + 20, (headBox?.y ?? 0) + (headBox?.height ?? 0) / 2);
+    await page.mouse.down();
+    await page.mouse.move((headBox?.x ?? 0) + 140, (headBox?.y ?? 0) + 100, { steps: 8 });
+    await page.mouse.up();
+    const after = await modal.boundingBox();
+    expect((after?.x ?? 0) - (before?.x ?? 0)).toBeGreaterThan(100);
+    expect((after?.y ?? 0) - (before?.y ?? 0)).toBeGreaterThan(50);
+    expect(after?.x ?? 0).toBeGreaterThanOrEqual(0);
+    expect((after?.x ?? 0) + (after?.width ?? 0)).toBeLessThanOrEqual(1440);
 
     // Full setup ceremony inside the modal.
     await modal.getByRole("button", { name: "Create your wallet" }).click();
@@ -82,6 +102,20 @@ test("Escape closes a nested wallet sheet before the modal, focus stays trapped"
     await trigger.click();
     const modal = page.getByRole("dialog", { name: "Practice wallet" });
     await expect(modal.getByRole("button", { name: "Receive" })).toBeVisible();
+    // Bare home row: disclosure left, gear right, same line.
+    const bareRow = modal.locator(".w-topbar-bare");
+    await expect(bareRow).toBeVisible();
+    const row = await bareRow.boundingBox();
+    const gear = modal.getByRole("button", { name: "Settings" });
+    const gearBox = await gear.boundingBox();
+    const note = modal.locator(".w-topbar-bare .w-disclosure");
+    const noteBox = await note.boundingBox();
+    expect(noteBox?.x ?? 0).toBeLessThan(gearBox?.x ?? 0);
+    expect(Math.abs((noteBox?.y ?? 0) - (gearBox?.y ?? 0))).toBeLessThan(row?.height ?? 0);
+    // Inline styling actually applied (left, no hairlines) — geometry alone
+    // would pass on the base centered strip.
+    expect(await note.evaluate((el) => getComputedStyle(el).textAlign)).toBe("left");
+    expect(await note.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("0px");
 
     // Trap: tabbing never leaves the modal.
     for (let i = 0; i < 25; i++) {

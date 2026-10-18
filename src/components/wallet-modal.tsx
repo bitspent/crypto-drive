@@ -34,6 +34,44 @@ export function WalletModal({
   esploraBase: string;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const headRef = useRef<HTMLDivElement>(null);
+  // Floating position once dragged (null = veil-centered). position:fixed +
+  // left/top only — never transform, which would re-anchor the wallet's own
+  // fixed sheets.
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragRef = useRef<{ dx: number; dy: number } | null>(null);
+
+  function onHeadPointerDown(e: React.PointerEvent) {
+    if (e.button !== 0 || e.isPrimary === false) return;
+    if (window.innerWidth <= 640) return; // bottom sheet on mobile: no drag
+    if ((e.target as HTMLElement).closest("button, a, input, textarea, select")) return;
+    const panel = panelRef.current;
+    const head = headRef.current;
+    if (!panel || !head) return;
+    const r = panel.getBoundingClientRect();
+    dragRef.current = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+    head.setPointerCapture(e.pointerId);
+    setDragging(true);
+  }
+
+  function onHeadPointerMove(e: React.PointerEvent) {
+    const d = dragRef.current;
+    const panel = panelRef.current;
+    if (!d || !panel) return;
+    const w = panel.offsetWidth;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    setPos({
+      left: Math.min(Math.max(e.clientX - d.dx, 120 - w), vw - 120),
+      top: Math.min(Math.max(e.clientY - d.dy, 8), vh - 120),
+    });
+  }
+
+  function endDrag() {
+    dragRef.current = null;
+    setDragging(false);
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -81,9 +119,31 @@ export function WalletModal({
         aria-modal="true"
         aria-label="Practice wallet"
         className="wallet-modal"
+        style={
+          pos
+            ? {
+                position: "fixed",
+                left: pos.left,
+                top: pos.top,
+                margin: 0,
+                // Pin the bottom inside the viewport: content that grows
+                // after a drag (setup phases) scrolls internally instead of
+                // stranding buttons below the fold.
+                maxHeight: `calc(100dvh - ${Math.round(pos.top)}px - 16px)`,
+              }
+            : undefined
+        }
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="wallet-modal-head">
+        <div
+          ref={headRef}
+          className="wallet-modal-head"
+          data-dragging={dragging || undefined}
+          onPointerDown={onHeadPointerDown}
+          onPointerMove={onHeadPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+        >
           <p className="wallet-modal-title">Practice wallet</p>
           <Link
             href="/wallet"
@@ -96,10 +156,11 @@ export function WalletModal({
           </Link>
           <button
             type="button"
+            aria-label="Close wallet"
             className="wallet-modal-close"
             onClick={() => closeTo(triggerRef, onClose)}
           >
-            Close wallet
+            <span aria-hidden="true">×</span>
           </button>
         </div>
         <WalletModalBody network={network} esploraBase={esploraBase} />
@@ -157,7 +218,7 @@ function WalletModalBody({
       </p>
     );
   }
-  return <WalletApp initial={initial} network={network} esploraBase={esploraBase} />;
+  return <WalletApp initial={initial} network={network} esploraBase={esploraBase} bare />;
 }
 
 function closeTo(triggerRef: RefObject<HTMLElement | null>, onClose: () => void) {

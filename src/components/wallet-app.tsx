@@ -634,31 +634,59 @@ function GearIcon() {
   );
 }
 
-function WalletTop({
+const DISCLOSURE = "Practice wallet · Play money · No real Bitcoin";
+
+function SettingsGear({
   onOpenSettings,
   gearRef,
 }: {
-  onOpenSettings?: () => void;
+  onOpenSettings: () => void;
   gearRef?: RefObject<HTMLButtonElement | null>;
 }) {
+  return (
+    <button
+      ref={gearRef}
+      type="button"
+      className="w-gear-btn"
+      aria-label="Settings"
+      aria-haspopup="menu"
+      onClick={onOpenSettings}
+    >
+      <GearIcon />
+    </button>
+  );
+}
+
+function WalletTop({
+  onOpenSettings,
+  gearRef,
+  bare,
+}: {
+  onOpenSettings?: () => void;
+  gearRef?: RefObject<HTMLButtonElement | null>;
+  bare?: boolean;
+}) {
+  // Bare (in-course modal): the dialog header already titles it, so the row
+  // is the disclosure left-aligned with the gear right-aligned.
+  if (bare) {
+    return (
+      <div className="w-topbar w-topbar-bare">
+        <p className="w-disclosure w-disclosure-inline">{DISCLOSURE}</p>
+        {onOpenSettings ? (
+          <SettingsGear onOpenSettings={onOpenSettings} gearRef={gearRef} />
+        ) : null}
+      </div>
+    );
+  }
   return (
     <>
       <div className="w-topbar">
         <span>Practice wallet</span>
         {onOpenSettings ? (
-          <button
-            ref={gearRef}
-            type="button"
-            className="w-gear-btn"
-            aria-label="Settings"
-            aria-haspopup="menu"
-            onClick={onOpenSettings}
-          >
-            <GearIcon />
-          </button>
+          <SettingsGear onOpenSettings={onOpenSettings} gearRef={gearRef} />
         ) : null}
       </div>
-      <p className="w-disclosure">Practice wallet · Play money · No real Bitcoin</p>
+      <p className="w-disclosure">{DISCLOSURE}</p>
     </>
   );
 }
@@ -700,10 +728,12 @@ function SeedReveal({
   words,
   onDone,
   onCancel,
+  bare,
 }: {
   words: string[];
   onDone: () => void;
   onCancel?: () => void;
+  bare?: boolean;
 }) {
   // showing → masked (once, 5s in) → reshown (stays; writing takes a while).
   const [maskState, setMaskState] = useState<"showing" | "masked" | "reshown">("showing");
@@ -716,7 +746,7 @@ function SeedReveal({
 
   return (
     <div className="w-shell">
-      <WalletTop />
+      <WalletTop bare={bare} />
       <h2 className="w-flow-title">Your 12 words</h2>
       <p className="w-flow-sub">
         Write them down on paper. In order. Never photograph them. Never share them.
@@ -770,10 +800,12 @@ function SeedConfirm({
   words,
   onDone,
   onCancel,
+  bare,
 }: {
   words: string[];
   onDone: () => void;
   onCancel?: () => void;
+  bare?: boolean;
 }) {
   const [round, setRound] = useState(0);
   const [doneIdx, setDoneIdx] = useState<number[]>([]);
@@ -822,7 +854,7 @@ function SeedConfirm({
 
   return (
     <div className="w-shell">
-      <WalletTop />
+      <WalletTop bare={bare} />
       <h2 className="w-flow-title">Prove it</h2>
       <p className="w-flow-sub">Tap the words we ask for.</p>
       <p
@@ -951,7 +983,15 @@ function SettingsMenu({
   );
 }
 
-function BackupDone({ backupAt, onBack }: { backupAt: string; onBack: () => void }) {
+function BackupDone({
+  backupAt,
+  onBack,
+  bare,
+}: {
+  backupAt: string;
+  onBack: () => void;
+  bare?: boolean;
+}) {
   const date = new Date(backupAt).toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
@@ -959,7 +999,7 @@ function BackupDone({ backupAt, onBack }: { backupAt: string; onBack: () => void
   });
   return (
     <div className="w-shell">
-      <WalletTop />
+      <WalletTop bare={bare} />
       <div className="w-done-card" role="status">
         <p className="w-done-check" aria-hidden="true">
           ✓
@@ -1465,14 +1505,16 @@ function EmptyState({
   onCreate,
   creating,
   error,
+  bare,
 }: {
   onCreate: () => void;
   creating: boolean;
   error: string | null;
+  bare?: boolean;
 }) {
   return (
     <div className="w-shell">
-      <WalletTop />
+      <WalletTop bare={bare} />
       <div className="w-card w-empty-state">
         <WalletIcon />
         <h2>You don&apos;t have a wallet yet.</h2>
@@ -1494,10 +1536,12 @@ export function WalletApp({
   initial,
   network,
   esploraBase,
+  bare,
 }: {
   initial: WalletState | null;
   network: BitcoinNetwork;
   esploraBase: string;
+  bare?: boolean;
 }) {
   const [wallet, setWallet] = useState<WalletState | null>(initial);
   const [phase, setPhase] = useState<"home" | "reveal" | "confirm">("home");
@@ -1629,13 +1673,13 @@ export function WalletApp({
   }
 
   if (!wallet) {
-    return <EmptyState onCreate={create} creating={creating} error={error} />;
+    return <EmptyState onCreate={create} creating={creating} error={error} bare={bare} />;
   }
   if (phase === "reveal") {
-    return <SeedReveal words={wallet.seedWords} onDone={() => setPhase("confirm")} />;
+    return <SeedReveal words={wallet.seedWords} onDone={() => setPhase("confirm")} bare={bare} />;
   }
   if (phase === "confirm") {
-    return <SeedConfirm words={wallet.seedWords} onDone={() => setPhase("home")} />;
+    return <SeedConfirm words={wallet.seedWords} onDone={() => setPhase("home")} bare={bare} />;
   }
   if (backup === "reveal") {
     return (
@@ -1643,16 +1687,22 @@ export function WalletApp({
         words={wallet.seedWords}
         onDone={() => setBackup("confirm")}
         onCancel={exitBackup}
+        bare={bare}
       />
     );
   }
   if (backup === "confirm") {
     return (
-      <SeedConfirm words={wallet.seedWords} onDone={completeBackup} onCancel={exitBackup} />
+      <SeedConfirm
+        words={wallet.seedWords}
+        onDone={completeBackup}
+        onCancel={exitBackup}
+        bare={bare}
+      />
     );
   }
   if (backup === "done" && wallet.backupAt) {
-    return <BackupDone backupAt={wallet.backupAt} onBack={exitBackup} />;
+    return <BackupDone backupAt={wallet.backupAt} onBack={exitBackup} bare={bare} />;
   }
 
   const incoming = wallet.history.filter((t) => t.direction === "in");
@@ -1670,7 +1720,7 @@ export function WalletApp({
 
   return (
     <div className="w-shell">
-      <WalletTop onOpenSettings={() => setMenu(true)} gearRef={gearRef} />
+      <WalletTop onOpenSettings={() => setMenu(true)} gearRef={gearRef} bare={bare} />
 
       <div className="w-balance-block">
         <AnimatedBalance sats={wallet.balance} reduced={reduced} />

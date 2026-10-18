@@ -831,12 +831,21 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(8, 10, 16, 0.6);
+  background: rgba(8, 10, 16, 0.28);
+  /* Glass over the lesson. backdrop-filter re-anchors fixed descendants to
+     the veil — which is exactly viewport-sized, so the wallet's own fixed
+     sheets keep identical geometry. */
+  -webkit-backdrop-filter: blur(10px) saturate(1.25);
+  backdrop-filter: blur(10px) saturate(1.25);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1rem;
   animation: wallet-modal-veil-in 150ms ease-out;
+}
+
+.dark .wallet-modal-veil {
+  background: rgba(8, 10, 16, 0.5);
 }
 
 @keyframes wallet-modal-veil-in {
@@ -849,13 +858,18 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
 }
 
 .wallet-modal {
-  width: min(540px, 100%);
+  width: min(440px, 100%);
   max-height: calc(100dvh - 2rem);
   overflow-y: auto;
   background: var(--cabin);
   border: 1px solid var(--lane);
   border-radius: 1rem;
   padding: 1rem 1rem 1.25rem;
+  box-shadow: 0 24px 64px rgba(8, 10, 16, 0.28);
+}
+
+.dark .wallet-modal {
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
 }
 
 .wallet-modal-head {
@@ -898,14 +912,33 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
 }
 
 .wallet-modal-close {
-  min-height: 44px;
-  padding: 0 1rem;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--lane);
   border-radius: 0.75rem;
   background: transparent;
   color: var(--paper);
-  font-size: 0.9rem;
-  white-space: nowrap;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.wallet-modal-close:hover {
+  color: var(--amber);
+  border-color: var(--amber);
+}
+
+@media (min-width: 641px) {
+  .wallet-modal-head {
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .wallet-modal-head[data-dragging] {
+    cursor: grabbing;
+  }
 }
 
 .wallet-modal-state {
@@ -914,21 +947,7 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   color: var(--mute);
 }
 
-/* Bare mode in the course modal: the dialog header already says
-   "Practice wallet", so the wallet's own title eyebrow hides (the gear
-   and the disclosure strip stay). display:none also drops the duplicate
-   from the accessibility tree. */
-.wallet-modal .w-topbar > span {
-  display: none;
-}
 
-.wallet-modal .w-topbar:not(:has(button)) {
-  display: none;
-}
-
-.wallet-modal .w-topbar {
-  justify-content: flex-end;
-}
 
 @media (max-width: 640px) {
   .wallet-modal-veil {
@@ -1156,6 +1175,21 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   text-align: center;
   font-size: 0.75rem;
   color: var(--mute);
+}
+
+/* Bare wallet row (in-course modal): disclosure left, gear right. Lives
+   after the base rules so source order agrees with specificity. Never as a
+   doubled selector (.a.a) — the CSS pipeline collapses those to (.a). */
+.w-topbar-bare {
+  padding: 4px 2px 8px;
+}
+
+.w-topbar-bare .w-disclosure-inline {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  padding: 0;
+  text-align: left;
 }
 
 .w-balance-block {
