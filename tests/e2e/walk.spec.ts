@@ -238,24 +238,27 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
   await page.getByRole("link", { name: "Continue", exact: true }).click();
   await page.waitForURL("**/prove-it/exam");
 
-  // exam, task 1: set up the wallet (link out, full ceremony, back).
+  // exam, task 1: set up the wallet in the in-course modal (no navigation).
   await expectLayoutContract(page, "prove-it/exam");
-  await page.getByRole("link", { name: "Create your wallet" }).click();
-  await page.waitForURL("**/wallet");
-  await page.getByRole("button", { name: "Create your wallet" }).click();
-  await expect(page.getByRole("heading", { name: "Your 12 words" })).toBeVisible();
-  const proceed = page.getByRole("button", { name: "I've written them down" });
-  await expect(page.locator(".w-seed-word").first()).toContainText("•", { timeout: 10000 });
-  await page.getByRole("button", { name: "Show them again" }).click();
+  const modal = page.getByRole("dialog", { name: "Practice wallet" });
+  await page.getByRole("button", { name: "Create your wallet", exact: true }).click();
+  await expect(modal).toBeVisible();
+  await expect(page).toHaveURL(/\/prove-it\/exam/);
+  await modal.getByRole("button", { name: "Create your wallet" }).click();
+  await expect(modal.getByRole("heading", { name: "Your 12 words" })).toBeVisible();
+  const proceed = modal.getByRole("button", { name: "I've written them down" });
+  await expect(modal.locator(".w-seed-word").first()).toContainText("•", { timeout: 10000 });
+  await modal.getByRole("button", { name: "Show them again" }).click();
   await proceed.click();
   for (const n of [3, 7, 11]) {
-    await expect(page.getByText(`Tap word ${n}`)).toBeVisible();
-    await page.getByRole("button", { name: words[n - 1] ?? "", exact: true }).click();
+    await expect(modal.getByText(`Tap word ${n}`)).toBeVisible();
+    await modal.getByRole("button", { name: words[n - 1] ?? "", exact: true }).click();
   }
-  await expect(page.getByRole("button", { name: "Receive" })).toBeVisible();
+  await expect(modal.getByRole("button", { name: "Receive" })).toBeVisible();
+  await modal.getByRole("button", { name: "Close wallet" }).click();
+  await expect(modal).toBeHidden();
 
-  // back to the exam; setup done.
-  await page.goto("/track/bitcoin/prove-it/exam");
+  // Setup done — the exam re-syncs on modal close, no manual refresh.
   await expect(page.getByText("Wallet ready")).toBeVisible();
 
   // task 2: receive from the faucet, polled to confirmed by the scene.
@@ -268,34 +271,38 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
   await page.getByRole("button", { name: "Send (Standard fee)" }).click();
   await expect(page.getByText("Spend proven.")).toBeVisible({ timeout: 60000 });
 
-  // task 4: restore from the same 12 words (link out and back).
-  await page.getByRole("link", { name: "Open wallet settings" }).click();
-  await page.waitForURL("**/wallet");
-  await page.getByRole("button", { name: "Settings" }).click();
-  await page.getByRole("menuitem", { name: "Restore a wallet" }).click();
-  const restoreDialog = page.getByRole("dialog", { name: "Restore a wallet" });
+  // task 4: restore from the same 12 words (in the modal).
+  await page.getByRole("button", { name: "Open wallet settings" }).click();
+  await expect(modal).toBeVisible();
+  await modal.getByRole("button", { name: "Settings" }).click();
+  await modal.getByRole("menuitem", { name: "Restore a wallet" }).click();
+  const restoreDialog = modal.getByRole("dialog", { name: "Restore a wallet" });
   await expect(restoreDialog).toBeVisible();
   await restoreDialog.getByRole("button", { name: "Continue" }).click();
   for (let i = 0; i < 12; i++) {
-    await page.getByLabel(`Word ${i + 1}`, { exact: true }).fill(words[i] ?? "");
+    await modal.getByLabel(`Word ${i + 1}`, { exact: true }).fill(words[i] ?? "");
   }
-  await page.getByRole("button", { name: "Check words" }).click();
-  await expect(page.getByText("Same wallet. Same address. Same balance.")).toBeVisible();
+  await modal.getByRole("button", { name: "Check words" }).click();
+  await expect(modal.getByText("Same wallet. Same address. Same balance.")).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(restoreDialog).toBeHidden();
+  await expect(modal).toBeVisible();
 
   // task 5: read back the first 8 txid chars from the deposit details.
-  await page
+  await modal
     .getByRole("button", { name: /^Received .* Show details\.$/ })
     .click();
-  const dialog = page.getByRole("dialog", { name: "Transaction details" });
+  const dialog = modal.getByRole("dialog", { name: "Transaction details" });
   await expect(dialog).toBeVisible();
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await dialog.getByRole("button", { name: "Copy transaction ID" }).click();
   const fullTxid = await page.evaluate(() => navigator.clipboard.readText());
   expect(fullTxid).toMatch(/^[0-9a-f]{64}$/i);
-  await page.goto("/track/bitcoin/prove-it/exam");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await modal.getByRole("button", { name: "Close wallet" }).click();
+  await expect(modal).toBeHidden();
   await expect(page.getByText("Wallet ready")).toBeVisible();
-  await page.getByRole("button", { name: "Refresh status" }).click();
   await expect(page.getByText(/Restored /)).toBeVisible();
   await page.fill("#exam-claim", fullTxid.slice(0, 8));
 

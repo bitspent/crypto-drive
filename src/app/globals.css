@@ -733,6 +733,21 @@ body {
   color: var(--amber);
 }
 
+.drive-tools button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: var(--fog);
+  font-size: 0.85rem;
+}
+
+.drive-tools button:hover {
+  color: var(--amber);
+}
+
 /* One prose cap, used by coach + idea panel. Interactive scenes stay full width. */
 .drive-prose {
   max-width: 72ch;
@@ -807,6 +822,106 @@ body {
 @media (min-width: 1024px) {
   .drive-drawer-veil {
     display: none;
+  }
+}
+
+/* In-course wallet modal: full WalletApp in a dialog. Above the route
+drawer (50/51). The panel must NEVER get transform/filter/backdrop-filter:
+wallet sheets are viewport-fixed descendants and must stay that way. */
+.wallet-modal-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(8, 10, 16, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: wallet-modal-veil-in 150ms ease-out;
+}
+
+@keyframes wallet-modal-veil-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.wallet-modal {
+  width: min(540px, 100%);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  background: var(--cabin);
+  border: 1px solid var(--lane);
+  border-radius: 1rem;
+  padding: 1rem 1rem 1.25rem;
+}
+
+.wallet-modal-head {
+  position: sticky;
+  top: -1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: -1rem -1rem 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--cabin);
+  border-bottom: 1px solid var(--lane);
+  border-radius: 1rem 1rem 0 0;
+}
+
+.wallet-modal-title {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.wallet-modal-full {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--amber);
+  white-space: nowrap;
+}
+
+.wallet-modal-close {
+  min-height: 44px;
+  padding: 0 1rem;
+  border: 1px solid var(--lane);
+  border-radius: 0.75rem;
+  background: transparent;
+  color: var(--paper);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.wallet-modal-state {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--mute);
+}
+
+@media (max-width: 640px) {
+  .wallet-modal-veil {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .wallet-modal {
+    width: 100%;
+    max-height: 94dvh;
+    border-radius: 1rem 1rem 0 0;
+    border-bottom: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wallet-modal-veil {
+    animation: none;
   }
 }
 

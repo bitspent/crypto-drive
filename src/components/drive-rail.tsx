@@ -17,9 +17,10 @@ type RailBodyProps = {
   stepLabel: string;
   steps: RailStep[];
   explorerUrl: string;
+  onOpenWallet: (trigger: HTMLElement) => void;
 };
 
-function RailBody({ driveLabel, stepLabel, steps, explorerUrl }: RailBodyProps) {
+function RailBody({ driveLabel, stepLabel, steps, explorerUrl, onOpenWallet }: RailBodyProps) {
   const listRef = useRef<HTMLOListElement>(null);
 
   // Keep the current step visible inside the rail on mount. Container-local
@@ -60,7 +61,9 @@ function RailBody({ driveLabel, stepLabel, steps, explorerUrl }: RailBodyProps) 
       <p className="drive-rail-count">{stepLabel}</p>
       <div className="drive-tools">
         <p className="drive-tools-title">TOOLS</p>
-        <Link href="/wallet">Practice wallet</Link>
+        <button type="button" onClick={(e) => onOpenWallet(e.currentTarget)}>
+          Practice wallet
+        </button>
         <Link href="/course">Course</Link>
         {/* Always rendered with a step-aware href: the slot never jumps. */}
         <a href={explorerUrl} target="_blank" rel="noreferrer">

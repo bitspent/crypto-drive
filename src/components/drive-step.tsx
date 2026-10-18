@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { CertifyForm } from "@/components/certify-form";
 import { CopyChip } from "@/components/copy-chip";
 import { DriveRail, RouteDrawer, type RailStep } from "@/components/drive-rail";
+import { WalletModal } from "@/components/wallet-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { publish } from "@/components/journey/journey-bus";
@@ -71,7 +72,16 @@ const RailContext = createContext<{
   driveLabel: string;
   stepLabel: string;
   explorerUrl: string;
-}>({ route: [], driveLabel: "", stepLabel: "", explorerUrl: "https://mempool.space" });
+  onOpenWallet: (trigger: HTMLElement) => void;
+  walletSync: number;
+}>({
+  route: [],
+  driveLabel: "",
+  stepLabel: "",
+  explorerUrl: "https://mempool.space",
+  onOpenWallet: () => undefined,
+  walletSync: 0,
+});
 
 function useFootPrimary(node: ReactNode, deps: unknown[]) {
   const setPrimary = useContext(FootPrimaryContext);
@@ -111,6 +121,19 @@ export function DriveStep({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const routeTriggerRef = useRef<HTMLButtonElement>(null);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+  const [walletOpen, setWalletOpen] = useState(false);
+  const [walletSync, setWalletSync] = useState(0);
+  const walletTriggerRef = useRef<HTMLElement | null>(null);
+  const openWallet = useCallback((trigger: HTMLElement) => {
+    walletTriggerRef.current = trigger;
+    setDrawerOpen(false);
+    setWalletOpen(true);
+  }, []);
+  const closeWallet = useCallback(() => {
+    setWalletOpen(false);
+    // Bump so scenes holding wallet state (exam) re-fetch on close.
+    setWalletSync((s) => s + 1);
+  }, []);
   const railValue = useMemo(
     () => ({
       route,
@@ -118,8 +141,10 @@ export function DriveStep({
       stepLabel: `Step ${stepIndex + 1} of ${stepCount}`,
       explorerUrl:
         step.action.type === "explorer-read" ? step.action.explorerUrl : "https://mempool.space",
+      onOpenWallet: openWallet,
+      walletSync,
     }),
-    [route, driveIndex, driveTitle, stepIndex, stepCount, step.action],
+    [route, driveIndex, driveTitle, stepIndex, stepCount, step.action, openWallet, walletSync],
   );
 
   const done = solved || alreadyPassed;
@@ -278,6 +303,14 @@ export function DriveStep({
           stepLabel={railValue.stepLabel}
           steps={railValue.route}
           explorerUrl={railValue.explorerUrl}
+          onOpenWallet={railValue.onOpenWallet}
+        />
+        <WalletModal
+          open={walletOpen}
+          onClose={closeWallet}
+          triggerRef={walletTriggerRef}
+          network={network}
+          esploraBase={esploraBase}
         />
 
         {done && step.pocketCard ? (
@@ -370,6 +403,7 @@ function Split({ coach, children }: { coach: string; children: ReactNode }) {
         stepLabel={rail.stepLabel}
         steps={rail.route}
         explorerUrl={rail.explorerUrl}
+        onOpenWallet={rail.onOpenWallet}
       />
       <div className="min-w-0 space-y-5">
         <div className="drive-prose">
@@ -2510,6 +2544,7 @@ function ExamScene({
   const [claim, setClaim] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
   const [pollNote, setPollNote] = useState<string | null>(null);
+  const { onOpenWallet, walletSync } = useContext(RailContext);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -2533,7 +2568,8 @@ function ExamScene({
       .finally(() => {
         if (alive.current) setLoading(false);
       });
-  }, [refresh]);
+    // walletSync bumps when the in-course wallet modal closes.
+  }, [refresh, walletSync]);
 
   const readiness = useMemo(() => examReadiness(wallet, network), [wallet, network]);
   const examTx = wallet?.history.find((t) => t.id === readiness.examTxid) ?? null;
@@ -2695,17 +2731,25 @@ function ExamScene({
               <p className="text-sm text-[var(--fog)]">
                 Wallet ready —{" "}
                 <span className="font-mono">{truncateMiddle(wallet.address, 6)}</span>.{" "}
-                <Link href="/wallet" className="text-[var(--amber)]">
+                <button
+                  type="button"
+                  onClick={(e) => onOpenWallet(e.currentTarget)}
+                  className="cursor-pointer text-[var(--amber)] hover:underline"
+                >
                   Open wallet
-                </Link>
+                </button>
               </p>
             ) : (
               <p className="text-sm text-[var(--fog)]">
                 No wallet yet.{" "}
-                <Link href="/wallet" className="text-[var(--amber)]">
+                <button
+                  type="button"
+                  onClick={(e) => onOpenWallet(e.currentTarget)}
+                  className="cursor-pointer text-[var(--amber)] hover:underline"
+                >
                   Create your wallet
-                </Link>
-                , confirm the 3 words there, then Refresh below.
+                </button>
+                , confirm the 3 words, then close the wallet.
               </p>
             )}
           </Frame>
@@ -2789,10 +2833,14 @@ function ExamScene({
               </p>
             ) : (
               <p className="text-sm text-[var(--fog)]">
-                <Link href="/wallet" className="text-[var(--amber)]">
+                <button
+                  type="button"
+                  onClick={(e) => onOpenWallet(e.currentTarget)}
+                  className="cursor-pointer text-[var(--amber)] hover:underline"
+                >
                   Open wallet settings
-                </Link>
-                , restore from your 12 words, then Refresh below.
+                </button>
+                , restore from your 12 words, then close the wallet.
               </p>
             )}
           </Frame>
