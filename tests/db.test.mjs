@@ -67,6 +67,16 @@ describe("postgres store", { skip: !HAS_DB }, () => {
     assert.equal(await store.getWalletForSession(sessionId), null);
   });
 
+  it("exam attempt marker sets once and reads back", async () => {
+    const { student, sessionId } = await store.unlockStudent(email("exam"), LICENSE);
+    assert.equal((await store.getStudentBySession(sessionId))?.examStartedAt, undefined);
+    const first = await store.ensureExamStartedAt(student.id);
+    assert.match(first, /^\d{4}-\d{2}-\d{2}T/);
+    const second = await store.ensureExamStartedAt(student.id);
+    assert.equal(second, first);
+    assert.equal((await store.getStudentBySession(sessionId))?.examStartedAt, first);
+  });
+
   it("expired sessions read as signed out", async () => {
     const { sessionId, student } = await store.unlockStudent(email("d"), LICENSE);
     assert.ok(await store.getStudentBySession(sessionId));

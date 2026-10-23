@@ -18,6 +18,7 @@ export const students = pgTable(
     wallet: jsonb("wallet").$type<WalletState | null>(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     revocationReason: text("revocation_reason"),
+    examStartedAt: timestamp("exam_started_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

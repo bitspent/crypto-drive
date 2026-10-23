@@ -14,7 +14,13 @@ export async function verifyWalletExam(
 ): Promise<void> {
   const provider = getBitcoinProvider();
   const wallet = student.wallet?.exists ? student.wallet : null;
-  const readiness = examReadiness(wallet, provider.network);
+  // Fail closed: without an attempt marker (direct POST, never opened the
+  // exam step) nothing counts.
+  const since = student.examStartedAt ?? null;
+  if (!since) {
+    throw new Error("Open the exam step first — your attempt starts when you arrive.");
+  }
+  const readiness = examReadiness(wallet, provider.network, since);
   if (!readiness.setup) {
     throw new Error("Set up your practice wallet first — create it in the wallet tab.");
   }
@@ -42,9 +48,13 @@ export async function verifyWalletExam(
   if (!tx || tx.status !== "confirmed") {
     throw new Error("That deposit is not confirmed yet — wait for its confirmations.");
   }
+  if (tx.timestamp < since) {
+    throw new Error("Read back the deposit you received in this exam — not an older one.");
+  }
   if (provider.network === "regtest") {
-    // Any confirmed on-chain deposit counts: the chain check itself proves
-    // presence, so an invented txid fails here with the not-on-chain message.
+    // Any fresh confirmed on-chain deposit counts: the chain check itself
+    // proves presence, so an invented txid fails here with the not-on-chain
+    // message.
     let height: number | null;
     try {
       height = (await provider.getTxStatus(tx.id)).blockHeight;

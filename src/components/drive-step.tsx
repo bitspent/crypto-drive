@@ -63,6 +63,8 @@ type Props = {
   network: BitcoinNetwork;
   esploraBase: string;
   route: RailStep[];
+  /** Exam attempt marker (ISO). Only the exam step receives one. */
+  examSince?: string | null;
 };
 
 const FootPrimaryContext = createContext<(node: ReactNode) => void>(() => undefined);
@@ -112,6 +114,7 @@ export function DriveStep({
   network,
   esploraBase,
   route,
+  examSince,
 }: Props) {
   const router = useRouter();
   const [solved, setSolved] = useState(alreadyPassed);
@@ -292,6 +295,7 @@ export function DriveStep({
               onCommit={(answer) => void commit(answer)}
               network={network}
               esploraBase={esploraBase}
+              examSince={examSince}
             />
           </BareContext.Provider>
         </RailContext.Provider>
@@ -428,6 +432,7 @@ function Scene({
   onCommit,
   network,
   esploraBase,
+  examSince,
 }: {
   step: Step;
   practice: PracticeSet;
@@ -436,6 +441,7 @@ function Scene({
   onCommit: (answer?: StepAnswer) => void;
   network: BitcoinNetwork;
   esploraBase: string;
+  examSince?: string | null;
 }) {
   const action = step.action;
   if (action.type === "intro") {
@@ -572,6 +578,7 @@ function Scene({
         onCommit={onCommit}
         network={network}
         esploraBase={esploraBase}
+        examSince={examSince}
       />
     );
   }
@@ -2538,6 +2545,7 @@ function ExamScene({
   onCommit,
   network,
   esploraBase,
+  examSince,
 }: {
   step: Step;
   review: boolean;
@@ -2545,6 +2553,7 @@ function ExamScene({
   onCommit: (answer?: StepAnswer) => void;
   network: BitcoinNetwork;
   esploraBase: string;
+  examSince?: string | null;
 }) {
   const [wallet, setWallet] = useState<WalletState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -2582,7 +2591,10 @@ function ExamScene({
     // walletSync bumps when the in-course wallet modal closes.
   }, [refresh, walletSync]);
 
-  const readiness = useMemo(() => examReadiness(wallet, network), [wallet, network]);
+  const readiness = useMemo(
+    () => examReadiness(wallet, network, examSince ?? null),
+    [wallet, network, examSince],
+  );
   const examTx = wallet?.history.find((t) => t.id === readiness.examTxid) ?? null;
   const explorerUrl =
     examTx && isOnChainTx(examTx) ? explorerTxUrl(network, examTx.id, esploraBase) : null;
@@ -2724,6 +2736,11 @@ function ExamScene({
       <p className="text-sm text-[var(--mute)]" aria-live="polite">
         {doneCount} of 5 tasks done.
       </p>
+      {review ? null : (
+        <p className="text-sm text-[var(--fog)]">
+          Only work done after opening this exam counts — earlier practice does not carry over.
+        </p>
+      )}
       <IdeaPanel step={step} />
       {loading ? (
         <Frame title="EXAM">

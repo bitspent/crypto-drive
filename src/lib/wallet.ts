@@ -273,20 +273,27 @@ export type ExamReadiness = Record<ExamTaskId, boolean> & { examTxid: string | n
 export function examReadiness(
   wallet: WalletState | null | undefined,
   network: BitcoinNetwork,
+  since?: string | null,
 ): ExamReadiness {
   const setup =
     !!wallet?.exists && wallet.seedWords.length === 12 && wallet.address.trim().length > 0;
+  // Attempt binding: only evidence from at-or-after the exam start counts.
+  // Setup stays a precondition (no wallet wipe); the three actions plus the
+  // live read-back must be performed during the attempt. ISO timestamps
+  // compare chronologically as strings.
+  const fresh = (ts: string | null | undefined) => !since || !!ts && ts >= since;
   const deposits = (wallet?.history ?? []).filter(
     (t) =>
       t.direction === "in" &&
       t.status === "confirmed" &&
-      (network !== "regtest" || isOnChainTx(t)),
+      (network !== "regtest" || isOnChainTx(t)) &&
+      fresh(t.timestamp),
   );
   const receive = deposits.length > 0;
   const send = (wallet?.history ?? []).some(
-    (t) => t.direction === "out" && t.status === "confirmed",
+    (t) => t.direction === "out" && t.status === "confirmed" && fresh(t.timestamp),
   );
-  const restore = !!wallet?.restoredAt;
+  const restore = !!wallet?.restoredAt && fresh(wallet.restoredAt);
   return { setup, receive, send, restore, examTxid: deposits[0]?.id ?? null };
 }
 

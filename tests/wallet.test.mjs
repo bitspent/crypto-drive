@@ -305,6 +305,72 @@ describe("wallet send", () => {
     assert.equal(wallet.examReadiness(spent.wallet, "regtest").send, true);
   });
 
+  it("examReadiness ignores pre-attempt evidence when since is set", () => {
+    const old = "2026-10-10T00:00:00.000Z";
+    const mark = "2026-10-15T00:00:00.000Z";
+    const bare = freshWallet();
+    const dep = wallet.applyTxStatus(
+      wallet.applyDeposit(bare, {
+        txid: "c".repeat(64),
+        from: ADDR,
+        amountSats: 500000,
+        timestamp: old,
+      }),
+      "c".repeat(64),
+      { confirmations: 3 },
+    ).wallet;
+    const w = { ...dep, restoredAt: old, balance: 500000 };
+    const sent = wallet.applySend(w, {
+      txid: "e".repeat(64),
+      to: ADDR,
+      amountSats: 100000,
+      feeTier: "economy",
+      timestamp: old,
+    });
+    let cur = sent;
+    for (let i = 0; i < 3; i++) cur = wallet.advanceTx(cur, "e".repeat(64)).wallet;
+    // Without a marker everything counts (back-compat).
+    const open = wallet.examReadiness(cur, "simulated");
+    assert.equal(open.receive, true);
+    assert.equal(open.send, true);
+    assert.equal(open.restore, true);
+    // With a marker, stale evidence drops but setup (a precondition) holds.
+    const stale = wallet.examReadiness(cur, "simulated", mark);
+    assert.equal(stale.setup, true);
+    assert.equal(stale.receive, false);
+    assert.equal(stale.send, false);
+    assert.equal(stale.restore, false);
+    assert.equal(stale.examTxid, null);
+  });
+
+  it("examReadiness picks the fresh deposit and honors the boundary", () => {
+    const mark = "2026-10-15T00:00:00.000Z";
+    const bare = freshWallet();
+    const old = wallet.applyTxStatus(
+      wallet.applyDeposit(bare, {
+        txid: "a".repeat(64),
+        from: ADDR,
+        amountSats: 500000,
+        timestamp: "2026-10-10T00:00:00.000Z",
+      }),
+      "a".repeat(64),
+      { confirmations: 3 },
+    ).wallet;
+    const both = wallet.applyTxStatus(
+      wallet.applyDeposit(old, {
+        txid: "b".repeat(64),
+        from: ADDR,
+        amountSats: 500000,
+        timestamp: mark,
+      }),
+      "b".repeat(64),
+      { confirmations: 3 },
+    ).wallet;
+    const r = wallet.examReadiness(both, "simulated", mark);
+    assert.equal(r.receive, true);
+    assert.equal(r.examTxid, "b".repeat(64));
+  });
+
   it("shouldPollChain polls only regtest txs that exist on the chain", () => {
     const on = { onChain: true, counterparty: wallet.REGTEST_FAUCET_LABEL };
     const off = { onChain: false, counterparty: ADDR };

@@ -46,6 +46,8 @@ export type Student = {
   /** Set by refund/dispute/cancellation webhooks. Revoked students unlock nothing. */
   revokedAt?: string | null;
   revocationReason?: string | null;
+  /** ISO start of the prove-it exam attempt. Evidence older than this never counts. */
+  examStartedAt?: string | null;
   /** @deprecated Slice 1 field — kept for old store files */
   module1PassedAt?: string | null;
 };
@@ -162,6 +164,7 @@ function studentFromRow(row: StudentRow): Student {
     wallet: (row.wallet as WalletState | null | undefined) ?? undefined,
     revokedAt: row.revokedAt?.toISOString() ?? undefined,
     revocationReason: row.revocationReason ?? undefined,
+    examStartedAt: row.examStartedAt?.toISOString() ?? undefined,
   };
 }
 
@@ -749,6 +752,34 @@ export async function passStep(
     data.students[student.id] = stored;
     await saveStore(data);
   }
+}
+
+/**
+ * Start (or resume) the prove-it exam attempt: set exam_started_at once, on
+ * first exam-step load. Returns the ISO marker. Never resets — the attempt
+ * has no clock, only a floor for evidence timestamps.
+ */
+export async function ensureExamStartedAt(studentId: string): Promise<string> {
+  if (shouldUsePostgres()) {
+    const rows = await getDb()
+      .update(students)
+      .set({
+        examStartedAt: sql`coalesce(${students.examStartedAt}, now())`,
+        updatedAt: new Date(),
+      })
+      .where(eq(students.id, studentId))
+      .returning({ examStartedAt: students.examStartedAt });
+    const at = rows[0]?.examStartedAt;
+    if (!at) throw new Error("Unlock with your license before you continue.");
+    return at.toISOString();
+  }
+  const data = await ensureStore();
+  const stored = data.students[studentId];
+  if (!stored) throw new Error("Unlock with your license before you continue.");
+  stored.examStartedAt = stored.examStartedAt ?? new Date().toISOString();
+  data.students[studentId] = stored;
+  await saveStore(data);
+  return stored.examStartedAt;
 }
 
 export async function getPracticeForSession(

@@ -26,8 +26,14 @@ function freshWallet() {
   return wallet.createWalletState({ seedWords: WORDS, address: ADDR });
 }
 
-function studentWith(w) {
-  return { id: "st_exam", email: "exam@test.local", wallet: w };
+function studentWith(w, examStartedAt = "2026-10-14T00:00:00.000Z") {
+  return { id: "st_exam", email: "exam@test.local", wallet: w, examStartedAt };
+}
+
+function fullyWorkedWallet() {
+  let w = confirmedDeposit(freshWallet());
+  w = confirmedSend(w);
+  return { ...w, restoredAt: "2026-10-15T00:00:00.000Z" };
 }
 
 function confirmedDeposit(w, { txid = TX, onChain = false, from = ADDR } = {}) {
@@ -151,6 +157,87 @@ describe("verifyWalletExam", () => {
       exam.verifyWalletExam(student, { examTxid: TX, examClaim: "soon" }),
       /does not match/,
     );
+  });
+
+  it("fails closed without an attempt marker", async () => {
+    const student = studentWith(fullyWorkedWallet(), null);
+    await assert.rejects(
+      exam.verifyWalletExam(student, { examTxid: TX, examClaim: TX.slice(0, 8) }),
+      /Open the exam step first/,
+    );
+  });
+
+  it("rejects sandbox work older than the attempt", async () => {
+    // Every task done a day before the exam opened: receive fails first.
+    const stale = studentWith(fullyWorkedWallet(), "2026-10-16T00:00:00.000Z");
+    await assert.rejects(
+      exam.verifyWalletExam(stale, { examTxid: TX, examClaim: TX.slice(0, 8) }),
+      /Receive/,
+    );
+  });
+
+  it("rejects a stale send and a stale restore independently", async () => {
+    // Fresh deposit, stale send.
+    let w = confirmedDeposit(freshWallet());
+    w = wallet.applySend(
+      { ...w, balance: 500000 },
+      {
+        txid: "e".repeat(64),
+        to: ADDR,
+        amountSats: 100000,
+        feeTier: "economy",
+        timestamp: "2026-10-10T00:00:00.000Z",
+      },
+    );
+    for (let i = 0; i < 3; i++) w = wallet.advanceTx(w, "e".repeat(64)).wallet;
+    w = { ...w, restoredAt: "2026-10-15T12:00:00.000Z" };
+    await assert.rejects(
+      exam.verifyWalletExam(
+        studentWith(w, "2026-10-15T00:00:00.000Z"),
+        { examTxid: TX, examClaim: TX.slice(0, 8) },
+      ),
+      /Send a payment/,
+    );
+    // Fresh deposit and send, stale restore.
+    let w2 = confirmedDeposit(freshWallet());
+    w2 = confirmedSend(w2);
+    w2 = { ...w2, restoredAt: "2026-10-10T00:00:00.000Z" };
+    await assert.rejects(
+      exam.verifyWalletExam(
+        studentWith(w2, "2026-10-15T00:00:00.000Z"),
+        { examTxid: TX, examClaim: TX.slice(0, 8) },
+      ),
+      /Restore/,
+    );
+  });
+
+  it("rejects reading back a pre-attempt deposit", async () => {
+    // Old deposit + fresh deposit; citing the old one fails the read-back.
+    let w = confirmedDeposit(freshWallet(), { txid: "a".repeat(64) });
+    w = { ...w, history: w.history.map((t) => ({ ...t, timestamp: "2026-10-10T00:00:00.000Z" })) };
+    const fresh = wallet.applyDeposit(w, {
+      txid: TX,
+      from: ADDR,
+      amountSats: 500000,
+      timestamp: "2026-10-15T12:00:00.000Z",
+    });
+    const done = wallet.applyTxStatus(fresh, TX, { confirmations: 3 }).wallet;
+    let cur = confirmedSend(done);
+    cur = { ...cur, restoredAt: "2026-10-15T12:00:00.000Z" };
+    const student = studentWith(cur, "2026-10-15T00:00:00.000Z");
+    await assert.rejects(
+      exam.verifyWalletExam(student, {
+        examTxid: "a".repeat(64),
+        examClaim: "a".repeat(8),
+      }),
+      /not an older one/,
+    );
+    await exam.verifyWalletExam(student, { examTxid: TX, examClaim: TX.slice(0, 8) });
+  });
+
+  it("counts evidence stamped exactly at the attempt start", async () => {
+    const student = studentWith(fullyWorkedWallet(), "2026-10-15T00:00:00.000Z");
+    await exam.verifyWalletExam(student, { examTxid: TX, examClaim: TX.slice(0, 8) });
   });
 
   it("fails closed when the txid is not on the chain", async () => {

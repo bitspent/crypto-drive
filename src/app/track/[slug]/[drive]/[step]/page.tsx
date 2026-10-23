@@ -15,6 +15,7 @@ import {
 } from "@/lib/drive";
 import { getSessionId } from "@/lib/session";
 import {
+  ensureExamStartedAt,
   getPracticeForSession,
   getStudentBySession,
   getTrackCertificate,
@@ -72,6 +73,13 @@ export default async function DriveStepPage({ params }: Props) {
   }
   const esploraBase = process.env.ESPLORA_PUBLIC_URL?.trim() || "http://localhost:5000";
 
+  // Exam attempt binding: the marker is set once, on first exam load. Only
+  // evidence from at-or-after it counts toward the certificate.
+  const examSince =
+    found.step.action.type === "wallet-exam"
+      ? await ensureExamStartedAt(student.id)
+      : null;
+
   // Rail route: every step in this drive with done/now/todo from passes.
   const route = found.drive.steps.map((s) => ({
     id: s.id,
@@ -111,6 +119,7 @@ export default async function DriveStepPage({ params }: Props) {
           network={network}
           esploraBase={esploraBase}
           route={route}
+          examSince={examSince}
         />
       </main>
     </div>

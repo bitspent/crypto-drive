@@ -36,6 +36,35 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
     if (res.status() === 429) throttled.push(res.url());
   });
   await unlock(page, uniqueEmail("walk"));
+  // Freshness fixture: a fully-worked wallet completed BEFORE the exam opens.
+  // Its evidence must not count once the attempt starts.
+  const staleBuild = await page.request.post("/api/wallet");
+  expect(staleBuild.ok()).toBe(true);
+  const staleWallet = (await staleBuild.json()) as { wallet: { seedWords: string[] } };
+  const staleDep = await page.request.post("/api/wallet/deposit");
+  expect(staleDep.ok()).toBe(true);
+  const { tx: staleTx } = (await staleDep.json()) as { tx: { id: string } };
+  for (let i = 0; i < 3; i++) {
+    const tick = await page.request.post("/api/wallet/tick", { data: { txid: staleTx.id } });
+    expect(tick.ok()).toBe(true);
+  }
+  const staleSend = await page.request.post("/api/wallet/send", {
+    data: {
+      to: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+      amountSats: 100000,
+      feeTier: "economy",
+    },
+  });
+  expect(staleSend.ok()).toBe(true);
+  const { tx: staleOut } = (await staleSend.json()) as { tx: { id: string } };
+  for (let i = 0; i < 3; i++) {
+    const tick = await page.request.post("/api/wallet/tick", { data: { txid: staleOut.id } });
+    expect(tick.ok()).toBe(true);
+  }
+  const staleRestore = await page.request.post("/api/wallet/restore", {
+    data: { words: staleWallet.wallet.seedWords },
+  });
+  expect(staleRestore.ok()).toBe(true);
   await page.getByRole("link", { name: /Continue Bitcoin|Bitcoin road/ }).click();
   await page.waitForURL("**/what-is/satoshi");
 
@@ -249,6 +278,20 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
   await page.getByRole("link", { name: "Continue", exact: true }).click();
   await page.waitForURL("**/prove-it/exam");
 
+  // exam freshness: the pre-exam wallet counts for setup only. Actions
+  // must be redone inside the attempt; submit is rejected until then.
+  await expectLayoutContract(page, "prove-it/exam");
+  await expect(page.getByText("Only work done after opening this exam counts")).toBeVisible();
+  await expect(page.getByText("Wallet ready")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Receive from faucet" })).toBeVisible();
+  await page.getByRole("button", { name: "Submit my exam" }).click();
+  await expect(page.getByText("Receive from the faucet first")).toBeVisible();
+  // Reset clears the stale wallet; the original in-exam flow follows.
+  const reset = await page.request.post("/api/wallet/reset", {
+    data: { confirm: "RESET" },
+  });
+  expect(reset.ok()).toBe(true);
+  await page.reload();
   // exam, task 1: set up the wallet in the in-course modal (no navigation).
   await expectLayoutContract(page, "prove-it/exam");
   const modal = page.getByRole("dialog", { name: "Practice wallet" });
