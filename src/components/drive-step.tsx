@@ -23,7 +23,7 @@ import { publish } from "@/components/journey/journey-bus";
 import { driveKey, JOURNEY_DRIVES } from "@/components/journey/registry";
 import { JOURNEY_3D_ENABLED } from "@/components/journey/enabled";
 import { useWebGLAvailable } from "@/components/journey/use-webgl";
-import type { IntroScene, QuickCheck, Step } from "@/lib/content";
+import type { IntroScene, NetworkTicket, QuickCheck, Step } from "@/lib/content";
 import type { BitcoinNetwork } from "@/lib/bitcoin/provider";
 import { PIZZA_EXPLORER } from "@/lib/explorer-lesson";
 import {
@@ -548,6 +548,17 @@ function Scene({
         busy={busy}
         button={step.button}
         coach={step.coachLine}
+        onCommit={onCommit}
+      />
+    );
+  }
+  if (action.type === "network-pick") {
+    return (
+      <NetworkPickScene
+        step={step}
+        review={review}
+        busy={busy}
+        button={step.button}
         onCommit={onCommit}
       />
     );
@@ -2426,6 +2437,152 @@ const POLICY_SCENARIOS = [
 const POLICY_OPTIONS = [0, 1, 3, 6, 12] as const;
 
 type PolicyId = (typeof POLICY_SCENARIOS)[number]["id"];
+
+function NetworkPickScene({
+  step,
+  review,
+  busy,
+  button,
+  onCommit,
+}: {
+  step: Step;
+  review: boolean;
+  busy: boolean;
+  button: string;
+  onCommit: (answer?: StepAnswer) => void;
+}) {
+  // Stablecoin ticket drill: static content, cleared ticket by ticket.
+  // recognize: name the road for each subject. verify: approve/refuse each
+  // deposit or withdrawal ticket. Wrong picks teach and retry; the commit
+  // carries the cleared picks and the server re-grades against the tickets.
+  const tickets =
+    step.action.type === "network-pick" ? (step.action.tickets ?? []) : [];
+  const [picks, setPicks] = useState<Record<string, string>>({});
+  const [wrong, setWrong] = useState<Record<string, string>>({});
+
+  function expected(t: NetworkTicket): string {
+    return t.verdict ?? String(t.answer ?? -1);
+  }
+  function cleared(t: NetworkTicket): boolean {
+    return review || picks[t.id] === expected(t);
+  }
+  const allClear = tickets.length > 0 && tickets.every(cleared);
+
+  function pick(t: NetworkTicket, value: string) {
+    if (value === expected(t)) {
+      setPicks((p) => ({ ...p, [t.id]: value }));
+      setWrong((w) => {
+        if (!(t.id in w)) return w;
+        const next = { ...w };
+        delete next[t.id];
+        return next;
+      });
+    } else {
+      setWrong((w) => ({
+        ...w,
+        [t.id]: t.why ?? "Not that road — read the prefix again.",
+      }));
+    }
+  }
+
+  function submit() {
+    if (!allClear) return;
+    onCommit({ networkPicks: tickets.map((t) => picks[t.id] ?? "") });
+  }
+
+  useFootPrimary(
+    review ? null : (
+      <Button size="lg" disabled={busy || !allClear} onClick={submit}>
+        {button}
+      </Button>
+    ),
+    [review, busy, button, allClear, picks],
+  );
+
+  return (
+    <Split coach={step.coachLine}>
+      <IdeaPanel step={step} />
+      <div className="space-y-4">
+        {tickets.map((t) =>
+          t.verdict ? (
+            <div
+              key={t.id}
+              role="group"
+              aria-label={`ticket ${t.id}`}
+              className="rounded-xl border border-[var(--lane)] p-4"
+            >
+              <dl className="space-y-2 text-sm">
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-[var(--mute)]">Network</dt>
+                  <dd className="text-[var(--paper)]">{t.network}</dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-[var(--mute)]">Address</dt>
+                  <dd className="break-all font-mono text-xs text-[var(--paper)]">
+                    {t.address}
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-[var(--mute)]">Amount</dt>
+                  <dd className="text-[var(--paper)]">{t.amount}</dd>
+                </div>
+              </dl>
+              {review || cleared(t) ? (
+                <p className="mt-3 text-sm text-[var(--go)]">
+                  ✓ {t.verdict === "approve" ? "Approved" : "Refused"} — {t.why}
+                </p>
+              ) : (
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Button variant="secondary" onClick={() => pick(t, "approve")}>
+                    Approve
+                  </Button>
+                  <Button variant="secondary" onClick={() => pick(t, "refuse")}>
+                    Refuse
+                  </Button>
+                </div>
+              )}
+              {wrong[t.id] ? (
+                <p className="mt-3 text-sm text-[var(--danger)]" role="alert">
+                  ✗ {wrong[t.id]}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <div
+              key={t.id}
+              role="group"
+              aria-label={`ticket ${t.id}`}
+              className="rounded-xl border border-[var(--lane)] p-4"
+            >
+              <p className="text-sm text-[var(--paper)]">{t.prompt}</p>
+              <div className="mt-3 flex flex-wrap gap-3">
+                {(t.choices ?? []).map((choice, i) => {
+                  const isClear = cleared(t) && picks[t.id] === String(i);
+                  return (
+                    <Button
+                      key={choice}
+                      variant={isClear || review ? "default" : "secondary"}
+                      onClick={() => pick(t, String(i))}
+                    >
+                      {isClear || review ? "✓ " : ""}
+                      {choice}
+                    </Button>
+                  );
+                })}
+              </div>
+              {wrong[t.id] ? (
+                <p className="mt-3 text-sm text-[var(--danger)]" role="alert">
+                  ✗ {wrong[t.id]}
+                </p>
+              ) : null}
+            </div>
+          ),
+        )}
+      </div>
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
+    </Split>
+  );
+}
 
 function PolicyScene({
   step,

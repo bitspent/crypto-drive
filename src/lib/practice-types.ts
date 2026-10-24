@@ -50,6 +50,8 @@ export type StepAnswer = {
   examClaim?: string;
   /** Road-test stuck drill: the priority bump landed. */
   stuckBumped?: boolean;
+  /** Stablecoin network-pick: per-ticket picks aligned to action.tickets. */
+  networkPicks?: string[];
 };
 
 /** Capstone policy-pick: accepted confirmation thresholds per scenario. */

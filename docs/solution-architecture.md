@@ -89,7 +89,8 @@ flowchart TB
 | Landing page | Pitch + “Get course” + “I have a license” | Vercel (Next.js) | **Now** |
 | Unlock / access gate | Accept email + license; grant tier path | Vercel app | **Now** (demo keys; Gumroad verify later) |
 | Drive + step UI (Bitcoin: 6 drives, 26 steps) | Coach cues + graded drills + capstone | Vercel app (in-app content) | **Now** |
-| Tracks ETH / USDT / Tron / Solana | Later tracks | Vercel app | **Scaffold** (`status: "coming"`) |
+| Track C (USDT: 3 drives, 10 steps) | Network-picker drills + capstone cert | Vercel app (in-app content) | **Now** |
+| Tracks ETH / Tron / Solana | Later tracks | Vercel app | **Scaffold** (`status: "coming"`) |
 | Cert generator | Name, date, unique id/hash → PNG | Vercel (`@vercel/og` / satori) | **Now** |
 | `/verify/[certId]` | Public attestation page | Vercel (public route) | **Now** |
 | Share CTAs | Intent / copy links to X, LinkedIn, Instagram | Learner browser → social apps | **Now** |
@@ -252,10 +253,10 @@ max (traveler orb); no postprocessing; no shadow maps.
 
 **Validation notes (Playwright, `tests/e2e/`, `npx playwright test`):**
 
-- Full 26-step walk on desktop + mobile, layout contract both viewports in
-  both themes, keyboard drive, reduced-motion, no-WebGL: all green. The
-  harness asserts the 2D illustration card mounts and no `.journey-stage`
-  exists.
+- Full 26-step BTC walk + 10-step USDT walk on desktop + mobile, layout
+  contract both viewports in both themes, keyboard drive, reduced-motion,
+  no-WebGL: all green. The harness asserts the 2D illustration card mounts
+  and no `.journey-stage` exists.
 - Recall-loop harness lesson: after the final recall tap the app keeps
   showing `WORD 9` (by design) while the Continue link appears — so the loop
   must wait for *either* a new title *or* Continue, never a title change
@@ -267,8 +268,10 @@ max (traveler orb); no postprocessing; no shadow maps.
 
 ## 8. Curriculum map (as of HEAD)
 
-Bitcoin is content-complete. All other tracks are scaffolds (`status:
-"coming"`, `lessons: []`).
+Bitcoin and USDT are content-complete. ETH / Tron / Solana remain scaffolds
+(`status: "coming"`, `lessons: []`).
+
+Bitcoin — 6 drives:
 
 | Drive | Title | Steps |
 | --- | --- | --- |
@@ -283,14 +286,26 @@ Bitcoin is content-complete. All other tracks are scaffolds (`status:
 issues on `prove-it/exam` (the final step) after the five-task wallet exam; all tiers walk every step, and
 only the certificate is tier-gated.
 
+USDT — 3 drives, 10 steps, all static (no wallet touchpoints):
+
+| Drive | Title | Steps |
+| --- | --- | --- |
+| `one-coin` | One coin, many roads | 3 — erc, trc, rule |
+| `picker` | The picker drill | 4 — deposit, withdraw, fees, custody |
+| `road` | Stable road test | 3 — explorer, save, capstone |
+
+Nine steps use the `network-pick` ticket drill (recognize / approve-refuse),
+`picker/custody` reuses `model-compare`, and the certificate issues on
+`road/capstone`. One cert per track, each verifiable at /verify.
+
 ---
 
 ## 9. Test surface
 
 | Suite | Command | Covers |
 | --- | --- | --- |
-| Unit | `node --test --test-concurrency=1 tests/` | Practice determinism + grading (incl. capstone rubric), content shape (26 steps, idea panels, cert target), tier flags, module redirects, `CERT_HASH_SECRET` production gate, wallet lib (formatting, send/deposit/restore, fee tiers), commerce + revocation + hashing (serial: file-store writers race across files) |
-| E2E | `CERT_HASH_SECRET=… npm run build` then `npx playwright test` (once: `npx playwright install chromium`) | Full 26-step walk on desktop + mobile viewports, layout contract, keyboard drive, reduced-motion, no-WebGL, mobile smoke, wallet sandbox flows (setup, deposit, send, backup/restore/reset), legal pages, health, bitcoin modes — in file-store and Postgres modes (`E2E_DATABASE_URL`, see `tests/e2e/README.md`). Config: `playwright.config.ts`; specs: `tests/e2e/` |
+| Unit | `node --test --test-concurrency=1 tests/` | Practice determinism + grading (incl. capstone rubric + network-pick), content shape (26 BTC + 10 USDT steps, idea panels, cert targets), tier flags, module redirects, `CERT_HASH_SECRET` production gate, wallet lib (formatting, send/deposit/restore, fee tiers), commerce + revocation + hashing (serial: file-store writers race across files) |
+| E2E | `CERT_HASH_SECRET=… npm run build` then `npx playwright test` (once: `npx playwright install chromium`) | Full 26-step BTC walk + 10-step USDT walk on desktop + mobile viewports, layout contract, keyboard drive, reduced-motion, no-WebGL, mobile smoke, wallet sandbox flows (setup, deposit, send, backup/restore/reset), legal pages, health, bitcoin modes — in file-store and Postgres modes (`E2E_DATABASE_URL`, see `tests/e2e/README.md`). Config: `playwright.config.ts`; specs: `tests/e2e/` |
 
 Both suites must pass before any charge-readiness review. Pre-launch
 blockers live in `docs/charge-ready-checklist.md`.

@@ -1,8 +1,9 @@
-# Stablecoin track outline (Track C) — approved direction, not yet built
+# Stablecoin track outline (Track C) — shipped, retained as design history
 
-Status: direction approved by owner (see Locked decisions). The Bitcoin
-track stays the charge-quality product; this doc scopes what "coming next"
-means for `content/tracks/usdt-networks.json`.
+Status: built and green — `content/tracks/usdt-networks.json` is live
+(`status: ready`, 3 drives, 10 steps, capstone cert). This doc is retained
+as the design record: the locked decisions below are what shipped, and the
+follow-ups are what did not.
 
 ## Locked decisions
 
@@ -100,3 +101,18 @@ pattern (faucet, tx status, mine, fees). Explorer reads stay Model A
 (link out to sepolia.etherscan.io / tronscan — no keys, no self-hosted
 Blockscout). Tron gets no private net: TRC-20 drills are recognition-only
 (address alphabet + picker), which needs no chain.
+
+## Shipped shape (what v1 actually is)
+
+- One new action type: `network-pick` (recognize + approve/refuse tickets,
+  static JSON, server-graded against the step's own tickets).
+- One reuse: `model-compare` for `picker/custody` (the four models are
+  chain-agnostic; the idea panel adds USDT issuer-freeze risk).
+- Deliberately not built: live explorer reads (the `explorer-read` scene is
+  PIZZA/sat-vB specific — generalizing it needs per-step bounds plus
+  verified Tronscan values, an external dependency for a drill), the
+  toll-policy-fee BTC scenes (denominated in sats), and any wallet
+  touchpoint (wallet stays BTC-only per the locked decision).
+- Explorer coverage is recognition-level: which window sees which address
+  (Etherscan / Tronscan / mempool.space). A live-read drill is the
+  follow-up if chain-backed Track C ever gets approved.

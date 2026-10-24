@@ -733,6 +733,7 @@ export async function passStep(
       practice,
       answer,
       student.wallet,
+      foundStep.step.action,
     );
     if (gradeError) throw new Error(gradeError);
   }

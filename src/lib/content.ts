@@ -81,6 +81,20 @@ export type IntroScene =
   | "change";
 export type RoadScene = "support" | "network" | "mismatch";
 
+export type NetworkTicket = {
+  id: string;
+  /** recognize: question + choices + correct index. */
+  prompt?: string;
+  choices?: string[];
+  answer?: number;
+  /** verify: withdrawal/deposit ticket + expected verdict. */
+  network?: string;
+  address?: string;
+  amount?: string;
+  verdict?: "approve" | "refuse";
+  why?: string;
+};
+
 export type StepAction =
   | { type: "intro"; scene: IntroScene }
   | { type: "address-check" }
@@ -93,6 +107,7 @@ export type StepAction =
   | { type: "seed-card" }
   | { type: "scene"; scene: RoadScene }
   | { type: "stuck-fix" }
+  | { type: "network-pick"; mode: "recognize" | "verify"; tickets: NetworkTicket[] }
   | { type: "policy-pick" }
   | { type: "model-compare" }
   | { type: "fee-strategy" }

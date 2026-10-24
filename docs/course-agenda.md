@@ -1,6 +1,6 @@
 # Crypto Drive — Course agenda (v2)
 
-**Status:** The Bitcoin track is **content-complete** (6 drives, 26 steps, capstone included). Ethereum, USDT/Tron, and Solana remain scaffolds. Charge-readiness requires the checklist in `docs/charge-ready-checklist.md` — this agenda stays the qualitative bar below it.
+**Status:** The Bitcoin track is **content-complete** (6 drives, 26 steps, capstone included), and the USDT track is **content-complete** (3 drives, 10 steps, capstone cert). Ethereum, Tron, and Solana remain scaffolds. Charge-readiness requires the checklist in `docs/charge-ready-checklist.md` — this agenda stays the qualitative bar below it.
 
 **Audience:** Non-tech professionals. Coach tone (learn to drive), never academic.
 
@@ -96,8 +96,8 @@ Phishing, fake apps, seed screenshots, “connect wallet” traps, test-send sma
 ## Build order (replace scaffolding)
 
 1. ~~Rewrite **Track A (Bitcoin)** fully in app + Context guides~~ — done (6 drives, 26 steps, capstone cert)  
-2. Track B (Ethereum)  
-3. Track C (USDT + Tron)  
+2. ~~Track C (USDT + networks)~~ — done (3 drives, 10 steps, capstone cert, BTC wallet untouched)  
+3. Track B (Ethereum)  
 4. Track D (Solana)  
 5. Polish hygiene + Certified certs per major milestone  
 6. Only then: live Gumroad — gated by `docs/charge-ready-checklist.md`  

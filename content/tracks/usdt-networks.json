@@ -4,17 +4,682 @@
   "number": 3,
   "title": "USDT + networks",
   "shortTitle": "USDT",
-  "status": "coming",
+  "status": "ready",
   "eyebrow": "TRACK C · STABLECOINS",
-  "headline": "Coming next — the network picker that saves money",
-  "summary": "USDT is not one road. Ethereum vs Tron vs others — deposit/withdraw with network checks. Scaffold only.",
-  "coachPitch": "Wrong network is the #1 way people lose stables. We’ll drill the picker hard.",
+  "headline": "The network picker that saves money",
+  "summary": "USDT is not one road. Ethereum vs Tron — deposits and withdrawals with network checks, drilled to reflex.",
+  "coachPitch": "Wrong network is the #1 way people lose stables. We drill the picker hard.",
   "symbol": "usdt",
-  "comingBeats": [
-    "USDT ≠ one chain",
-    "Network picker drills",
-    "Tron (TRC-20) fee feel + explorer",
-    "One USDT certificate at the end of the road"
-  ],
-  "lessons": []
+  "lessons": [],
+  "drives": [
+    {
+      "id": "usdt-coin",
+      "slug": "one-coin",
+      "title": "One coin, many roads",
+      "minutes": "6 min",
+      "job": "Tell the three USDT roads apart on sight",
+      "outcome": "You'll read an address and name its network — 0x, T, or legacy — before you ever press send.",
+      "steps": [
+        {
+          "id": "usdt-coin-erc",
+          "slug": "erc",
+          "job": "0x means Ethereum",
+          "coachLine": "Forty hex characters after 0x. That is an Ethereum address — USDT on it moves as ERC-20.",
+          "button": "Check my reads",
+          "action": {
+            "type": "network-pick",
+            "mode": "recognize",
+            "tickets": [
+              {
+                "id": "t1",
+                "prompt": "0x8f3a…c41d holds 250 USDT. Which road is it on?",
+                "choices": [
+                  "Ethereum (ERC-20)",
+                  "Tron (TRC-20)",
+                  "Bitcoin"
+                ],
+                "answer": 0
+              },
+              {
+                "id": "t2",
+                "prompt": "0xdAC17F958D2ee523a2206206994597C13D831ec7 — the USDT contract itself. Which road?",
+                "choices": [
+                  "Ethereum (ERC-20)",
+                  "Tron (TRC-20)",
+                  "Bitcoin"
+                ],
+                "answer": 0
+              },
+              {
+                "id": "t3",
+                "prompt": "T9yD…xuWwb holds 40 USDT. Which road is it on?",
+                "choices": [
+                  "Ethereum (ERC-20)",
+                  "Tron (TRC-20)",
+                  "Bitcoin"
+                ],
+                "answer": 1
+              }
+            ]
+          },
+          "ideaTitle": "0x is a street sign",
+          "ideaBody": "Every Ethereum address starts with 0x followed by forty hexadecimal characters. When USDT sits on one, it moves as an ERC-20 token: Ethereum rules, Ethereum fees, an Ethereum explorer to verify. If the address in front of you starts with 0x, you are on the Ethereum road no matter what the screen around it claims.",
+          "objective": "After this screen you can identify an ERC-20 USDT address on sight.",
+          "whyItMatters": "Mislabeled deposit screens are routine — the address prefix is the ground truth your ops team checks.",
+          "keyTerms": [
+            "ERC-20",
+            "0x prefix",
+            "hexadecimal"
+          ],
+          "misconception": "USDT looks the same everywhere, so any USDT address works on any network.",
+          "pocketCard": "0x means Ethereum. Full stop.",
+          "quickCheck": {
+            "question": "A client pastes 0x7a…9f2e for a USDT invoice. Which network must the payment use?",
+            "options": [
+              "Tron (TRC-20)",
+              "Ethereum (ERC-20)",
+              "Bitcoin",
+              "Any — USDT is universal"
+            ],
+            "answerIndex": 1,
+            "explanation": "0x is Ethereum's alphabet — the payment must travel as ERC-20."
+          }
+        },
+        {
+          "id": "usdt-coin-trc",
+          "slug": "trc",
+          "job": "T means Tron",
+          "coachLine": "A capital T plus 33 characters. That is a Tron address — USDT on it moves as TRC-20.",
+          "button": "Check my reads",
+          "action": {
+            "type": "network-pick",
+            "mode": "recognize",
+            "tickets": [
+              {
+                "id": "t1",
+                "prompt": "T9yD…xuWwb holds 1,000 USDT. Which road is it on?",
+                "choices": [
+                  "Ethereum (ERC-20)",
+                  "Tron (TRC-20)",
+                  "Bitcoin"
+                ],
+                "answer": 1
+              },
+              {
+                "id": "t2",
+                "prompt": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t — the USDT contract itself. Which road?",
+                "choices": [
+                  "Ethereum (ERC-20)",
+                  "Tron (TRC-20)",
+                  "Bitcoin"
+                ],
+                "answer": 1
+              },
+              {
+                "id": "t3",
+                "prompt": "0x8f3a…c41d holds 250 USDT. Which road is it on?",
+                "choices": [
+                  "Ethereum (ERC-20)",
+                  "Tron (TRC-20)",
+                  "Bitcoin"
+                ],
+                "answer": 0
+              }
+            ]
+          },
+          "ideaTitle": "T is a street sign",
+          "ideaBody": "Every Tron address starts with a capital T followed by thirty-three characters in Base58 — an alphabet with no zero, no capital O, and nothing that looks like punctuation. USDT on a T address moves as TRC-20: Tron rules, Tron fees, Tronscan to verify. The T does the same job as 0x on the other road: it tells you where you are before money moves.",
+          "objective": "After this screen you can identify a TRC-20 USDT address on sight.",
+          "whyItMatters": "Tron carries the bulk of retail USDT volume — your team will see T addresses daily.",
+          "keyTerms": [
+            "TRC-20",
+            "T prefix",
+            "Base58"
+          ],
+          "misconception": "Tron addresses are just shorter Ethereum addresses and work the same way.",
+          "pocketCard": "T means Tron. Full stop.",
+          "quickCheck": {
+            "question": "Payroll sends USDT to T9yD…xuWwb. Which network must the withdrawal use?",
+            "options": [
+              "Tron (TRC-20)",
+              "Ethereum (ERC-20)",
+              "Bitcoin",
+              "Any — the exchange converts it"
+            ],
+            "answerIndex": 0,
+            "explanation": "T is Tron's alphabet — the withdrawal must travel as TRC-20."
+          }
+        },
+        {
+          "id": "usdt-coin-rule",
+          "slug": "rule",
+          "job": "The network is part of the address",
+          "coachLine": "Same coin, three alphabets. Read the prefix first — everything else follows.",
+          "button": "Check my reads",
+          "action": {
+            "type": "network-pick",
+            "mode": "recognize",
+            "tickets": [
+              {
+                "id": "t1",
+                "prompt": "0x3cD2…77aa receives 90 USDT. Which road?",
+                "choices": [
+                  "Ethereum (ERC-20)",
+                  "Tron (TRC-20)",
+                  "Bitcoin (legacy Omni)"
+                ],
+                "answer": 0
+              },
+              {
+                "id": "t2",
+                "prompt": "TKm9…Qp2e receives 90 USDT. Which road?",
+                "choices": [
+                  "Ethereum (ERC-20)",
+                  "Tron (TRC-20)",
+                  "Bitcoin (legacy Omni)"
+                ],
+                "answer": 1
+              },
+              {
+                "id": "t3",
+                "prompt": "1M9x…kL4p — a Bitcoin-format address from the Omni era. Which road?",
+                "choices": [
+                  "Ethereum (ERC-20)",
+                  "Tron (TRC-20)",
+                  "Bitcoin (legacy Omni)"
+                ],
+                "answer": 2
+              },
+              {
+                "id": "t4",
+                "prompt": "0xbB0c…E11d receives 12 USDT. Which road?",
+                "choices": [
+                  "Ethereum (ERC-20)",
+                  "Tron (TRC-20)",
+                  "Bitcoin (legacy Omni)"
+                ],
+                "answer": 0
+              }
+            ]
+          },
+          "ideaTitle": "The network is part of the address",
+          "ideaBody": "USDT has lived on several chains, and each chain stamps its own alphabet on every address: 0x on Ethereum, T on Tron, and the old 1… and 3… formats from its Omni days on Bitcoin. The prefix is not decoration — it decides which network must process the payment. Treat the network as part of the address itself: copy one without the other and the payment has nowhere valid to go.",
+          "objective": "After this screen you can sort any USDT address into its network from the prefix alone.",
+          "whyItMatters": "The prefix read is the cheapest control in stablecoin ops — one glance, zero tooling.",
+          "keyTerms": [
+            "address alphabet",
+            "Omni legacy",
+            "prefix"
+          ],
+          "misconception": "Copying the address is enough — the wallet figures out the network by itself.",
+          "pocketCard": "No prefix read, no send.",
+          "quickCheck": {
+            "question": "What does the 0x / T / 1… split tell you?",
+            "options": [
+              "They are interchangeable",
+              "Only the amount matters",
+              "Each prefix names its own road",
+              "Newer is always safer"
+            ],
+            "answerIndex": 2,
+            "explanation": "Three alphabets, three roads — the prefix names the road."
+          }
+        }
+      ]
+    },
+    {
+      "id": "usdt-picker",
+      "slug": "picker",
+      "title": "The picker drill",
+      "minutes": "8 min",
+      "job": "Match every ticket: network, address, amount",
+      "outcome": "You'll clear deposit and withdrawal tickets the way an exchange operator does — network first, address second, amount last.",
+      "steps": [
+        {
+          "id": "usdt-picker-deposit",
+          "slug": "deposit",
+          "job": "Clear the deposit queue",
+          "coachLine": "The exchange shows a network and an address. Approve only when the two agree.",
+          "button": "Clear the queue",
+          "action": {
+            "type": "network-pick",
+            "mode": "verify",
+            "tickets": [
+              {
+                "id": "d1",
+                "network": "Ethereum (ERC-20)",
+                "address": "0x8f3a…c41d",
+                "amount": "250 USDT",
+                "verdict": "approve",
+                "why": "0x address on the Ethereum ticket — road and address agree."
+              },
+              {
+                "id": "d2",
+                "network": "Tron (TRC-20)",
+                "address": "0x8f3a…c41d",
+                "amount": "250 USDT",
+                "verdict": "refuse",
+                "why": "The ticket says Tron but the address is Ethereum's alphabet — approving strands the deposit."
+              },
+              {
+                "id": "d3",
+                "network": "Tron (TRC-20)",
+                "address": "T9yD…xuWwb",
+                "amount": "1,000 USDT",
+                "verdict": "approve",
+                "why": "T address on the Tron ticket — road and address agree."
+              },
+              {
+                "id": "d4",
+                "network": "Ethereum (ERC-20)",
+                "address": "T9yD…xuWwb",
+                "amount": "1,000 USDT",
+                "verdict": "refuse",
+                "why": "Ethereum ticket with a Tron address — the network and the address disagree."
+              }
+            ]
+          },
+          "ideaTitle": "Two claims, one check",
+          "ideaBody": "An exchange deposit screen makes two claims at once: this network, this address. Either claim can be wrong — a mislabeled network, a pasted address from the other road — and the screen will not warn you. Your job is the two-second check the screen skips: does the address alphabet match the named network? Approve on agreement, refuse on anything else.",
+          "objective": "After this screen you can approve or refuse a USDT deposit ticket from the network-address match.",
+          "whyItMatters": "Misdirected deposits are the most common USDT ops loss — and the most preventable.",
+          "keyTerms": [
+            "deposit ticket",
+            "agreement check",
+            "mislabel"
+          ],
+          "misconception": "The exchange deposit screen is always right, so approval is a formality.",
+          "pocketCard": "Network and address must agree.",
+          "quickCheck": {
+            "question": "What earns a deposit ticket your approval?",
+            "options": [
+              "The amount looks right",
+              "The address alphabet matches the network",
+              "The ticket loaded fast",
+              "The coin is USDT"
+            ],
+            "answerIndex": 1,
+            "explanation": "Agreement is the whole check — anything else is a refuse."
+          }
+        },
+        {
+          "id": "usdt-picker-withdraw",
+          "slug": "withdraw",
+          "job": "Refuse the wrong road",
+          "coachLine": "Withdrawals ask you to pick the network. Pick the one the destination address lives on.",
+          "button": "Clear the queue",
+          "action": {
+            "type": "network-pick",
+            "mode": "verify",
+            "tickets": [
+              {
+                "id": "w1",
+                "network": "Ethereum (ERC-20)",
+                "address": "0x8f3a…c41d",
+                "amount": "400 USDT",
+                "verdict": "approve",
+                "why": "ERC-20 chosen, 0x destination — the withdrawal travels the right road."
+              },
+              {
+                "id": "w2",
+                "network": "Tron (TRC-20)",
+                "address": "0x8f3a…c41d",
+                "amount": "400 USDT",
+                "verdict": "refuse",
+                "why": "TRC-20 chosen for a 0x destination — the funds would leave on a road the address cannot receive."
+              },
+              {
+                "id": "w3",
+                "network": "Tron (TRC-20)",
+                "address": "T9yD…xuWwb",
+                "amount": "2,200 USDT",
+                "verdict": "approve",
+                "why": "TRC-20 chosen, T destination — the withdrawal travels the right road."
+              },
+              {
+                "id": "w4",
+                "network": "Ethereum (ERC-20)",
+                "address": "T9yD…xuWwb",
+                "amount": "2,200 USDT",
+                "verdict": "refuse",
+                "why": "ERC-20 chosen for a T destination — stop and switch the network before sending."
+              }
+            ]
+          },
+          "ideaTitle": "The default is never evidence",
+          "ideaBody": "A withdrawal reverses the deposit check: you choose the network, then paste the destination. The danger is momentum — the picker defaults to the last network you used, and the pasted address belongs to the other road. Read the destination's prefix before you touch the picker, then choose the network the prefix names. The default is never evidence.",
+          "objective": "After this screen you can pick the withdrawal network from the destination prefix.",
+          "whyItMatters": "Wrong-network withdrawals are usually unrecoverable — this check is the control.",
+          "keyTerms": [
+            "withdrawal picker",
+            "default network",
+            "destination prefix"
+          ],
+          "misconception": "The picker's default network is a safe choice because the exchange set it.",
+          "pocketCard": "Prefix first, picker second.",
+          "quickCheck": {
+            "question": "What decides the withdrawal network?",
+            "options": [
+              "The destination's prefix",
+              "The picker's default",
+              "The lowest fee shown",
+              "The fastest option"
+            ],
+            "answerIndex": 0,
+            "explanation": "The destination prefix is the only vote that counts."
+          }
+        },
+        {
+          "id": "usdt-picker-fees",
+          "slug": "fees",
+          "job": "Who collects the toll?",
+          "coachLine": "USDT never pays its own way. The road's native coin pays — ETH on Ethereum, bandwidth and energy on Tron.",
+          "button": "Check my reads",
+          "action": {
+            "type": "network-pick",
+            "mode": "recognize",
+            "tickets": [
+              {
+                "id": "f1",
+                "prompt": "A transfer burns gas quoted in gwei. Which road?",
+                "choices": [
+                  "Ethereum",
+                  "Tron",
+                  "Bitcoin"
+                ],
+                "answer": 0
+              },
+              {
+                "id": "f2",
+                "prompt": "A transfer consumes bandwidth and energy. Which road?",
+                "choices": [
+                  "Ethereum",
+                  "Tron",
+                  "Bitcoin"
+                ],
+                "answer": 1
+              },
+              {
+                "id": "f3",
+                "prompt": "Your wallet holds 500 USDT and zero ETH. Which coin must you add before an ERC-20 send can move?",
+                "choices": [
+                  "ETH",
+                  "More USDT",
+                  "BTC"
+                ],
+                "answer": 0
+              }
+            ]
+          },
+          "ideaTitle": "The token never pays the toll",
+          "ideaBody": "A USDT transfer is a token moving on someone else's road, so the toll goes to the road, not the token: gas in ETH on Ethereum, bandwidth and energy on Tron. That means a wallet holding only USDT is stranded — it cannot send until it also holds the road's native coin. Fund the toll before you promise the payment.",
+          "objective": "After this screen you can name which coin funds a USDT transfer on each road.",
+          "whyItMatters": "Stranded-wallet incidents are embarrassing and entirely plannable — fund both balances.",
+          "keyTerms": [
+            "gas",
+            "bandwidth and energy",
+            "native coin"
+          ],
+          "misconception": "The fee comes out of the USDT being sent, like a bank wire fee.",
+          "pocketCard": "No native coin, no send.",
+          "quickCheck": {
+            "question": "What pays for a USDT transfer?",
+            "options": [
+              "USDT",
+              "BTC",
+              "The road's native coin",
+              "The exchange pays it"
+            ],
+            "answerIndex": 2,
+            "explanation": "The toll is always the road's coin — USDT alone cannot move itself."
+          }
+        },
+        {
+          "id": "usdt-picker-custody",
+          "slug": "custody",
+          "job": "Where do the stables sleep?",
+          "coachLine": "Same four models as Bitcoin — exchange, self-custody, institutional, multi-sig. The tradeoffs travel with the keys, not the coin.",
+          "button": "I've compared the models",
+          "action": {
+            "type": "model-compare"
+          },
+          "ideaTitle": "Same keys, same tradeoffs",
+          "ideaBody": "Where USDT sleeps is the same four-way choice as Bitcoin: an exchange that can freeze you, self-custody that only you can lose, an institutional custodian under contract, or multi-sig across key holders. Stables add exactly one risk Bitcoin lacks — the issuer can freeze tokens at the contract level, and no custody model removes that. Compare all four, then place the freeze risk where it belongs: outside custody's control.",
+          "objective": "After this screen you can place USDT across the four custody models including issuer risk.",
+          "whyItMatters": "Treasury policy must name both the custody model and the residual issuer risk.",
+          "keyTerms": [
+            "custody model",
+            "issuer freeze",
+            "key holder"
+          ],
+          "misconception": "Self-custody removes every third party from USDT — the issuer can still freeze it.",
+          "pocketCard": "Custody is keys; freezing is the issuer.",
+          "quickCheck": {
+            "question": "Which model removes single-key-holder failure for USDT?",
+            "options": [
+              "Exchange custody",
+              "Multi-sig",
+              "Leaving it on the invoice",
+              "Splitting across roads"
+            ],
+            "answerIndex": 1,
+            "explanation": "Multi-sig spreads key risk; nothing spreads issuer risk."
+          }
+        }
+      ]
+    },
+    {
+      "id": "usdt-road",
+      "slug": "road",
+      "title": "Stable road test",
+      "minutes": "6 min",
+      "job": "Prove the picker under pressure",
+      "outcome": "You'll name the right explorer, save a mismatched withdrawal, and earn the USDT certificate.",
+      "steps": [
+        {
+          "id": "usdt-road-explorer",
+          "slug": "explorer",
+          "job": "Name the explorer",
+          "coachLine": "Every road has its own window. Match the address to the explorer that can see it.",
+          "button": "Check my reads",
+          "action": {
+            "type": "network-pick",
+            "mode": "recognize",
+            "tickets": [
+              {
+                "id": "e1",
+                "prompt": "0x8f3a…c41d just received 250 USDT. Which window shows it?",
+                "choices": [
+                  "Etherscan",
+                  "Tronscan",
+                  "mempool.space"
+                ],
+                "answer": 0
+              },
+              {
+                "id": "e2",
+                "prompt": "T9yD…xuWwb just received 1,000 USDT. Which window shows it?",
+                "choices": [
+                  "Etherscan",
+                  "Tronscan",
+                  "mempool.space"
+                ],
+                "answer": 1
+              },
+              {
+                "id": "e3",
+                "prompt": "1M9x…kL4p moved old Omni USDT. Which window shows it?",
+                "choices": [
+                  "Etherscan",
+                  "Tronscan",
+                  "mempool.space"
+                ],
+                "answer": 2
+              }
+            ]
+          },
+          "ideaTitle": "The right window first",
+          "ideaBody": "No explorer sees every road: Etherscan reads Ethereum, Tronscan reads Tron, mempool.space reads Bitcoin. Pasting a T address into Etherscan returns nothing — not because the payment failed, but because you asked the wrong window. Name the road from the prefix first, then open its explorer. Verification starts with the right window, not the right txid.",
+          "objective": "After this screen you can match a USDT address to its explorer.",
+          "whyItMatters": "Half of all 'missing payment' escalations are just the wrong explorer.",
+          "keyTerms": [
+            "Etherscan",
+            "Tronscan",
+            "block explorer"
+          ],
+          "misconception": "One explorer searches all chains, so any of them works for any address.",
+          "pocketCard": "Prefix names the road; road names the window.",
+          "quickCheck": {
+            "question": "Where do you check T9yD…xuWwb?",
+            "options": [
+              "Etherscan",
+              "Tronscan",
+              "mempool.space",
+              "Any search engine"
+            ],
+            "answerIndex": 1,
+            "explanation": "T is Tron, and Tron's window is Tronscan."
+          }
+        },
+        {
+          "id": "usdt-road-save",
+          "slug": "save",
+          "job": "Save the withdrawal",
+          "coachLine": "Four tickets, two traps. The traps pay a bonus to whoever catches them: nothing lost.",
+          "button": "Clear the queue",
+          "action": {
+            "type": "network-pick",
+            "mode": "verify",
+            "tickets": [
+              {
+                "id": "s1",
+                "network": "Tron (TRC-20)",
+                "address": "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
+                "amount": "5,000 USDT",
+                "verdict": "approve",
+                "why": "Full-length T address on the Tron ticket — count the prefix, then approve."
+              },
+              {
+                "id": "s2",
+                "network": "Ethereum (ERC-20)",
+                "address": "0x8f3a7d1c9e2b4f6a8d0c2e4b6a8d0c2e4b6a8d0c2",
+                "amount": "5,000 USDT",
+                "verdict": "approve",
+                "why": "Full-length 0x address on the Ethereum ticket — count the prefix, then approve."
+              },
+              {
+                "id": "s3",
+                "network": "Tron (TRC-20)",
+                "address": "0x8f3a…c41d",
+                "amount": "5,000 USDT",
+                "verdict": "refuse",
+                "why": "Tron ticket, Ethereum alphabet — the amounts match but the roads don't."
+              },
+              {
+                "id": "s4",
+                "network": "Ethereum (ERC-20)",
+                "address": "T9yD…xuWwb",
+                "amount": "5,000 USDT",
+                "verdict": "refuse",
+                "why": "Ethereum ticket, Tron alphabet — refuse before the queue moves."
+              }
+            ]
+          },
+          "ideaTitle": "Pressure never changes the rule",
+          "ideaBody": "Under pressure the check compresses to one motion: prefix, network, verdict. These tickets look busier — full-length addresses, round amounts, a queue that wants speed — but the rule never changes. Read the first characters, name the road, compare it to the ticket. The two traps here fail that comparison, and catching them is the whole skill.",
+          "objective": "After this screen you can clear a mixed queue without missing a mismatch.",
+          "whyItMatters": "Fatigue is when ops teams misroute — the drill makes the check automatic.",
+          "keyTerms": [
+            "full-length check",
+            "trap ticket",
+            "prefix read"
+          ],
+          "misconception": "Full-length addresses are safer, so long tickets can be approved faster.",
+          "pocketCard": "Busy queue, same check.",
+          "quickCheck": {
+            "question": "What clears a ticket under pressure?",
+            "options": [
+              "The prefix-road match",
+              "The address length",
+              "The round amount",
+              "The queue order"
+            ],
+            "answerIndex": 0,
+            "explanation": "Length proves nothing — only the prefix-road match clears a ticket."
+          }
+        },
+        {
+          "id": "usdt-road-capstone",
+          "slug": "capstone",
+          "job": "Earn the USDT road stripe",
+          "coachLine": "Mixed queue: deposits, withdrawals, both roads. Clear it clean.",
+          "button": "Finish the road test",
+          "action": {
+            "type": "network-pick",
+            "mode": "verify",
+            "tickets": [
+              {
+                "id": "c1",
+                "network": "Ethereum (ERC-20)",
+                "address": "0x3cD2…77aa",
+                "amount": "900 USDT",
+                "verdict": "approve",
+                "why": "Deposit road and address agree — clear it."
+              },
+              {
+                "id": "c2",
+                "network": "Ethereum (ERC-20)",
+                "address": "TKm9…Qp2e",
+                "amount": "900 USDT",
+                "verdict": "refuse",
+                "why": "Ethereum ticket with a Tron destination — the capstone trap, refused."
+              },
+              {
+                "id": "c3",
+                "network": "Tron (TRC-20)",
+                "address": "TKm9…Qp2e",
+                "amount": "1,500 USDT",
+                "verdict": "approve",
+                "why": "Withdrawal road and address agree — clear it."
+              },
+              {
+                "id": "c4",
+                "network": "Tron (TRC-20)",
+                "address": "0xbB0c…E11d",
+                "amount": "1,500 USDT",
+                "verdict": "refuse",
+                "why": "Tron ticket with an Ethereum destination — refused, queue clean."
+              }
+            ]
+          },
+          "cert": {
+            "certModuleLabel": "USDT + Networks",
+            "certMilestoneLabel": "Can recognize USDT networks, verify deposit addresses, and refuse mismatched withdrawals."
+          },
+          "ideaTitle": "The operator's queue",
+          "ideaBody": "This is the same queue an operator clears every day: deposits and withdrawals interleaved, both roads in play, two tickets quietly wrong. Nothing here is new — prefix, network, verdict, four times. Clear it clean and the certificate says what you proved: you can move USDT without feeding the wrong road.",
+          "objective": "After this screen you can clear a mixed USDT queue with zero misroutes.",
+          "whyItMatters": "This queue is the job — the certificate attests the reflex, not the reading.",
+          "keyTerms": [
+            "mixed queue",
+            "capstone",
+            "clean clear"
+          ],
+          "misconception": "The capstone needs new skills — it only needs the old checks at speed.",
+          "pocketCard": "Clear it clean.",
+          "quickCheck": {
+            "question": "What carries you through the capstone?",
+            "options": [
+              "Speed over accuracy",
+              "Trust the ticket labels",
+              "Skip the small amounts",
+              "Prefix, network, verdict — every ticket"
+            ],
+            "answerIndex": 3,
+            "explanation": "Every ticket in the queue answers to the same check."
+          }
+        }
+      ]
+    }
+  ]
 }

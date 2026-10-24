@@ -1,5 +1,5 @@
 {
   "brand": "Crypto Drive",
   "order": ["bitcoin", "ethereum", "usdt-networks", "tron", "solana"],
-  "note": "Bitcoin is the charge-quality track. ETH / USDT / Tron / Solana are coming-next scaffolds until rebuilt to the same bar."
+  "note": "Bitcoin and USDT are the charge-quality tracks. ETH / Tron / Solana are coming-next scaffolds until rebuilt to the same bar."
 }

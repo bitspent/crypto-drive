@@ -23,6 +23,9 @@ const { STUCK_DRILL_SATS } = jiti(join(root, "src/lib/wallet.ts"));
 const bitcoin = JSON.parse(
   readFileSync(join(root, "content/tracks/bitcoin.json"), "utf8"),
 );
+const usdt = JSON.parse(
+  readFileSync(join(root, "content/tracks/usdt-networks.json"), "utf8"),
+);
 const bip39 = new Set(
   readFileSync(join(root, "src/lib/data/bip39-english.txt"), "utf8")
     .split("\n")
@@ -188,6 +191,37 @@ describe("practice samples", () => {
     assert.ok(grade({ stuckBumped: true }, wallet([tx({ id: "bb".repeat(32), fee: 2100 }), stuck])));
     // No wallet: legacy ungraded path.
     assert.equal(grade({ stuckBumped: true }), null);
+  });
+
+  it("grades network-pick answers against the step tickets", () => {
+    const p = practiceFor(derivePracticeSeed("grade@example.com", "CD-DRIVE-STARTER"));
+    const recognize = {
+      type: "network-pick",
+      mode: "recognize",
+      tickets: [
+        { id: "t1", prompt: "0x…?", choices: ["Ethereum (ERC-20)", "Tron (TRC-20)"], answer: 0 },
+        { id: "t2", prompt: "T…?", choices: ["Ethereum (ERC-20)", "Tron (TRC-20)"], answer: 1 },
+      ],
+    };
+    const verify = {
+      type: "network-pick",
+      mode: "verify",
+      tickets: [
+        { id: "d1", network: "Ethereum (ERC-20)", address: "0x…", verdict: "approve" },
+        { id: "d2", network: "Tron (TRC-20)", address: "0x…", verdict: "refuse" },
+      ],
+    };
+    const grade = (answer, action) =>
+      gradeStepAnswer("usdt-coin-erc", "network-pick", p, answer, null, action);
+    assert.equal(grade({ networkPicks: ["0", "1"] }, recognize), null);
+    assert.equal(grade({ networkPicks: ["approve", "refuse"] }, verify), null);
+    // Wrong picks, short answers, missing action, and missing tickets fail.
+    assert.ok(grade({ networkPicks: ["1", "1"] }, recognize));
+    assert.ok(grade({ networkPicks: ["approve", "approve"] }, verify));
+    assert.ok(grade({ networkPicks: ["0"] }, recognize));
+    assert.ok(grade({}));
+    assert.ok(grade({ networkPicks: ["0", "1"] }));
+    assert.ok(grade({ networkPicks: ["0", "1"] }, { type: "network-pick", mode: "recognize", tickets: [] }));
   });
 });
 
@@ -482,5 +516,100 @@ describe("bitcoin first drive", () => {
         explorerFeeRate: 12,
       }),
     );
+  });
+});
+
+describe("usdt track", () => {
+  const steps = usdt.drives.flatMap((d) => d.steps);
+
+  it("ships 3 drives and 10 steps with one certificate", () => {
+    assert.equal(usdt.status, "ready");
+    assert.deepEqual(
+      usdt.drives.map((d) => d.slug),
+      ["one-coin", "picker", "road"],
+    );
+    assert.equal(steps.length, 10);
+    const certs = steps.filter((s) => s.cert);
+    assert.equal(certs.length, 1);
+    assert.equal(certs[0].id, "usdt-road-capstone");
+    assert.match(
+      certs[0].cert.certMilestoneLabel,
+      /recognize USDT networks, verify deposit addresses, and refuse mismatched withdrawals\./,
+    );
+  });
+
+  it("gives all 10 usdt steps the full idea panel", () => {
+    for (const step of steps) {
+      assert.ok(step.ideaTitle?.trim(), `${step.id} missing ideaTitle`);
+      assert.ok(step.ideaBody?.trim(), `${step.id} missing ideaBody`);
+      assert.ok(step.objective?.trim(), `${step.id} missing objective`);
+      assert.ok(step.whyItMatters?.trim(), `${step.id} missing whyItMatters`);
+      assert.ok(Array.isArray(step.keyTerms) && step.keyTerms.length >= 1, `${step.id} keyTerms`);
+      assert.ok(step.misconception?.trim(), `${step.id} missing misconception`);
+      assert.ok(step.pocketCard?.trim(), `${step.id} missing pocketCard`);
+      const qc = step.quickCheck;
+      assert.ok(qc?.question?.trim(), `${step.id} quickCheck question`);
+      assert.ok(
+        Array.isArray(qc.options) && qc.options.length >= 3,
+        `${step.id} quickCheck options`,
+      );
+      assert.ok(
+        Number.isInteger(qc.answerIndex) && qc.options[qc.answerIndex],
+        `${step.id} quickCheck answerIndex`,
+      );
+      assert.ok(qc.explanation?.trim(), `${step.id} quickCheck explanation`);
+    }
+  });
+
+  it("keeps idea bodies and quick checks unique across both tracks", () => {
+    const all = bitcoin.drives
+      .flatMap((d) => d.steps)
+      .concat(steps)
+      .filter((s) => typeof s.ideaBody === "string" && s.ideaBody.trim());
+    const bodies = all.map((s) => s.ideaBody.trim());
+    assert.equal(new Set(bodies).size, bodies.length, "duplicate ideaBody across tracks");
+    const questions = all.map((s) => s.quickCheck.question.trim());
+    assert.equal(new Set(questions).size, questions.length, "duplicate quickCheck across tracks");
+  });
+
+  it("uses only network-pick and model-compare with well-formed tickets", () => {
+    for (const step of steps) {
+      const action = step.action;
+      assert.ok(
+        action.type === "network-pick" || action.type === "model-compare",
+        `${step.id} action ${action.type}`,
+      );
+      if (action.type !== "network-pick") continue;
+      assert.ok(
+        action.mode === "recognize" || action.mode === "verify",
+        `${step.id} mode ${action.mode}`,
+      );
+      assert.ok(
+        Array.isArray(action.tickets) && action.tickets.length >= 2,
+        `${step.id} needs at least 2 tickets`,
+      );
+      for (const t of action.tickets) {
+        assert.ok(t.id?.trim(), `${step.id} ticket missing id`);
+        if (action.mode === "recognize") {
+          assert.ok(t.prompt?.trim(), `${step.id}/${t.id} missing prompt`);
+          assert.ok(
+            Array.isArray(t.choices) && t.choices.length >= 2,
+            `${step.id}/${t.id} choices`,
+          );
+          assert.ok(
+            Number.isInteger(t.answer) && t.choices[t.answer],
+            `${step.id}/${t.id} answer out of range`,
+          );
+        } else {
+          assert.ok(t.network?.trim(), `${step.id}/${t.id} missing network`);
+          assert.ok(t.address?.trim(), `${step.id}/${t.id} missing address`);
+          assert.ok(
+            t.verdict === "approve" || t.verdict === "refuse",
+            `${step.id}/${t.id} verdict ${t.verdict}`,
+          );
+          assert.ok(t.why?.trim(), `${step.id}/${t.id} missing why`);
+        }
+      }
+    }
   });
 });

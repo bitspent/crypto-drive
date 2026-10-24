@@ -84,6 +84,10 @@ export default async function TrackPage({ params }: Props) {
   const drives = track.drives ?? [];
   const done = countFinishedDrives(drives, student.modulesPassed);
   const resume = resumeHref(track.slug, drives, student.modulesPassed);
+  const minutes = drives.reduce((sum, d) => {
+    const m = /(\d+)\s*min/.exec(d.minutes ?? "");
+    return sum + (m ? Number(m[1]) : 0);
+  }, 0);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -102,7 +106,8 @@ export default async function TrackPage({ params }: Props) {
             </div>
             <p className="mt-3 max-w-2xl text-[var(--fog)]">{track.coachPitch}</p>
             <p className="mt-2 text-sm text-[var(--mute)]">
-              Play money. About 35 minutes. {done} / {drives.length} stops done.
+              Play money. About {minutes > 0 ? minutes : 35} minutes. {done} / {drives.length}{" "}
+              stops done.
             </p>
           </div>
           <Link href="/course" className="text-sm text-[var(--mute)] hover:text-[var(--amber)]">

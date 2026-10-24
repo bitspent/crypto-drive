@@ -4,6 +4,7 @@ import { join } from "path";
 import { PIZZA_EXPLORER } from "./explorer-lesson";
 import type { WalletState } from "./wallet";
 import { STUCK_DRILL_SATS } from "./wallet";
+import type { StepAction } from "./content";
 import {
   CUSTODY_MODELS,
   FEE_STRATEGY,
@@ -247,6 +248,7 @@ export function gradeStepAnswer(
   practice: PracticeSet,
   answer: StepAnswer | undefined,
   wallet?: WalletState | null,
+  action?: StepAction | null,
 ): string | null {
   if (actionType === "address-check") {
     const first = answer?.first4?.trim().toLowerCase() ?? "";
@@ -323,6 +325,22 @@ export function gradeStepAnswer(
     const bump = drills.find((t) => (t.fee ?? 0) === topFee);
     if (!bump || bump.status !== "confirmed") {
       return "Wait until the bumped payment lands.";
+    }
+    return null;
+  }
+
+  if (actionType === "network-pick") {
+    // Stablecoin ticket drill: static content, server-graded against the
+    // step's own tickets (recognize: choice index; verify: approve/refuse).
+    // Fail closed without the action — a direct POST carries no tickets.
+    const tickets = action?.type === "network-pick" ? (action.tickets ?? []) : [];
+    if (tickets.length === 0) {
+      return "Open the step to load its tickets.";
+    }
+    const expected = tickets.map((t) => t.verdict ?? String(t.answer ?? -1));
+    const got = answer?.networkPicks ?? [];
+    if (got.length !== expected.length || got.some((g, i) => g !== expected[i])) {
+      return "Clear every ticket — the queue is not clean yet.";
     }
     return null;
   }
