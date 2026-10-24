@@ -1114,6 +1114,7 @@ function ExplorerReadScene({
           </div>
         )}
       </Frame>
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
     </Split>
   );
 }

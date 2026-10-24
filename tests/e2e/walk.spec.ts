@@ -209,6 +209,17 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
 
   // verify: same three checks as the explorer lesson, new commit button.
   await expectLayoutContract(page, "prove-it/verify");
+  // quick check renders on verify: wrong pick shows ✗, right pick shows ✓.
+  const verifyWrong = page.getByRole("radio", {
+    name: "The sender's phone number and a screenshot",
+  });
+  await verifyWrong.click();
+  await expect(verifyWrong).toContainText("✗");
+  const verifyRight = page.getByRole("radio", {
+    name: "The transaction ID and a public explorer",
+  });
+  await verifyRight.click();
+  await expect(verifyRight).toContainText("✓");
   await page.getByRole("radio", { name: "Yes" }).check();
   await page.fill("#explorer-confirms", "900000");
   await page.fill("#explorer-fee", "4191");
