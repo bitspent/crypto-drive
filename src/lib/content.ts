@@ -92,6 +92,7 @@ export type StepAction =
   | { type: "key-contrast" }
   | { type: "seed-card" }
   | { type: "scene"; scene: RoadScene }
+  | { type: "stuck-fix" }
   | { type: "policy-pick" }
   | { type: "model-compare" }
   | { type: "fee-strategy" }

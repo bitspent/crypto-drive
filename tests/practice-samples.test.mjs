@@ -18,6 +18,7 @@ const {
   PIZZA_EXPLORER,
   POLICY_THRESHOLDS,
 } = jiti(join(root, "src/lib/practice-samples.ts"));
+const { STUCK_DRILL_SATS } = jiti(join(root, "src/lib/wallet.ts"));
 
 const bitcoin = JSON.parse(
   readFileSync(join(root, "content/tracks/bitcoin.json"), "utf8"),
@@ -161,6 +162,33 @@ describe("practice samples", () => {
     // No wallet: legacy ungraded path.
     assert.equal(grade({ txid: "whatever" }), null);
   });
+
+  it("grades stuck-drill answers against the bumped send", () => {
+    const p = practiceFor(derivePracticeSeed("grade@example.com", "CD-DRIVE-STARTER"));
+    const tx = (over) => ({
+      id: "ab".repeat(32),
+      direction: "out",
+      amount: STUCK_DRILL_SATS,
+      counterparty: p.dest,
+      status: "pending",
+      confirmations: 0,
+      fee: 140,
+      timestamp: "2026-10-15T00:00:00.000Z",
+      ...over,
+    });
+    const wallet = (history) => ({ exists: true, history });
+    const grade = (answer, w) => gradeStepAnswer("btc-test-stuck", "stuck-fix", p, answer, w);
+    const stuck = tx({ id: "aa".repeat(32) });
+    const bump = tx({ id: "bb".repeat(32), fee: 2100, status: "confirmed", confirmations: 3 });
+    assert.equal(grade({ stuckBumped: true }, wallet([bump, stuck])), null);
+    // Missing flag, lone stuck send, equal fees, and unconfirmed bump fail.
+    assert.ok(grade({}, wallet([bump, stuck])));
+    assert.ok(grade({ stuckBumped: true }, wallet([stuck])));
+    assert.ok(grade({ stuckBumped: true }, wallet([stuck, tx({ id: "bb".repeat(32), fee: 140 })])));
+    assert.ok(grade({ stuckBumped: true }, wallet([tx({ id: "bb".repeat(32), fee: 2100 }), stuck])));
+    // No wallet: legacy ungraded path.
+    assert.equal(grade({ stuckBumped: true }), null);
+  });
 });
 
 describe("bitcoin first drive", () => {
@@ -168,7 +196,7 @@ describe("bitcoin first drive", () => {
     assert.equal(bitcoin.drives.length, 6);
     assert.equal(bitcoin.drives[0].slug, "what-is");
     const steps = bitcoin.drives.flatMap((drive) => drive.steps);
-    assert.equal(steps.length, 25);
+    assert.equal(steps.length, 26);
     const certs = steps.filter((step) => step.cert);
     assert.equal(certs.length, 1);
     assert.equal(certs[0].id, "btc-prove-exam");
@@ -203,9 +231,9 @@ describe("bitcoin first drive", () => {
     assert.equal(new Set(bodies).size, bodies.length, "duplicate ideaBody in bitcoin.json");
   });
 
-  it("gives all 25 bitcoin steps the full idea panel", () => {
+  it("gives all 26 bitcoin steps the full idea panel", () => {
     const steps = bitcoin.drives.flatMap((d) => d.steps);
-    assert.equal(steps.length, 25);
+    assert.equal(steps.length, 26);
     for (const step of steps) {
       assert.ok(step.ideaTitle?.trim(), `${step.id} missing ideaTitle`);
       assert.ok(step.ideaBody?.trim(), `${step.id} missing ideaBody`);
@@ -216,7 +244,7 @@ describe("bitcoin first drive", () => {
     }
   });
 
-  it("gives all 25 bitcoin steps a unique quick check", () => {
+  it("gives all 26 bitcoin steps a unique quick check", () => {
     const steps = bitcoin.drives.flatMap((d) => d.steps);
     const questions = [];
     for (const step of steps) {
@@ -236,7 +264,7 @@ describe("bitcoin first drive", () => {
     assert.equal(new Set(questions).size, questions.length, "duplicate quickCheck question");
   });
 
-  it("gives all 25 bitcoin steps a pocket card", () => {
+  it("gives all 26 bitcoin steps a pocket card", () => {
     const steps = bitcoin.drives.flatMap((d) => d.steps);
     for (const step of steps) {
       assert.ok(step.pocketCard?.trim(), `${step.id} missing pocketCard`);

@@ -1,4 +1,4 @@
-// Full walk: unlock -> all 25 steps -> certificate -> verify page.
+// Full walk: unlock -> all 26 steps -> certificate -> verify page.
 // Ported from the operator validate.mjs (screenshots dropped, explorer step added:
 // the operator script predates the get-paid/explorer lesson).
 import { expect, test, type Page } from "@playwright/test";
@@ -23,7 +23,7 @@ async function commitAndContinue(page: Page, buttonName: string, urlPart: string
   }
 }
 
-test("walks unlock to verified certificate across all 25 steps", async ({ page }) => {
+test("walks unlock to verified certificate across all 26 steps", async ({ page }) => {
   const failures = collectPageErrors(page);
   // A legitimate full walk must never trip rate limits.
   const throttled: string[] = [];
@@ -240,8 +240,36 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
   await page.getByRole("button", { name: "Switch to Bitcoin" }).click();
   await commitAndContinue(page, "Continue", "road-test/mismatch");
 
-  // No cert on mismatch: pocket card shows, Continue leads into the capstone.
-  await commitAndContinue(page, "Stop the send", "prove-it/verify");
+  // No cert on mismatch: pocket card shows, Continue leads to the stuck drill.
+  await commitAndContinue(page, "Stop the send", "road-test/stuck");
+
+  // stuck: the economy send stalls at 0, the wrong remedy scolds, the bump lands.
+  await page.getByRole("button", { name: "Send with an economy fee" }).click();
+  await expect(page.getByText(/0 · Stuck/)).toBeVisible();
+  await page.getByRole("button", { name: "Wait it out" }).click();
+  await expect(
+    page.locator('[role="alert"]', { hasText: /nobody is in a hurry/ }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Bump the fee" }).click();
+  await page.getByRole("button", { name: "Bump to priority" }).click();
+  await page.waitForFunction(
+    () =>
+      ![...document.querySelectorAll("button")].find((b) => b.textContent === "It landed")
+        ?.disabled,
+    undefined,
+    { polling: 100 },
+  );
+  await expect(page.getByText(/· Landed/)).toBeVisible();
+  await commitAndContinue(page, "It landed", "prove-it/verify");
+  // Both drill sends share the wallet: stuck pending, bump confirmed.
+  const wstuck = await page.request.get("/api/wallet");
+  expect(wstuck.ok()).toBe(true);
+  const { wallet: stuckWallet } = (await wstuck.json()) as {
+    wallet: { history: { direction: string; status: string; amount: number }[] };
+  };
+  expect(
+    stuckWallet.history.filter((t) => t.direction === "out" && t.amount === 50000).length,
+  ).toBeGreaterThanOrEqual(2);
 
   // verify: same three checks as the explorer lesson, new commit button.
   await expectLayoutContract(page, "prove-it/verify");

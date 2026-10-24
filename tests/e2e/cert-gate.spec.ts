@@ -1,5 +1,5 @@
 // Cert gate: a direct POST to /api/complete with no exam pass fails.
-// The happy path (walk all 25 steps, pass the exam, issue) is walk.spec.ts.
+// The happy path (walk all 26 steps, pass the exam, issue) is walk.spec.ts.
 import { expect, test } from "@playwright/test";
 import { uniqueEmail, unlock } from "./helpers";
 

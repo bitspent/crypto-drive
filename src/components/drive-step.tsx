@@ -32,6 +32,7 @@ import {
   formatBtcTrim,
   isOnChainTx,
   truncateMiddle,
+  STUCK_DRILL_SATS,
   WALLET_DEPOSIT_SATS,
   type TxRecord,
   type WalletState,
@@ -528,6 +529,19 @@ function Scene({
   if (action.type === "send-confirm") {
     return (
       <SendScene
+        step={step}
+        practice={practice}
+        review={review}
+        busy={busy}
+        button={step.button}
+        coach={step.coachLine}
+        onCommit={onCommit}
+      />
+    );
+  }
+  if (action.type === "stuck-fix") {
+    return (
+      <StuckScene
         step={step}
         practice={practice}
         review={review}
@@ -1753,6 +1767,291 @@ function SendScene({
       ) : (
         <div className="space-y-3">
           {!sent ? <p className="text-[var(--fog)]">No undo. Send the test anyway?</p> : null}
+          {localError ? (
+            <p className="text-sm text-[var(--danger)]" role="alert">
+              {localError}
+            </p>
+          ) : null}
+        </div>
+      )}
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
+    </Split>
+  );
+}
+
+function StuckScene({
+  step,
+  practice,
+  review,
+  busy,
+  button,
+  coach,
+  onCommit,
+}: {
+  step: Step;
+  practice: PracticeSet;
+  review: boolean;
+  busy: boolean;
+  button: string;
+  coach: string;
+  onCommit: (answer?: StepAnswer) => void;
+}) {
+  // The stuck drill spends the practice wallet twice: an economy send that
+  // stays pending (never ticked — that IS the stuck state), then a priority
+  // bump of the same payment, ticked to confirmed.
+  const [stuck, setStuck] = useState<TxRecord | null>(null);
+  const [bump, setBump] = useState<TxRecord | null>(null);
+  const [remedy, setRemedy] = useState<"wait" | "bump" | "double" | null>(null);
+  const [working, setWorking] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const landed = bump?.status === "confirmed";
+
+  useEffect(() => {
+    if (!review) return;
+    let live = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/wallet");
+        const data = (await res.json()) as { wallet?: WalletState | null };
+        const drills = (data.wallet?.history ?? []).filter(
+          (t) =>
+            t.direction === "out" &&
+            t.counterparty === practice.dest &&
+            t.amount === STUCK_DRILL_SATS,
+        );
+        if (!live || drills.length === 0) return;
+        const top = Math.max(...drills.map((t) => t.fee ?? 0));
+        setStuck(drills.find((t) => (t.fee ?? 0) < top) ?? drills[0] ?? null);
+        setBump(drills.find((t) => (t.fee ?? 0) === top) ?? null);
+      } catch {
+        if (live) {
+          setStuck(null);
+          setBump(null);
+        }
+      }
+    })();
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- practice is mount-stable
+  }, [review]);
+
+  async function sendStuck() {
+    setWorking(true);
+    setLocalError(null);
+    try {
+      const res = await fetch("/api/wallet");
+      const data = (await res.json()) as { wallet?: WalletState | null; error?: string };
+      if (!res.ok || !data.wallet?.exists) {
+        throw new Error("Complete the receipt step first — the wallet is empty.");
+      }
+      // A matching in-flight send is reused (retry-safe); otherwise send.
+      // Never ticked: zero confirmations is the stuck state under study.
+      // The lowest-fee match is the stuck one (the bump pays more).
+      const prior = data.wallet.history.filter(
+        (t) =>
+          t.direction === "out" &&
+          t.counterparty === practice.dest &&
+          t.amount === STUCK_DRILL_SATS,
+      );
+      let outgoing =
+        prior.length === 0
+          ? null
+          : prior.reduce((a, b) => ((a.fee ?? 0) <= (b.fee ?? 0) ? a : b));
+      if (!outgoing) {
+        const sent = await fetch("/api/wallet/send", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            to: practice.dest,
+            amountSats: STUCK_DRILL_SATS,
+            feeTier: "economy",
+          }),
+        });
+        const signed = (await sent.json()) as { tx?: TxRecord; error?: string };
+        if (!sent.ok || !signed.tx) {
+          throw new Error(signed.error || "The stuck send did not go through.");
+        }
+        outgoing = signed.tx;
+      }
+      setStuck(outgoing);
+    } catch (e) {
+      setLocalError(
+        e instanceof Error ? e.message : "Couldn't reach the practice wallet. Try again.",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  function pickRemedy(pick: "wait" | "bump" | "double") {
+    setRemedy(pick);
+    if (pick === "wait") {
+      setLocalError("Waiting works when nobody is in a hurry — the recipient needs it within the hour.");
+    } else if (pick === "double") {
+      setLocalError("A second payment doesn't cancel the first — you'd pay twice.");
+    } else {
+      setLocalError(null);
+    }
+  }
+
+  async function sendBump() {
+    if (!stuck) return;
+    setWorking(true);
+    setLocalError(null);
+    try {
+      // A matching in-flight bump is reused (retry-safe); otherwise send.
+      const res = await fetch("/api/wallet");
+      const data = (await res.json()) as { wallet?: WalletState | null; error?: string };
+      if (!res.ok || !data.wallet?.exists) {
+        throw new Error("Complete the receipt step first — the wallet is empty.");
+      }
+      const stuckFee = stuck.fee ?? 0;
+      let outgoing =
+        data.wallet.history.find(
+          (t) =>
+            t.direction === "out" &&
+            t.counterparty === practice.dest &&
+            t.amount === STUCK_DRILL_SATS &&
+            (t.fee ?? 0) > stuckFee,
+        ) ?? null;
+      if (!outgoing) {
+        const sent = await fetch("/api/wallet/send", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            to: practice.dest,
+            amountSats: STUCK_DRILL_SATS,
+            feeTier: "priority",
+          }),
+        });
+        const signed = (await sent.json()) as { tx?: TxRecord; error?: string };
+        if (!sent.ok || !signed.tx) {
+          throw new Error(signed.error || "The bump did not go through.");
+        }
+        outgoing = signed.tx;
+      }
+      setBump(outgoing);
+      let advanced = outgoing;
+      for (let i = 0; i < 12 && advanced.status !== "confirmed"; i++) {
+        await new Promise((r) => setTimeout(r, 1500));
+        const ticked = await fetch("/api/wallet/tick", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ txid: advanced.id }),
+        });
+        const tick = (await ticked.json()) as { tx?: TxRecord; error?: string };
+        if (!ticked.ok || !tick.tx) {
+          throw new Error(tick.error || "Could not advance.");
+        }
+        advanced = tick.tx;
+        setBump(advanced);
+      }
+      if (advanced.status !== "confirmed") {
+        throw new Error("Still waiting on the network — try again.");
+      }
+    } catch (e) {
+      setLocalError(
+        e instanceof Error ? e.message : "Couldn't reach the practice wallet. Try again.",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  function confirm() {
+    if (!bump || bump.status !== "confirmed") {
+      setLocalError("Wait until the bump says landed.");
+      return;
+    }
+    onCommit({ stuckBumped: true });
+  }
+
+  useFootPrimary(
+    review ? null : landed ? (
+      <Button size="lg" disabled={busy || !landed} onClick={confirm}>
+        {button}
+      </Button>
+    ) : stuck && remedy === "bump" ? (
+      <Button size="lg" disabled={busy || working} onClick={sendBump}>
+        Bump to priority
+      </Button>
+    ) : stuck ? null : (
+      <Button size="lg" disabled={busy || working} onClick={sendStuck}>
+        Send with an economy fee
+      </Button>
+    ),
+    [review, landed, stuck, remedy, busy, button, working],
+  );
+
+  return (
+    <Split coach={coach}>
+      <Frame title="STUCK PAYMENT">
+        <dl className="space-y-3 text-sm">
+          <div>
+            <dt className="text-[var(--mute)]">Amount</dt>
+            <dd className="mt-1 font-[family-name:var(--font-display)] text-2xl text-[var(--paper)]">
+              {stuck ? `${formatBtcTrim(stuck.amount)} BTC` : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[var(--mute)]">Fee paid</dt>
+            <dd className="mt-1 font-mono text-xs text-[var(--paper)]">
+              {stuck ? `${(stuck.fee ?? 0).toLocaleString()} sats (economy)` : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[var(--mute)]">Confirmations</dt>
+            <dd className="mt-1 text-[var(--danger)]">
+              {stuck ? `${stuck.confirmations} · Stuck` : "Send to clog the line"}
+            </dd>
+          </div>
+        </dl>
+      </Frame>
+      {review ? (
+        <p className="text-sm text-[var(--go)]">Stuck payment bumped and landed.</p>
+      ) : (
+        <div className="space-y-3">
+          {!stuck ? (
+            <p className="text-[var(--fog)]">
+              The mempool is busy. Send with a cheap fee and watch it stall.
+            </p>
+          ) : null}
+          {stuck && remedy !== "bump" ? (
+            <div className="flex flex-wrap gap-3">
+              <Button variant="secondary" onClick={() => pickRemedy("wait")}>
+                Wait it out
+              </Button>
+              <Button variant="secondary" onClick={() => pickRemedy("bump")}>
+                Bump the fee
+              </Button>
+              <Button variant="secondary" onClick={() => pickRemedy("double")}>
+                Send it again
+              </Button>
+            </div>
+          ) : null}
+          {remedy === "bump" ? (
+            <div className="space-y-3">
+              <dl className="space-y-3 text-sm">
+                <div>
+                  <dt className="text-[var(--mute)]">Bump fee</dt>
+                  <dd className="mt-1 font-mono text-xs text-[var(--paper)]">
+                    {bump ? `${(bump.fee ?? 0).toLocaleString()} sats (priority)` : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[var(--mute)]">Bump confirmations</dt>
+                  <dd className={cn("mt-1", landed ? "text-[var(--go)]" : "text-[var(--fog)]")}>
+                    {bump ? `${bump.confirmations} · ${landed ? "Landed" : "Confirming…"}` : "Bump to start the clock"}
+                  </dd>
+                </div>
+              </dl>
+              <p className="text-sm text-[var(--mute)]">
+                Both payments stay visible in the sandbox — on the real chain the
+                bump replaces the stuck one.
+              </p>
+            </div>
+          ) : null}
           {localError ? (
             <p className="text-sm text-[var(--danger)]" role="alert">
               {localError}

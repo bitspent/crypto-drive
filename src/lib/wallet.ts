@@ -53,6 +53,8 @@ export const WALLET_CONFIRMED_THRESHOLD = 3;
 export const REGTEST_FAUCET_LABEL = "regtest faucet";
 /** Fixed simulated deposit per receive flow, in sats (0.005 BTC). */
 export const WALLET_DEPOSIT_SATS = 500_000;
+/** Road-test stuck drill: each of the two sends (stuck + bump), in sats. */
+export const STUCK_DRILL_SATS = 50_000;
 /** Assumed tx size for fee estimates. Static simulation, not a live read. */
 export const WALLET_TX_VBYTES = 140;
 /** Typed confirmation word that authorizes a wallet reset. */

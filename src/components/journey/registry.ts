@@ -49,6 +49,7 @@ export const JOURNEY_ANCHORS: Record<string, Record<string, Anchor>> = {
     support: { pos: [0, 4.8, 9.6], look: [0, 1.8, 0] },
     network: { pos: [14, 4.8, 9.6], look: [14, 1.8, 0] },
     mismatch: { pos: [28, 4.8, 9.6], look: [28, 1.8, 0] },
+    stuck: { pos: [42, 4.8, 9.6], look: [42, 1.8, 0] },
   },
 };
 

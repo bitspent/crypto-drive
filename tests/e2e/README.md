@@ -8,7 +8,7 @@ or computed style.
 
 | File | What it proves |
 | --- | --- |
-| `walk.spec.ts` | Unlock → all 25 steps → certificate issue → verify page, zero console/page/network errors, zero 429s, layout contract on every prove-it step |
+| `walk.spec.ts` | Unlock → all 26 steps → certificate issue → verify page, zero console/page/network errors, zero 429s, layout contract on every prove-it step |
 | `layout.spec.ts` | Left column and illustration card stay within the drive-head width, desktop + mobile viewports, both themes |
 | `keyboard.spec.ts` | ArrowRight advances, ArrowLeft goes back, Up/Down rove focus, arrows never hijack typing |
 | `reduced-motion.spec.ts` | Under `prefers-reduced-motion`, no animation runs and end poses pin |

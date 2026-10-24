@@ -3,6 +3,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { PIZZA_EXPLORER } from "./explorer-lesson";
 import type { WalletState } from "./wallet";
+import { STUCK_DRILL_SATS } from "./wallet";
 import {
   CUSTODY_MODELS,
   FEE_STRATEGY,
@@ -292,6 +293,36 @@ export function gradeStepAnswer(
     );
     if (!sent || sent.status !== "confirmed") {
       return "Send the test from this screen and wait until it lands.";
+    }
+    return null;
+  }
+
+  if (actionType === "stuck-fix") {
+    // The stuck drill spends the real practice wallet twice: an economy send
+    // that stays pending, then a priority bump of the same payment. The bump
+    // must pay a strictly higher fee and be confirmed. Fees compare
+    // relatively so the check holds on every backend's tiers.
+    // Without a wallet there is nothing to check (legacy ungraded path).
+    if (!wallet) return null;
+    if (answer?.stuckBumped !== true) {
+      return "Bump the stuck payment and wait until the bump lands.";
+    }
+    const drills = wallet.history.filter(
+      (t) =>
+        t.direction === "out" &&
+        t.counterparty === practice.dest &&
+        t.amount === STUCK_DRILL_SATS,
+    );
+    if (drills.length < 2) {
+      return "Send the stuck payment first, then bump it.";
+    }
+    const topFee = Math.max(...drills.map((t) => t.fee ?? 0));
+    if (!drills.some((t) => (t.fee ?? 0) < topFee)) {
+      return "The bump must pay a higher fee than the stuck payment.";
+    }
+    const bump = drills.find((t) => (t.fee ?? 0) === topFee);
+    if (!bump || bump.status !== "confirmed") {
+      return "Wait until the bumped payment lands.";
     }
     return null;
   }

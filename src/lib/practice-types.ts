@@ -48,6 +48,8 @@ export type StepAnswer = {
   /** Final exam: read-back target txid + pasted claim (block height / txid prefix). */
   examTxid?: string;
   examClaim?: string;
+  /** Road-test stuck drill: the priority bump landed. */
+  stuckBumped?: boolean;
 };
 
 /** Capstone policy-pick: accepted confirmation thresholds per scenario. */

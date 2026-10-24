@@ -452,7 +452,7 @@
       "title": "Road test",
       "minutes": "5 min",
       "job": "Mix the moves. One certificate.",
-      "outcome": "The road test — you'll refuse scams, pick the right network, and stop a bad send.",
+      "outcome": "The road test — you'll refuse scams, pick the right network, stop a bad send, and bump a stuck payment.",
       "steps": [
         {
           "id": "btc-test-support",
@@ -530,6 +530,32 @@
             ],
             "answerIndex": 2,
             "explanation": "One changed character sends bitcoin elsewhere — mismatch means stop."
+          }
+        },
+        {
+          "id": "btc-test-stuck",
+          "slug": "stuck",
+          "job": "Unstick a slow payment",
+          "coachLine": "Zero confirmations and a busy mempool. The recipient needs it within the hour — waiting is not the move.",
+          "button": "It landed",
+          "action": { "type": "stuck-fix" },
+          "ideaTitle": "Stuck means underbid",
+          "ideaBody": "A payment with zero confirmations is not lost — it is waiting in line. Block space goes to the highest bidders first, so an economy fee in a busy hour can sit unconfirmed while urgent payments jump the queue. When the clock matters, you re-send the same payment at a higher fee rather than firing off a second one.",
+          "objective": "After this screen you can diagnose a zero-confirmation payment and bump its fee instead of double-sending.",
+          "whyItMatters": "A stuck supplier payment is an operations incident — knowing the bump beats knowing the panic.",
+          "keyTerms": ["stuck transaction", "fee bump", "double-send"],
+          "misconception": "A second payment cancels the first — it does not; you would pay twice.",
+          "pocketCard": "Stuck? Bump the fee — never send twice.",
+          "quickCheck": {
+            "question": "Your payment sits at zero confirmations and the recipient needs it within the hour. You...",
+            "options": [
+              "Send the same amount again to a new address",
+              "Re-send the same payment with a higher fee",
+              "Wait a week and hope it confirms",
+              "Delete the wallet and restore it"
+            ],
+            "answerIndex": 1,
+            "explanation": "A fee bump replaces the stuck payment; a second payment pays twice."
           }
         }
       ]
