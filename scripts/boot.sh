@@ -275,25 +275,36 @@ listeners() {
     lsof -nP -iTCP:"$port" -sTCP:LISTEN -Fp -Fc 2>/dev/null | awk '
       /^p/ { pid = substr($0, 2) }
       /^c/ { print pid "|" substr($0, 2); pid = "" }'
+  elif have ss; then
+    ss -ltn "sport = :$port" 2>/dev/null | grep -oE 'pid=[0-9]+' | cut -d= -f2 |
+      while read -r pid; do
+        echo "$pid|$(ps -o comm= -p "$pid" 2>/dev/null)"
+      done
   else
-    echo "no-probe|lsof missing" >&2
+    echo "no-probe|lsof and ss both missing" >&2
     return 1
   fi
 }
 
 # our_container_on <port>: container name when one of OUR services holds it.
+# Compose names derive from the checkout directory, so our own services match
+# by compose service label — hardcoded names would miss a renamed checkout.
 our_container_on() {
   local port=$1
   have docker || return 1
-  docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null | while read -r name ports; do
-    case "$ports" in
-      *":$port->"*|*":$port,"*|*":$port-"*|*"-$port->"*)
-        case "$name" in
-          bitcoin|electrs|electrum-ws|chopsticks|esplora|crypto-drive-infra-api-1|crypto-drive-esplora-ui-1|crypto-drive-pg)
-            echo "$name" ;;
-        esac ;;
-    esac
-  done
+  docker ps --format '{{.Names}}\t{{.Ports}}\t{{.Label "com.docker.compose.service"}}' 2>/dev/null |
+    while IFS=$'\t' read -r name ports svc; do
+      case "$ports" in
+        *":$port->"*|*":$port,"*|*":$port-"*|*"-$port->"*)
+          case "$name" in
+            bitcoin|electrs|electrum-ws|chopsticks|esplora|crypto-drive-pg)
+              echo "$name" ;;
+          esac
+          case "$svc" in
+            infra-api|esplora-ui) echo "$name" ;;
+          esac ;;
+      esac
+    done
 }
 
 # foreign_container_on <port>: any container publishing this port, ours or
@@ -722,6 +733,9 @@ step "1/6" "tooling"
 have node || die "node not found — install Node 20+ first"
 have npm || die "npm not found"
 say "node $(node --version), npm $(npm --version)"
+# Fail closed: without a listener probe every port reads free and the boot
+# walks into collisions. (Portable: macOS ships lsof, Linux ships ss.)
+(have lsof || have ss) || die "no listener probe — install lsof (macOS) or iproute2/ss (Linux)"
 if [ "$MODE" = "regtest" ] || [ "$WITH_DB" = 1 ]; then
   have docker || die "docker not found — needed for mode=$MODE / --with-db"
   docker ps >/dev/null 2>&1 || die "docker daemon is not reachable — start Docker Desktop"
@@ -886,7 +900,7 @@ if [ "$MODE" = "regtest" ]; then
         infra_ready && break
         sleep 1
       done
-      infra_ready || die "infra-api never turned healthy — 'docker logs crypto-drive-infra-api-1'"
+      infra_ready || die "infra-api never turned healthy — 'docker logs $(docker ps --filter label=com.docker.compose.service=infra-api --format '{{.Names}}' 2>/dev/null | head -1)'"
       ok "infra-api healthy on :$INFRA_PORT"
     fi
   fi
@@ -926,11 +940,29 @@ fi
 
 # ── [5/6] postgres ────────────────────────────────────────────────────
 
+# Running is not ready: a starting or recovering postgres refuses
+# connections, and the app would boot onto a dead DATABASE_URL.
+pg_ready() {
+  docker exec crypto-drive-pg pg_isready -U postgres >/dev/null 2>&1
+}
+
+wait_pg() {
+  if [ "$DRY_RUN" = 1 ]; then return 0; fi
+  say "waiting for postgres to accept connections (up to ${WAIT_SECS}s)…"
+  for _ in $(seq 1 "$WAIT_SECS"); do
+    pg_ready && break
+    sleep 1
+  done
+  pg_ready || die "crypto-drive-pg never accepted connections — 'docker logs crypto-drive-pg'"
+  ok "crypto-drive-pg accepts connections on :$PG_PORT"
+}
+
 if [ "$WITH_DB" = 1 ]; then
   step "5/6" "postgres (crypto-drive-pg :$PG_PORT)"
   state=$(docker inspect crypto-drive-pg --format '{{.State.Running}}' 2>/dev/null || echo "missing")
   if [ "$state" = "true" ]; then
     ok "crypto-drive-pg already running on :$PG_PORT — reusing"
+    wait_pg
   elif [ "$state" = "false" ]; then
     say "crypto-drive-pg exists but is stopped"
     if [ "$DRY_RUN" = 1 ]; then
@@ -938,6 +970,7 @@ if [ "$WITH_DB" = 1 ]; then
     else
       docker start crypto-drive-pg >/dev/null || die "'docker start crypto-drive-pg' failed"
       ok "crypto-drive-pg started on :$PG_PORT"
+      wait_pg
     fi
   else
     say "crypto-drive-pg does not exist — creating it (recipe from tests/e2e/README.md)"
@@ -948,6 +981,7 @@ if [ "$WITH_DB" = 1 ]; then
         --health-cmd="pg_isready -U postgres" --health-interval=10s --health-timeout=5s --health-retries=3 --health-start-period=15s \
         -e POSTGRES_PASSWORD=postgres postgres:16 >/dev/null || die "postgres container failed to start"
       ok "crypto-drive-pg created and running on :$PG_PORT"
+      wait_pg
     fi
   fi
 fi

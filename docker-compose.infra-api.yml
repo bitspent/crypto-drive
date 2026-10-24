@@ -16,7 +16,6 @@ services:
       BITCOIN_RPC_USER: admin1
       BITCOIN_RPC_PASSWORD: "123"
       ELECTRS_HTTP_URL: http://host.docker.internal:30000
-      CHOPSTICKS_URL: http://host.docker.internal:3000
       ESPLORA_URL: http://host.docker.internal:5000
       INFRA_SHARED_SECRET: dev
       ADMIN_MINE_TOKEN: dev

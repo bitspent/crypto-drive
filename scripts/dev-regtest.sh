@@ -17,13 +17,13 @@ if ! curl -s -o /dev/null --max-time 3 http://localhost:18443/; then
   exit 1
 fi
 
-# 2. Check infra-api is up
-HEALTH=$(curl -s -o /dev/null -w "%{http_code}" \
-  -H "Authorization: Bearer dev" \
-  http://localhost:8081/api/health || echo "000")
+# 2. Check infra-api is up AND ready: a bare 200 lies (/api/health always
+# 200s and puts readiness in the flags), so require bitcoind + faucet wallet.
+READY=$(curl -s -H "Authorization: Bearer dev" --max-time 3 \
+  http://localhost:8081/api/health 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const j=JSON.parse(s);console.log(j.bitcoind_ready===true&&j.wallet_ready===true?'yes':'no')}catch{console.log('no')}})") || true
 
-if [ "$HEALTH" != "200" ]; then
-  echo "infra-api not reachable at http://localhost:8081"
+if [ "$READY" != "yes" ]; then
+  echo "infra-api not ready at http://localhost:8081 (need bitcoind + faucet wallet)"
   echo "Start it: docker compose -f docker-compose.infra-api.yml up -d"
   exit 1
 fi

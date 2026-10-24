@@ -12,9 +12,17 @@ set -uo pipefail
 
 MODE="${1:-all}"
 APP_PORT="${APP_PORT:-43127}"
+INFRA_PORT="${INFRA_PORT:-8081}"
+PG_PORT="${PG_PORT:-5433}"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 
 have() { command -v "$1" >/dev/null 2>&1; }
+
+# Fail closed: without a probe every port reads FREE and the diagnosis lies.
+if ! have lsof && ! have ss; then
+  echo "cannot probe listeners: install lsof (macOS) or iproute2/ss (Linux)" >&2
+  exit 1
+fi
 
 # Portable listener lookup: prints "PID|COMMAND" per listener, empty when free.
 listeners() {
@@ -35,19 +43,25 @@ listeners() {
 }
 
 # Is this listener one of OUR containers? Prints container name or nothing.
+# Compose names derive from the checkout directory, so our own services match
+# by compose service label — hardcoded names miss a renamed checkout.
 our_container_on() {
   local port=$1
   have docker || return 1
-  docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null | while read -r name ports; do
-    # Match single ports (:8081->, :8081,) and range ends (:18443-, -18444->).
-    case "$ports" in
-      *":$port->"*|*":$port,"*|*":$port-"*|*"-$port->"*)
-        case "$name" in
-          bitcoin|electrs|electrum-ws|chopsticks|esplora|crypto-drive-infra-api-1|crypto-drive-esplora-ui-1|crypto-drive-pg)
-            echo "$name" ;;
-        esac ;;
-    esac
-  done
+  docker ps --format '{{.Names}}\t{{.Ports}}\t{{.Label "com.docker.compose.service"}}' 2>/dev/null |
+    while IFS=$'\t' read -r name ports svc; do
+      # Match single ports (:8081->, :8081,) and range ends (:18443-, -18444->).
+      case "$ports" in
+        *":$port->"*|*":$port,"*|*":$port-"*|*"-$port->"*)
+          case "$name" in
+            bitcoin|electrs|electrum-ws|chopsticks|esplora|crypto-drive-pg)
+              echo "$name" ;;
+          esac
+          case "$svc" in
+            infra-api|esplora-ui) echo "$name" ;;
+          esac ;;
+      esac
+    done
 }
 
 FAIL=0
@@ -90,10 +104,10 @@ check() {
 echo "Ports for mode: $MODE"
 case "$MODE" in
   app) check "$APP_PORT" "app" hard "stop it or pick another port" ;;
-  db) check 5433 "crypto-drive-pg" hard "stop it or remap -p" ;;
+  db) check "$PG_PORT" "crypto-drive-pg" hard "stop it or remap -p" ;;
   regtest | all)
     check "$APP_PORT" "app" hard "stop it or pick another port"
-    check 8081 "infra-api" hard "docker compose -f docker-compose.infra-api.yml down, or find the squatter"
+    check "$INFRA_PORT" "infra-api" hard "docker compose -f docker-compose.infra-api.yml down, or find the squatter"
     check 18443 "bitcoind RPC" hard "another bitcoind/Nigiri? 'nigiri stop' if ours"
     check 18444 "bitcoind P2P" hard "another bitcoind/Nigiri? 'nigiri stop' if ours"
     check 30000 "electrs HTTP" hard "another electrs? 'nigiri stop' if ours"
@@ -102,7 +116,7 @@ case "$MODE" in
     check 3000 "chopsticks" soft "only chopsticks fails; nothing in our path uses it"
     check "${ESPLORA_PORT:-5001}" "esplora-ui" soft "boot.sh jumps it automatically"
     if [ "$MODE" = "all" ]; then
-      check 5433 "crypto-drive-pg" hard "stop it or remap -p"
+      check "$PG_PORT" "crypto-drive-pg" hard "stop it or remap -p"
     fi
     ;;
   *)
