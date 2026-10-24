@@ -86,10 +86,17 @@ describe("status.sh", () => {
     });
     let out = "";
     child.stdout.on("data", (d) => { out += d; });
-    await new Promise((r) => setTimeout(r, 3500));
+    // Each report shells out to docker several times; under load the first
+    // report alone can exceed a fixed sleep, so poll until two headers land.
+    const deadline = Date.now() + 20000;
+    let headers = 0;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 500));
+      headers = out.split("crypto-drive status").length - 1;
+      if (headers >= 2) break;
+    }
     child.kill();
     await new Promise((r) => child.on("exit", r));
-    const headers = out.split("crypto-drive status").length - 1;
     assert.ok(headers >= 2, `expected 2+ reports, saw ${headers}`);
   });
 });

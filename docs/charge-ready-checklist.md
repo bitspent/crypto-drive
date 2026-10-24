@@ -2,7 +2,8 @@
 
 The final gate between the current state and taking payment. If it is not
 in here, it is not a blocker. Bitcoin is content-complete (6 drives,
-26 steps, capstone cert); everything below is commerce, hosting, data,
+26 steps, capstone cert) and USDT is content-complete (3 drives, 10 steps,
+capstone cert); everything below is commerce, hosting, data,
 or policy — not curriculum.
 
 Severity: **P0** = cannot charge without it. **P1** = needed before
@@ -63,11 +64,14 @@ sequence below plus P1/P2 items — no code blocks first charge.
   tier listing
 - **Acceptance:** a buyer can read all three before paying
 
-### License-verify request shape — resolves during launch step 5
-- **File/component:** `src/lib/gumroad.ts` sends `product_id`
-- **Fix (only if needed):** if unlocks fail with "License not recognized"
-  on keys Gumroad just issued, switch to `product_permalink` (one line)
-- **Acceptance:** the $20 self-purchase unlocks through the form
+### License-verify request shape — resolved 2026-10-25 by live probe
+- **File/component:** license verification sends form-encoded `product_id`
+- **Evidence:** `POST api.gumroad.com/v2/licenses/verify` with a bogus key
+  returns `{"success":false,"message":"That license does not exist..."}` —
+  the endpoint, method, and field shape are correct as implemented
+- **Fallback (only if needed):** if unlocks fail with "License not
+  recognized" on keys Gumroad just issued, switch to `product_permalink`
+  (one line); re-confirm during launch step 5
 
 ### State of the Union §15 open decisions enumerated — open (human)
 - **File/component:** pointer only — no "Section 15" exists in this repo
@@ -92,14 +96,44 @@ sequence below plus P1/P2 items — no code blocks first charge.
 - No Sentry/PostHog/analytics dependency: pick one error tracker and one
   funnel counter; instrument unlock → capstone → cert
 
+### Webhook crash window (record → provision) — open, P2
+- **File/component:** `processGumroadSale` (`src/lib/gumroad-webhook.ts`):
+  the sale event is recorded *before* the student is provisioned. A crash
+  in between makes the retry ack as a quiet duplicate with no account.
+- **Fix:** derive the license key deterministically from `sale_id` (HMAC)
+  so retries converge, or record the event pending → done. Do not reorder
+  naively: re-provisioning mints a *new* random key and invalidates the
+  emailed one.
+- **Acceptance:** kill -9 between record and provision, re-deliver, buyer
+  ends up provisioned exactly once
+
+### Failed welcome email has no self-serve recovery — open, P2
+- **File/component:** `sendLicenseEmail` failure path: the student is
+  provisioned but the buyer never gets the key, and unlock needs the key.
+- **Fix (needs product decision):** support-resend flow (admin endpoint or
+  unlock-by-email + Gumroad receipt check)
+- **Acceptance:** a buyer whose email bounced can recover the key without
+  engineering intervention
+
 ## Done — kept here so the gate stays complete
 
-- **E2E harness** (`playwright.config.ts`, `tests/e2e/`): 67 specs green
-  in file and Postgres modes — full 26-step walk, layout, keyboard,
-  reduced-motion, no-WebGL, wallet flows, legal, health, modes.
-- **Unit suite** (`node --test --test-concurrency=1 tests/`, serial):
-  practice, content, tiers, redirects, secrets, wallet, providers,
-  commerce, revocation, hashing, unlock, legal, limits, health.
+- **E2E harness** (`playwright.config.ts`, `tests/e2e/`): 46 chromium +
+  43 mobile + 1 regtest green — full 26-step BTC walk, 10-step USDT walk,
+  layout, keyboard, reduced-motion, no-WebGL, wallet flows, legal, health,
+  modes. Never run two suites concurrently: they share `.data/store.json`
+  and cross-talk flakes results.
+- **Unit suite** (`node --test --test-concurrency=1 tests/`, serial, 218
+  green): practice, content (BTC + USDT), tiers, redirects, secrets,
+  wallet, providers (Bitcoin + ETH), commerce, revocation, hashing,
+  unlock, legal, limits, health, container health, status.sh.
+- **External liveness** (probed 2026-10-25): bitcoin.org, mempool.space +
+  pizza tx + signet fees, blockstream signet, Gumroad license API all
+  answer; `NEXT_PUBLIC_GUMROAD_URL` default 404s until the real product
+  ships (expected, launch step 7).
+- **Track C (USDT)**: 3 drives, 10 steps, `network-pick` drill,
+  per-track cert; wallet stays BTC-only.
+- **EthProvider spike**: simulated / sepolia / local (Anvil) backends +
+  infra `/api/eth/*`; status reads only, no ETH wallet.
 - **Tier flags trimmed** to the three the runtime enforces.
 - **Wallet sandbox ships fully simulated** (`/wallet`) with play-money
   disclosure throughout; regtest fund/mine live behind `BITCOIN_MODE`.

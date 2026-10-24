@@ -4,6 +4,21 @@ The app calls this contract via `INFRA_BASE_URL`. All routes are HTTPS on port 4
 Auth: `Authorization: Bearer <INFRA_SHARED_SECRET>` on every request.
 Rate limit: 60 req/min per IP (Caddy). 429 on exceed.
 
+## Environment (infra-api service)
+
+| Var | Required | Notes |
+| --- | --- | --- |
+| `INFRA_SHARED_SECRET` | yes | Bearer auth on every route. `openssl rand -hex 32`. |
+| `ADMIN_MINE_TOKEN` | yes | `X-Admin-Token` for mine routes. `openssl rand -hex 32`. |
+| `BITCOIN_RPC_URL` / `_USER` / `_PASSWORD` | yes | bitcoind RPC (Nigiri dev: `http://host.docker.internal:18443`, `admin1` / `123`). |
+| `ELECTRS_HTTP_URL` | yes | electrs HTTP (Nigiri dev: `http://host.docker.internal:30000`). |
+| `ESPLORA_URL` | no | Esplora for fee estimates; unset = nominal 1 sat/vB everywhere. |
+| `ANVIL_RPC_URL` | no | Anvil devnet; unset = `/api/eth/*` 503. Compose sets `http://anvil:8545`. |
+| `PORT` | no | Default `8081`. |
+
+Dev values live in `docker-compose.infra-api.yml` (secret `dev`, plain HTTP).
+Production wraps the same service in Caddy + TLS with fresh secrets.
+
 ## GET /api/health
 
 Response 200: `{ ok: true, bitcoind_ready: bool, electrs_ready: bool, wallet_ready: bool, faucet_balance: number }` (`wallet_ready` = faucet wallet loaded; fund+mine 503 without it)
