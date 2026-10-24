@@ -181,14 +181,31 @@ describe("practice samples", () => {
     });
     const wallet = (history) => ({ exists: true, history });
     const grade = (answer, w) => gradeStepAnswer("btc-test-stuck", "stuck-fix", p, answer, w);
-    const stuck = tx({ id: "aa".repeat(32) });
-    const bump = tx({ id: "bb".repeat(32), fee: 2100, status: "confirmed", confirmations: 3 });
+    const stuck = tx({ id: "aa".repeat(32), feeTier: "economy" });
+    const bump = tx({
+      id: "bb".repeat(32),
+      feeTier: "priority",
+      status: "confirmed",
+      confirmations: 3,
+    });
     assert.equal(grade({ stuckBumped: true }, wallet([bump, stuck])), null);
-    // Missing flag, lone stuck send, equal fees, and unconfirmed bump fail.
+    // Flat fee market (regtest prices every tier the same): tiers still pass.
+    assert.equal(
+      grade(
+        { stuckBumped: true },
+        wallet([tx({ id: "bb".repeat(32), feeTier: "priority", fee: 140, status: "confirmed", confirmations: 3 }), stuck])),
+      null,
+    );
+    // Missing flag, lone stuck send, missing tiers, and unconfirmed bump fail.
     assert.ok(grade({}, wallet([bump, stuck])));
     assert.ok(grade({ stuckBumped: true }, wallet([stuck])));
-    assert.ok(grade({ stuckBumped: true }, wallet([stuck, tx({ id: "bb".repeat(32), fee: 140 })])));
-    assert.ok(grade({ stuckBumped: true }, wallet([tx({ id: "bb".repeat(32), fee: 2100 }), stuck])));
+    assert.ok(grade({ stuckBumped: true }, wallet([tx({ id: "aa".repeat(32) })])));
+    assert.ok(
+      grade(
+        { stuckBumped: true },
+        wallet([stuck, tx({ id: "bb".repeat(32), feeTier: "priority" })]),
+      ),
+    );
     // No wallet: legacy ungraded path.
     assert.equal(grade({ stuckBumped: true }), null);
   });

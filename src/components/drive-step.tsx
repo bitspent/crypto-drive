@@ -1831,9 +1831,8 @@ function StuckScene({
             t.amount === STUCK_DRILL_SATS,
         );
         if (!live || drills.length === 0) return;
-        const top = Math.max(...drills.map((t) => t.fee ?? 0));
-        setStuck(drills.find((t) => (t.fee ?? 0) < top) ?? drills[0] ?? null);
-        setBump(drills.find((t) => (t.fee ?? 0) === top) ?? null);
+        setStuck(drills.find((t) => t.feeTier === "economy") ?? null);
+        setBump(drills.find((t) => t.feeTier === "priority") ?? null);
       } catch {
         if (live) {
           setStuck(null);
@@ -1858,17 +1857,15 @@ function StuckScene({
       }
       // A matching in-flight send is reused (retry-safe); otherwise send.
       // Never ticked: zero confirmations is the stuck state under study.
-      // The lowest-fee match is the stuck one (the bump pays more).
-      const prior = data.wallet.history.filter(
-        (t) =>
-          t.direction === "out" &&
-          t.counterparty === practice.dest &&
-          t.amount === STUCK_DRILL_SATS,
-      );
+      // Matched by tier, not fee: flat markets price every tier the same.
       let outgoing =
-        prior.length === 0
-          ? null
-          : prior.reduce((a, b) => ((a.fee ?? 0) <= (b.fee ?? 0) ? a : b));
+        data.wallet.history.find(
+          (t) =>
+            t.direction === "out" &&
+            t.counterparty === practice.dest &&
+            t.amount === STUCK_DRILL_SATS &&
+            t.feeTier === "economy",
+        ) ?? null;
       if (!outgoing) {
         const sent = await fetch("/api/wallet/send", {
           method: "POST",
@@ -1917,14 +1914,13 @@ function StuckScene({
       if (!res.ok || !data.wallet?.exists) {
         throw new Error("Complete the receipt step first — the wallet is empty.");
       }
-      const stuckFee = stuck.fee ?? 0;
       let outgoing =
         data.wallet.history.find(
           (t) =>
             t.direction === "out" &&
             t.counterparty === practice.dest &&
             t.amount === STUCK_DRILL_SATS &&
-            (t.fee ?? 0) > stuckFee,
+            t.feeTier === "priority",
         ) ?? null;
       if (!outgoing) {
         const sent = await fetch("/api/wallet/send", {

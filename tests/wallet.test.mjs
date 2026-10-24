@@ -226,6 +226,7 @@ describe("wallet send", () => {
       timestamp: "2026-10-15T00:00:00.000Z",
     });
     assert.equal(sent.history[0].onChain, false);
+    assert.equal(sent.history[0].feeTier, "economy");
     const invented = wallet.applyDeposit(freshWallet(), {
       txid: "c".repeat(64),
       from: ADDR,

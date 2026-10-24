@@ -302,8 +302,9 @@ export function gradeStepAnswer(
   if (actionType === "stuck-fix") {
     // The stuck drill spends the real practice wallet twice: an economy send
     // that stays pending, then a priority bump of the same payment. The bump
-    // must pay a strictly higher fee and be confirmed. Fees compare
-    // relatively so the check holds on every backend's tiers.
+    // is identified by its TIER, not its fee: on a flat fee market (regtest
+    // prices every tier at 1 sat/vB) both sends cost the same, so a relative
+    // fee check can never pass there. The lesson is the tier choice.
     // Without a wallet there is nothing to check (legacy ungraded path).
     if (!wallet) return null;
     if (answer?.stuckBumped !== true) {
@@ -315,15 +316,14 @@ export function gradeStepAnswer(
         t.counterparty === practice.dest &&
         t.amount === STUCK_DRILL_SATS,
     );
-    if (drills.length < 2) {
+    if (!drills.some((t) => t.feeTier === "economy")) {
       return "Send the stuck payment first, then bump it.";
     }
-    const topFee = Math.max(...drills.map((t) => t.fee ?? 0));
-    if (!drills.some((t) => (t.fee ?? 0) < topFee)) {
-      return "The bump must pay a higher fee than the stuck payment.";
+    const bump = drills.find((t) => t.feeTier === "priority");
+    if (!bump) {
+      return "Bump the stuck payment to the priority tier.";
     }
-    const bump = drills.find((t) => (t.fee ?? 0) === topFee);
-    if (!bump || bump.status !== "confirmed") {
+    if (bump.status !== "confirmed") {
       return "Wait until the bumped payment lands.";
     }
     return null;

@@ -29,6 +29,8 @@ export type TxRecord = {
   onChain?: boolean;
   /** Fee in sats, outgoing only. */
   fee?: number;
+  /** Tier the fee was priced at, outgoing only. Absent on rows written before it existed. */
+  feeTier?: FeeTierId;
   timestamp: string;
   memo?: string;
 };
@@ -220,6 +222,7 @@ export function applySend(
     confirmations: 0,
     onChain: false,
     fee,
+    feeTier: args.feeTier,
     timestamp: args.timestamp,
     ...(args.memo?.trim() ? { memo: args.memo.trim() } : {}),
   };
