@@ -320,10 +320,18 @@ pending → confirmed), backup + restore (settings gear → backup reveal +
 recall stamps `backupAt`; restore compares 12 words without mutating; reset
 requires typed `RESET`).
 
-All simulated: every balance, txid, counterparty, and confirmation is
-deterministic practice-seed data. No chain calls, no private keys (the seed
-appears only in setup and backup), and a play-money disclosure strip sits on
-every wallet screen.
+All simulated in `simulated`/`signet` modes: every balance, txid,
+counterparty, and confirmation is deterministic practice-seed data. In
+`regtest` mode the faucet funds, mining, and confirmations are real operations
+on the local chain — still play money on a private net, never real Bitcoin.
+No private keys anywhere (the seed appears only in setup and backup), and a
+play-money disclosure strip sits on every wallet screen.
+
+One wallet: the course scenes operate this same wallet instead of parallel
+sims — `get-paid/receipt` performs a real deposit, `send/no-undo` a real
+send, and `guard/words` stamps `backupAt` once the learner writes the words
+and passes recall. The e2e walk asserts each touchpoint against `/api/wallet`
+(second confirmed in/out tx, non-null `backupAt`).
 
 Final exam (`prove-it/exam`, the cert step): five server-verified tasks over
 this wallet — setup, faucet receive, send, restore (stamps `restoredAt`), and
@@ -331,4 +339,7 @@ a read-back (regtest: block height pasted from the explorer, checked against
 the chain; otherwise: first 8 txid chars from the details sheet). Proofs are
 per-mode (`src/lib/exam.ts`, `examReadiness` in `src/lib/wallet.ts`); the
 scene (`ExamScene`) performs receive/send inline and links out for setup and
-restore.
+restore. Attempt freshness: opening the exam step stamps `exam_started_at`
+once (`ensureExamStartedAt` — set-once coalesce, no clock, no expiry); only
+evidence timestamped after the marker counts, and a direct POST with no
+marker fails closed. Mid-course wallet ops never carry into the cert.
