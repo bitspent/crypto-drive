@@ -152,6 +152,26 @@ describe("bitcoin first drive", () => {
     }
   });
 
+  it("gives all 25 bitcoin steps a unique quick check", () => {
+    const steps = bitcoin.drives.flatMap((d) => d.steps);
+    const questions = [];
+    for (const step of steps) {
+      const qc = step.quickCheck;
+      assert.ok(qc?.question?.trim(), `${step.id} quickCheck question`);
+      assert.ok(
+        Array.isArray(qc.options) && qc.options.length >= 3,
+        `${step.id} quickCheck options`,
+      );
+      assert.ok(
+        Number.isInteger(qc.answerIndex) && qc.options[qc.answerIndex],
+        `${step.id} quickCheck answerIndex`,
+      );
+      assert.ok(qc.explanation?.trim(), `${step.id} quickCheck explanation`);
+      questions.push(qc.question.trim());
+    }
+    assert.equal(new Set(questions).size, questions.length, "duplicate quickCheck question");
+  });
+
   it("shapes the prove-it capstone after road-test", () => {
     assert.deepEqual(
       bitcoin.drives.map((d) => d.slug),

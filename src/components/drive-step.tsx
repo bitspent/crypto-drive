@@ -473,6 +473,7 @@ function Scene({
   if (action.type === "address-check") {
     return (
       <AddressScene
+        step={step}
         practice={practice}
         review={review}
         busy={busy}
@@ -485,6 +486,7 @@ function Scene({
   if (action.type === "receipt") {
     return (
       <ReceiptScene
+        step={step}
         practice={practice}
         review={review}
         busy={busy}
@@ -497,6 +499,7 @@ function Scene({
   if (action.type === "clipboard-mismatch") {
     return (
       <SwapScene
+        step={step}
         practice={practice}
         review={review}
         busy={busy}
@@ -509,6 +512,7 @@ function Scene({
   if (action.type === "fee-room") {
     return (
       <FeeScene
+        step={step}
         practice={practice}
         review={review}
         busy={busy}
@@ -521,6 +525,7 @@ function Scene({
   if (action.type === "send-confirm") {
     return (
       <SendScene
+        step={step}
         practice={practice}
         review={review}
         busy={busy}
@@ -533,6 +538,7 @@ function Scene({
   if (action.type === "key-contrast") {
     return (
       <KeyScene
+        step={step}
         review={review}
         busy={busy}
         button={step.button}
@@ -544,6 +550,7 @@ function Scene({
   if (action.type === "seed-card") {
     return (
       <SeedScene
+        step={step}
         practice={practice}
         review={review}
         busy={busy}
@@ -584,6 +591,7 @@ function Scene({
   }
   return (
     <RoadScene
+      step={step}
       scene={action.scene}
       practice={practice}
       review={review}
@@ -809,6 +817,7 @@ function ChequesIntro({
           ) : null}
         </div>
       )}
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
     </Split>
   );
 }
@@ -876,6 +885,7 @@ function ChangeIntro({
           )}
         </dl>
       </Frame>
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
     </Split>
   );
 }
@@ -942,6 +952,7 @@ function IdeaIntro({
   return (
     <Split coach={coach}>
       <IdeaPanel step={step} extras={satoshiLinks} />
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
     </Split>
   );
 }
@@ -1120,6 +1131,7 @@ function ExplorerReadScene({
 }
 
 function AddressScene({
+  step,
   practice,
   review,
   busy,
@@ -1127,6 +1139,7 @@ function AddressScene({
   coach,
   onCommit,
 }: {
+  step: Step;
   practice: PracticeSet;
   review: boolean;
   busy: boolean;
@@ -1225,6 +1238,7 @@ function AddressScene({
           </div>
         )}
       </Frame>
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
     </Split>
   );
 }
@@ -1253,6 +1267,7 @@ function useConfirmations(active: boolean, immediate: boolean) {
 }
 
 function ReceiptScene({
+  step,
   practice,
   review,
   busy,
@@ -1260,6 +1275,7 @@ function ReceiptScene({
   coach,
   onCommit,
 }: {
+  step: Step;
   practice: PracticeSet;
   review: boolean;
   busy: boolean;
@@ -1362,11 +1378,13 @@ function ReceiptScene({
           ) : null}
         </div>
       )}
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
     </Split>
   );
 }
 
 function SwapScene({
+  step,
   practice,
   review,
   busy,
@@ -1374,6 +1392,7 @@ function SwapScene({
   coach,
   onCommit,
 }: {
+  step: Step;
   practice: PracticeSet;
   review: boolean;
   busy: boolean;
@@ -1428,11 +1447,13 @@ function SwapScene({
         )}
       </Frame>
       {review ? <p className="text-sm text-[var(--go)]">You rejected the swapped ending.</p> : null}
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
     </Split>
   );
 }
 
 function FeeScene({
+  step,
   practice,
   review,
   busy,
@@ -1440,6 +1461,7 @@ function FeeScene({
   coach,
   onCommit,
 }: {
+  step: Step;
   practice: PracticeSet;
   review: boolean;
   busy: boolean;
@@ -1515,11 +1537,13 @@ function FeeScene({
           ) : null}
         </div>
       )}
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
     </Split>
   );
 }
 
 function SendScene({
+  step,
   practice,
   review,
   busy,
@@ -1527,6 +1551,7 @@ function SendScene({
   coach,
   onCommit,
 }: {
+  step: Step;
   practice: PracticeSet;
   review: boolean;
   busy: boolean;
@@ -1599,17 +1624,20 @@ function SendScene({
           ) : null}
         </div>
       )}
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
     </Split>
   );
 }
 
 function KeyScene({
+  step,
   review,
   busy,
   button,
   coach,
   onCommit,
 }: {
+  step: Step;
   review: boolean;
   busy: boolean;
   button: string;
@@ -1660,17 +1688,20 @@ function KeyScene({
           )}
         </Frame>
       </div>
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
     </Split>
   );
 }
 
 function SeedScene({
+  step,
   practice,
   review,
   busy,
   coach,
   onCommit,
 }: {
+  step: Step;
   practice: PracticeSet;
   review: boolean;
   busy: boolean;
@@ -1879,6 +1910,7 @@ function SeedScene({
         </p>
       ) : null}
       {busy ? <p className="text-sm text-[var(--mute)]">Saving…</p> : null}
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
     </Split>
   );
 }
@@ -2957,6 +2989,7 @@ function ExamScene({
 }
 
 function RoadScene({
+  step,
   scene,
   practice,
   review,
@@ -2965,6 +2998,7 @@ function RoadScene({
   coach,
   onCommit,
 }: {
+  step: Step;
   scene: "support" | "network" | "mismatch";
   practice: PracticeSet;
   review: boolean;
@@ -2975,16 +3009,17 @@ function RoadScene({
 }) {
   if (scene === "support") {
     return (
-      <SupportRoad review={review} busy={busy} button={button} coach={coach} onCommit={onCommit} />
+      <SupportRoad step={step} review={review} busy={busy} button={button} coach={coach} onCommit={onCommit} />
     );
   }
   if (scene === "network") {
     return (
-      <NetworkRoad review={review} busy={busy} button={button} coach={coach} onCommit={onCommit} />
+      <NetworkRoad step={step} review={review} busy={busy} button={button} coach={coach} onCommit={onCommit} />
     );
   }
   return (
     <MismatchRoad
+      step={step}
       practice={practice}
       review={review}
       busy={busy}
@@ -2996,12 +3031,14 @@ function RoadScene({
 }
 
 function SupportRoad({
+  step,
   review,
   busy,
   button,
   coach,
   onCommit,
 }: {
+  step: Step;
   review: boolean;
   busy: boolean;
   button: string;
@@ -3045,17 +3082,20 @@ function SupportRoad({
           </div>
         )}
       </Frame>
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
     </Split>
   );
 }
 
 function NetworkRoad({
+  step,
   review,
   busy,
   button,
   coach,
   onCommit,
 }: {
+  step: Step;
   review: boolean;
   busy: boolean;
   button: string;
@@ -3092,11 +3132,13 @@ function NetworkRoad({
         </p>
         {review ? <p className="mt-4 text-sm text-[var(--go)]">Bitcoin selected.</p> : null}
       </Frame>
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
     </Split>
   );
 }
 
 function MismatchRoad({
+  step,
   practice,
   review,
   busy,
@@ -3104,6 +3146,7 @@ function MismatchRoad({
   coach,
   onCommit,
 }: {
+  step: Step;
   practice: PracticeSet;
   review: boolean;
   busy: boolean;
@@ -3154,6 +3197,7 @@ function MismatchRoad({
           </div>
         )}
       </Frame>
+      {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
     </Split>
   );
 }

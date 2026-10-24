@@ -72,6 +72,18 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
   await page.waitForSelector(".drive-layout");
   expect(await page.locator(".journey-stage").count()).toBe(0);
 
+  // Quick checks render from step one: wrong pick shows ✗, right pick shows ✓.
+  const satoshiWrong = page.getByRole("radio", {
+    name: "Satoshi Nakamoto, from an office in Tokyo",
+  });
+  await satoshiWrong.click();
+  await expect(satoshiWrong).toContainText("✗");
+  const satoshiRight = page.getByRole("radio", {
+    name: "No company — it is an open network running since 2009",
+  });
+  await satoshiRight.click();
+  await expect(satoshiRight).toContainText("✓");
+
   await clickAndWaitUrl(page, "Show me how scarce it is", "what-is/scarce");
   await clickAndWaitUrl(page, "How do new coins appear?", "what-is/block");
   await clickAndWaitUrl(page, "Does that pay stay the same?", "what-is/halving");

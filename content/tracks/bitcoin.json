@@ -32,7 +32,18 @@
           "objective": "After this screen you can say who started Bitcoin and that it is an open network, not a bank product.",
           "whyItMatters": "Pros meet \"Bitcoin\" in policy decks. Knowing it began as a public paper and a live network stops the myth that a single vendor runs it.",
           "keyTerms": ["Satoshi Nakamoto", "white paper", "open network"],
-          "misconception": "Bitcoin is a company you can call for support."
+          "misconception": "Bitcoin is a company you can call for support.",
+          "quickCheck": {
+            "question": "Who runs the Bitcoin network?",
+            "options": [
+              "Satoshi Nakamoto, from an office in Tokyo",
+              "No company — it is an open network running since 2009",
+              "The miners' association, by majority vote",
+              "Whoever holds the most bitcoin"
+            ],
+            "answerIndex": 1,
+            "explanation": "Satoshi published the idea in 2008; no company operates or owns the network."
+          }
         },
         {
           "id": "btc-intro-scarce",
@@ -46,7 +57,18 @@
           "objective": "After this screen you can explain the 21 million hard cap in one plain sentence.",
           "whyItMatters": "Scarcity is why people treat bitcoin differently from a bank balance that can be inflated by policy.",
           "keyTerms": ["21 million", "hard cap", "scarce"],
-          "misconception": "Miners can print as much bitcoin as they want whenever they like."
+          "misconception": "Miners can print as much bitcoin as they want whenever they like.",
+          "quickCheck": {
+            "question": "How many bitcoin will ever exist?",
+            "options": [
+              "As many as miners choose to print",
+              "21 million — the supply cannot stretch",
+              "100 million, one per satoshi",
+              "There is no cap; halvings just slow it down"
+            ],
+            "answerIndex": 1,
+            "explanation": "The hard cap is 21 million; new coins arrive on a schedule, then stop."
+          }
         },
         {
           "id": "btc-intro-block",
@@ -60,7 +82,18 @@
           "objective": "After this screen you can describe a block as a sealed page of payments that arrives on a roughly ten-minute rhythm.",
           "whyItMatters": "Waiting for a payment is waiting for that page to seal — not waiting for a bank clerk.",
           "keyTerms": ["block", "miner", "about ten minutes"],
-          "misconception": "Bitcoin payments clear instantly like a card swipe every time."
+          "misconception": "Bitcoin payments clear instantly like a card swipe every time.",
+          "quickCheck": {
+            "question": "What is a block?",
+            "options": [
+              "A sealed page of payments, roughly every ten minutes",
+              "A bank's daily settlement file",
+              "One person's entire balance",
+              "An instant card-style clearing"
+            ],
+            "answerIndex": 0,
+            "explanation": "Miners seal payments into blocks about every ten minutes and earn new bitcoin for it."
+          }
         },
         {
           "id": "btc-intro-halving",
@@ -74,7 +107,18 @@
           "objective": "After this screen you can say that miner rewards shrink over time on a schedule (halving).",
           "whyItMatters": "Issuance is mechanical, not a board decision. That is part of the scarcity story.",
           "keyTerms": ["halving", "block reward", "issuance"],
-          "misconception": "Someone can vote to mint unlimited new bitcoin next quarter."
+          "misconception": "Someone can vote to mint unlimited new bitcoin next quarter.",
+          "quickCheck": {
+            "question": "What does the halving do?",
+            "options": [
+              "It cuts the miner's new-coin pay in half on a schedule",
+              "It halves every holder's balance",
+              "It doubles the 21 million cap",
+              "It votes new coins into existence each quarter"
+            ],
+            "answerIndex": 0,
+            "explanation": "New-coin pay shrinks on a fixed schedule, so supply growth slows toward the cap."
+          }
         },
         {
           "id": "btc-intro-sats",
@@ -88,7 +132,18 @@
           "objective": "After this screen you can convert the idea \"1 BTC = 100,000,000 sats\" and know why small amounts still make sense.",
           "whyItMatters": "Pros see tiny decimals on invoices. Sats are the cents — that is normal, not a glitch.",
           "keyTerms": ["satoshi", "sats", "100,000,000"],
-          "misconception": "You can only send whole bitcoin."
+          "misconception": "You can only send whole bitcoin.",
+          "quickCheck": {
+            "question": "A coffee costs 4,000 sats. How much bitcoin is that?",
+            "options": [
+              "0.00004 BTC",
+              "0.004 BTC",
+              "0.4 BTC",
+              "4 BTC"
+            ],
+            "answerIndex": 0,
+            "explanation": "One bitcoin is 100,000,000 sats, so small everyday amounts are normal."
+          }
         },
         {
           "id": "btc-intro-cheques",
@@ -103,7 +158,18 @@
           "objective": "After this screen you can treat balance as the sum of unspent cheques, not a single account field.",
           "whyItMatters": "Explains change, coin selection, and why \"the wallet shows 0.01\" can mean several pieces.",
           "keyTerms": ["UTXO", "unspent cheque", "balance"],
-          "misconception": "Bitcoin works like a single running account balance at a bank."
+          "misconception": "Bitcoin works like a single running account balance at a bank.",
+          "quickCheck": {
+            "question": "What is your Bitcoin balance?",
+            "options": [
+              "A single account field at a bank",
+              "The sum of your unspent cheques (UTXOs)",
+              "The last block reward you received",
+              "Whatever the exchange shows on screen"
+            ],
+            "answerIndex": 1,
+            "explanation": "There is no account — your wallet adds up the unspent cheques you can sign."
+          }
         },
         {
           "id": "btc-intro-change",
@@ -118,7 +184,18 @@
           "objective": "After this screen you can explain pay + change + fee when spending from an unspent cheque.",
           "whyItMatters": "Stops panic when a send \"uses\" a larger piece than the invoice — change comes back.",
           "keyTerms": ["change", "fee", "sign and send"],
-          "misconception": "If you spend from a 1 BTC cheque to pay 0.1, the other 0.9 disappears."
+          "misconception": "If you spend from a 1 BTC cheque to pay 0.1, the other 0.9 disappears.",
+          "quickCheck": {
+            "question": "You pay 0.1 BTC from a 1 BTC cheque. Where does the other 0.9 go?",
+            "options": [
+              "It disappears",
+              "It returns to you as a new cheque, minus the fee",
+              "The miner keeps it all as the fee",
+              "It stays locked in the old cheque"
+            ],
+            "answerIndex": 1,
+            "explanation": "A spend consumes the whole cheque: pay the recipient, take change back, peel off the fee."
+          }
         }
       ]
     },
@@ -142,7 +219,18 @@
           "objective": "After this screen you can share a Bitcoin address to receive a payment while keeping the key private.",
           "whyItMatters": "Client onboarding often stalls on the fear that sharing an address leaks control; it does not — control stays with the key.",
           "keyTerms": ["address", "receive", "private key"],
-          "misconception": "Sharing your address gives the other person a way to take your bitcoin."
+          "misconception": "Sharing your address gives the other person a way to take your bitcoin.",
+          "quickCheck": {
+            "question": "Someone needs to pay you. What do you share?",
+            "options": [
+              "Your Bitcoin address — it can receive but not spend",
+              "Your private key, so they can deposit",
+              "Your seed words, so they can verify you",
+              "Your wallet password"
+            ],
+            "answerIndex": 0,
+            "explanation": "Addresses receive; only the key spends, and it never leaves your pocket."
+          }
         },
         {
           "id": "btc-paid-receipt",
@@ -157,7 +245,18 @@
           "objective": "After this screen you can read a receipt page and say whether a payment has reached three confirmations.",
           "whyItMatters": "Settlement finality is what a treasurer is really asking about; confirmations are how Bitcoin answers.",
           "keyTerms": ["confirmation", "settled", "receipt"],
-          "misconception": "A payment is final the moment your wallet shows it as incoming."
+          "misconception": "A payment is final the moment your wallet shows it as incoming.",
+          "quickCheck": {
+            "question": "Your wallet shows an incoming payment at 1 confirmation. This course calls a payment settled at...",
+            "options": [
+              "0 confirmations — shown means settled",
+              "1 confirmation",
+              "3 confirmations",
+              "100 confirmations"
+            ],
+            "answerIndex": 2,
+            "explanation": "One confirmation per sealed block; this course treats three as settled."
+          }
         },
         {
           "id": "btc-paid-explorer",
@@ -176,7 +275,18 @@
           "whyItMatters": "When someone pays you, the explorer — not a JPG — is how you prove it landed.",
           "keyTerms": ["txid", "confirmations", "fee rate (sat/vB)"],
           "misconception": "A payment screenshot in chat is as good as an explorer receipt.",
-          "pocketCard": "txid → explorer → status, confirms, block, fee rate, inputs, outputs. Looking up your own addresses on a public site leaks privacy — prefer your own node for real use. Personal drills in this course stay play money."
+          "pocketCard": "txid → explorer → status, confirms, block, fee rate, inputs, outputs. Looking up your own addresses on a public site leaks privacy — prefer your own node for real use. Personal drills in this course stay play money.",
+          "quickCheck": {
+            "question": "A sender messages \"I paid — here's a screenshot.\" How do you verify?",
+            "options": [
+              "Trust the screenshot",
+              "Ask for the txid and read it on mempool.space",
+              "Reply with your seed words so they can confirm",
+              "Wait for your bank to call"
+            ],
+            "answerIndex": 1,
+            "explanation": "Only the public explorer receipt — status, confirmations, fee rate — proves a payment."
+          }
         }
       ]
     },
@@ -201,7 +311,18 @@
           "objective": "After this screen you can spot a swapped paste by comparing the first and last characters with the intended address.",
           "whyItMatters": "Payment-detail fraud is a familiar compliance headache; on Bitcoin there is no bank to reverse it, so the check happens before you press send.",
           "keyTerms": ["clipboard swap", "verify", "recipient address"],
-          "misconception": "If the first few characters match, the pasted address must be the right one."
+          "misconception": "If the first few characters match, the pasted address must be the right one.",
+          "quickCheck": {
+            "question": "The pasted address starts the same but ends differently. What do you do?",
+            "options": [
+              "Send — matching starts are enough",
+              "Send a test to the swapped address first",
+              "Stop — check both ends against the original",
+              "Reformat the address and send"
+            ],
+            "answerIndex": 2,
+            "explanation": "Clipboard malware matches the start on purpose; swaps show at the ends."
+          }
         },
         {
           "id": "btc-send-fee",
@@ -216,7 +337,18 @@
           "objective": "After this screen you can explain why a send needs the payment amount plus a fee to leave the wallet.",
           "whyItMatters": "Clients often ask why the debited total exceeds the invoice; the fee is the toll, and it is set by the market for block space, not by a bank.",
           "keyTerms": ["fee", "block space", "miner"],
-          "misconception": "The fee is a percentage the wallet company takes from your send."
+          "misconception": "The fee is a percentage the wallet company takes from your send.",
+          "quickCheck": {
+            "question": "Why must a send cover more than the payment amount?",
+            "options": [
+              "The wallet company takes a percentage",
+              "Miners must include it in a block, paid from the same cheque",
+              "The exchange charges a withdrawal toll",
+              "Bitcoin burns a fixed cut per send"
+            ],
+            "answerIndex": 1,
+            "explanation": "The fee buys block space and comes out of the same unspent cheque as the payment."
+          }
         },
         {
           "id": "btc-send-confirm",
@@ -231,7 +363,18 @@
           "objective": "After this screen you can list the three things to check before pressing send: address, amount, and fee.",
           "whyItMatters": "Final settlement without a dispute process changes the risk model; controls move from chargebacks to pre-send checks.",
           "keyTerms": ["final", "test send", "self-custody"],
-          "misconception": "If you send to the wrong address, Bitcoin support can reverse it like a bank transfer."
+          "misconception": "If you send to the wrong address, Bitcoin support can reverse it like a bank transfer.",
+          "quickCheck": {
+            "question": "Before pressing send, you check...",
+            "options": [
+              "Address, amount, and fee",
+              "The Bitcoin price, the news, and your balance",
+              "Your password, your email, and your phone",
+              "The miner, the block, and the mempool"
+            ],
+            "answerIndex": 0,
+            "explanation": "A confirmed send cannot be reversed — verify the three, then press once."
+          }
         }
       ]
     },
@@ -255,7 +398,18 @@
           "objective": "After this screen you can say who controls bitcoin in each case: exchange account versus your own wallet.",
           "whyItMatters": "Custody is the first question in any institutional discussion; this is the difference between an IOU and actual control.",
           "keyTerms": ["private key", "custody", "sign"],
-          "misconception": "Your exchange login password is your Bitcoin private key."
+          "misconception": "Your exchange login password is your Bitcoin private key.",
+          "quickCheck": {
+            "question": "Who can spend the bitcoin in your exchange account?",
+            "options": [
+              "Only you — your password is the key",
+              "The exchange — it holds the real key",
+              "Nobody until you withdraw",
+              "The miners, after six blocks"
+            ],
+            "answerIndex": 1,
+            "explanation": "Exchange password is not the private key: on an exchange, the exchange signs."
+          }
         },
         {
           "id": "btc-guard-seed",
@@ -270,7 +424,18 @@
           "objective": "After this screen you can store a 12-word backup on paper in two places without photographing or typing it.",
           "whyItMatters": "Key backup is the operational risk clients underestimate most; paper in two places beats every clever digital shortcut.",
           "keyTerms": ["seed words", "backup", "paper"],
-          "misconception": "A photo of the word list in cloud storage is a safe backup."
+          "misconception": "A photo of the word list in cloud storage is a safe backup.",
+          "quickCheck": {
+            "question": "Where do your 12 words live?",
+            "options": [
+              "In a photo in cloud storage",
+              "On paper in two places, never photographed or typed",
+              "In your email drafts",
+              "In your phone's notes app"
+            ],
+            "answerIndex": 1,
+            "explanation": "Anyone with the words owns the wallet — paper in two places, no camera, no keyboard."
+          }
         }
       ]
     },
@@ -294,7 +459,18 @@
           "objective": "After this screen you can refuse a support chat that asks for your word list by closing it without sharing anything.",
           "whyItMatters": "Social engineering, not cryptography, is how most client funds are lost; staff who know this script protect the firm.",
           "keyTerms": ["phishing", "word list", "close the chat"],
-          "misconception": "A support agent may legitimately need your words to fix a stuck wallet."
+          "misconception": "A support agent may legitimately need your words to fix a stuck wallet.",
+          "quickCheck": {
+            "question": "Support asks for your word list to 'verify' your wallet. You...",
+            "options": [
+              "Send words 1-6 as a compromise",
+              "Close the chat without sharing anything",
+              "Send a photo of the card",
+              "Ask for their manager first"
+            ],
+            "answerIndex": 1,
+            "explanation": "No real helper needs your words for any reason, ever."
+          }
         },
         {
           "id": "btc-test-network",
@@ -308,7 +484,18 @@
           "objective": "After this screen you can reject a 0x address on a Bitcoin send and switch to the Bitcoin network.",
           "whyItMatters": "Wrong-network sends are unrecoverable, so network checks belong in every payment procedure alongside amount checks.",
           "keyTerms": ["network", "address format", "0x"],
-          "misconception": "All addresses work on all networks, so a 0x address is fine for Bitcoin."
+          "misconception": "All addresses work on all networks, so a 0x address is fine for Bitcoin.",
+          "quickCheck": {
+            "question": "The recipient's address starts with 0x. You...",
+            "options": [
+              "Send — all addresses work everywhere",
+              "Send a tiny test to the 0x address",
+              "Stop — 0x is a different road, not Bitcoin",
+              "Convert it by removing the 0x"
+            ],
+            "answerIndex": 2,
+            "explanation": "Each network has its own format; coins sent to the wrong one can be lost."
+          }
         },
         {
           "id": "btc-test-mismatch",
@@ -322,7 +509,18 @@
           "objective": "After this screen you can halt a send on an address mismatch and re-verify against the recipient's original address.",
           "whyItMatters": "A maker-checker habit on addresses is the cheapest control a finance team can adopt for Bitcoin payments.",
           "keyTerms": ["verify twice", "mismatch", "stop"],
-          "misconception": "One wrong character is harmless because the network will correct the address."
+          "misconception": "One wrong character is harmless because the network will correct the address.",
+          "quickCheck": {
+            "question": "The on-screen address differs from the recipient's by one character. You...",
+            "options": [
+              "Send — the network corrects typos",
+              "Fix the character yourself and send",
+              "Halt and re-verify against the original",
+              "Send half now, half after they confirm"
+            ],
+            "answerIndex": 2,
+            "explanation": "One changed character sends bitcoin elsewhere — mismatch means stop."
+          }
         }
       ]
     },
