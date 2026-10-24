@@ -105,7 +105,13 @@ test("wallet reuses the drive seed, address, and words", async ({ page }) => {
     ["Show me my balance", "what-is/cheques"],
   ] as const) {
     await page.getByRole("button", { name: btn }).click();
-    await page.waitForURL(`**/${frag}`);
+    try {
+      await page.waitForURL(`**/${frag}`, { timeout: 8000 });
+    } catch {
+      // Stay-and-Continue: every step carries a pocket card now.
+      await page.getByRole("link", { name: "Continue", exact: true }).click();
+      await page.waitForURL(`**/${frag}`);
+    }
   }
   const items = page.locator("li", { hasText: /Cheque \d/ });
   let sum = 0;

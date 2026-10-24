@@ -7,7 +7,8 @@ test("arrow keys drive, rove focus, and leave typing alone", async ({ page }) =>
   await unlock(page, uniqueEmail("kb"));
   await page.goto("/track/bitcoin/what-is/satoshi", { waitUntil: "networkidle" });
 
-  await page.keyboard.press("ArrowRight"); // primary: commit + push to scarce
+  await page.keyboard.press("ArrowRight"); // primary: commit, step stays + shows Continue
+  await page.getByRole("link", { name: "Continue", exact: true }).click();
   await page.waitForURL("**/what-is/scarce");
   await page.keyboard.press("ArrowLeft"); // back to satoshi
   await page.waitForURL("**/what-is/satoshi");
@@ -38,7 +39,13 @@ test("arrow keys drive, rove focus, and leave typing alone", async ({ page }) =>
     const cont = page.getByRole("link", { name: "Continue", exact: true });
     if ((await cont.count()) > 0) await cont.click();
     else await page.getByRole("button", { name: btn }).click();
-    await page.waitForURL(`**/${frag}`);
+    try {
+      await page.waitForURL(`**/${frag}`, { timeout: 8000 });
+    } catch {
+      // Fresh commit stays and shows its own Continue link.
+      await page.getByRole("link", { name: "Continue", exact: true }).click();
+      await page.waitForURL(`**/${frag}`);
+    }
   }
 
   // Arrow keys must not hijack typing.
