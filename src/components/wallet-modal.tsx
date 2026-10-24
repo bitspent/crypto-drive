@@ -101,6 +101,10 @@ export function WalletModal({
         return;
       }
       if (e.key !== "Tab" || !panelRef.current) return;
+      // Sheets own Tab while open (same as Escape above): this trap spans
+      // the whole panel, so without the deferral a forward Tab from the
+      // sheet's last stop wraps into the modal chrome.
+      if (document.querySelector(WALLET_SHEET_OPEN)) return;
       const els = focusables(panelRef.current);
       if (els.length === 0) return;
       const first = els[0] as HTMLElement;
@@ -145,7 +149,7 @@ export function WalletModal({
                 // grows after a drag scrolls internally instead of
                 // stranding buttons below the fold.
                 maxHeight: `min(640px, calc(100dvh - ${Math.round(pos.top)}px - 16px))`,
-                maxWidth: `calc(100vw - ${Math.round(pos.left)}px - 16px)`,
+                maxWidth: `min(640px, calc(100vw - ${Math.round(pos.left)}px - 16px))`,
               }
             : undefined
         }

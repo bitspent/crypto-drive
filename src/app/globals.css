@@ -897,11 +897,14 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
 
 @media (min-width: 641px) {
   /* Native grip: needs overflow != visible (set above), works on the
-     dragged fixed panel too. min-* keeps the header + QR usable. */
+     dragged fixed panel too. min-* keeps the header + QR usable; max-width
+     keeps an undragged resize inside the viewport (the dragged panel pins
+     via inline style instead). Mobile keeps full-bleed, so this stays here. */
   .wallet-modal {
     resize: both;
     min-width: 320px;
     min-height: 280px;
+    max-width: min(640px, calc(100vw - 2rem));
   }
 }
 

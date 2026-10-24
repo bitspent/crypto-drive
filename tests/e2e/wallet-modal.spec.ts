@@ -49,6 +49,7 @@ test("rail opens the wallet in place, setup works, close returns focus", async (
 
     // Compact default cap (undragged class rule) + slim scrollbars + frame.
     expect(await modal.evaluate((el) => getComputedStyle(el).maxHeight)).toBe("640px");
+    expect(await modal.evaluate((el) => getComputedStyle(el).maxWidth)).toBe("640px");
     expect(await modal.evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe("thin");
     expect(await modal.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("2px");
 
@@ -80,6 +81,22 @@ test("rail opens the wallet in place, setup works, close returns focus", async (
     const resized = await modal.boundingBox();
     expect((resized?.width ?? 0) - (grown?.width ?? 0)).toBeGreaterThan(60);
     expect((resized?.height ?? 0) - (grown?.height ?? 0)).toBeGreaterThan(40);
+
+    // The compact cap holds under an aggressive grip drag: no axis escapes.
+    const big = await modal.boundingBox();
+    await page.mouse.move(
+      (big?.x ?? 0) + (big?.width ?? 0) - 6,
+      (big?.y ?? 0) + (big?.height ?? 0) - 6,
+    );
+    await page.mouse.down();
+    await page.mouse.move((big?.x ?? 0) + (big?.width ?? 0) + 400, (big?.y ?? 0) + (big?.height ?? 0) + 400, {
+      steps: 8,
+    });
+    await page.mouse.up();
+    const capped = await modal.boundingBox();
+    expect(capped?.width ?? 0).toBeLessThanOrEqual(641);
+    expect(capped?.height ?? 0).toBeLessThanOrEqual(641);
+    expect((capped?.x ?? 0) + (capped?.width ?? 0)).toBeLessThanOrEqual(1440);
 
     // Full setup ceremony inside the modal.
     await modal.getByRole("button", { name: "Create your wallet" }).click();
@@ -156,6 +173,22 @@ test("Escape closes a nested wallet sheet before the modal, focus stays trapped"
     await modal.getByRole("button", { name: "Receive" }).click();
     const sheet = modal.getByRole("dialog", { name: "Your address" });
     await expect(sheet).toBeVisible();
+    // Open sheets own Tab: from the last stop it wraps inside the sheet
+    // instead of escaping to the modal chrome (and reverse too).
+    const stops = sheet.locator("button:not([disabled])");
+    await stops.last().focus();
+    await page.keyboard.press("Tab");
+    await expect(stops.first()).toBeFocused();
+    await stops.first().focus();
+    await page.keyboard.press("Shift+Tab");
+    await expect(stops.last()).toBeFocused();
+    for (let i = 0; i < 6; i++) {
+      await page.keyboard.press("Tab");
+      const inSheet = await page.evaluate(
+        () => !!document.activeElement?.closest(".w-sheet"),
+      );
+      expect(inSheet).toBe(true);
+    }
     // Contained: the sheet overlay sits inside the modal box, not the viewport.
     const overlayBox = await modal.locator(".w-overlay").boundingBox();
     const modalBox = await modal.boundingBox();
