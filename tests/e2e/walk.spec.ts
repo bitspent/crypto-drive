@@ -111,14 +111,7 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
   await page.fill("#last4", addr.slice(-4));
   await commitAndContinue(page, "That's my address", "get-paid/receipt");
 
-  // receipt: paste txid, wait for landed.
-  const receiptChip = await page
-    .getByRole("button", { name: "Copy receipt transaction id" })
-    .innerText();
-  const txidMatch = receiptChip.match(/([0-9a-f]{64})/);
-  expect(txidMatch, "could not read receipt txid from copy chip").not.toBeNull();
-  const txid = txidMatch?.[1] ?? "";
-  await page.fill("#receipt", txid);
+  // receipt: the client's payment lands as a real wallet deposit.
   await page.getByRole("button", { name: "Look it up" }).click();
   const landedBtn = page.getByRole("button", { name: "It landed" });
   await landedBtn.waitFor();
@@ -129,9 +122,24 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
     undefined,
     { polling: 100 },
   );
+  await expect(page.getByText(/· Landed/)).toBeVisible();
+  const receiptChip = await page
+    .getByRole("button", { name: "Copy receipt transaction id" })
+    .innerText();
+  expect(receiptChip, "could not read receipt txid from copy chip").toMatch(/([0-9a-f]{64})/);
   await landedBtn.click();
   await page.getByRole("link", { name: "Continue", exact: true }).click();
   await page.waitForURL("**/get-paid/explorer");
+  // The deposit is real: a second confirmed incoming tx sits in the wallet
+  // (the first is the pre-course freshness fixture).
+  const wstate = await page.request.get("/api/wallet");
+  expect(wstate.ok()).toBe(true);
+  const { wallet } = (await wstate.json()) as {
+    wallet: { history: { direction: string; status: string }[] };
+  };
+  expect(
+    wallet.history.filter((t) => t.direction === "in" && t.status === "confirmed").length,
+  ).toBeGreaterThanOrEqual(2);
 
   // explorer: three checks on the pizza payment (bounds match PIZZA_EXPLORER).
   await page.getByRole("radio", { name: "Yes" }).check();

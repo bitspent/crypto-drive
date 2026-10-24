@@ -2,6 +2,7 @@ import { createHash, createHmac } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { PIZZA_EXPLORER } from "./explorer-lesson";
+import type { WalletState } from "./wallet";
 import {
   CUSTODY_MODELS,
   FEE_STRATEGY,
@@ -244,6 +245,7 @@ export function gradeStepAnswer(
   actionType: string,
   practice: PracticeSet,
   answer: StepAnswer | undefined,
+  wallet?: WalletState | null,
 ): string | null {
   if (actionType === "address-check") {
     const first = answer?.first4?.trim().toLowerCase() ?? "";
@@ -255,7 +257,20 @@ export function gradeStepAnswer(
   }
 
   if (actionType === "receipt") {
-    if ((answer?.txid?.trim().toLowerCase() ?? "") !== practice.txid) {
+    // The receipt step funds the real practice wallet: the committed txid
+    // must be a confirmed incoming wallet tx, not the deterministic stub
+    // (which survives only as the no-wallet fallback for pure callers).
+    const txid = answer?.txid?.trim().toLowerCase() ?? "";
+    if (wallet) {
+      const landed = wallet.history.find(
+        (t) => t.id.toLowerCase() === txid && t.direction === "in",
+      );
+      if (!landed || landed.status !== "confirmed") {
+        return "Wait until the payment lands in your practice wallet.";
+      }
+      return null;
+    }
+    if (txid !== practice.txid) {
       return "Paste the full receipt number from the client.";
     }
     return null;

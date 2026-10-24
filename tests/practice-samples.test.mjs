@@ -97,6 +97,45 @@ describe("practice samples", () => {
       null,
     );
   });
+
+  it("grades receipt answers against the real wallet", () => {
+    const p = practiceFor(derivePracticeSeed("grade@example.com", "CD-DRIVE-STARTER"));
+    const tx = (over) => ({
+      id: "ab".repeat(32),
+      direction: "in",
+      amount: 500000,
+      counterparty: "bcrt1qfaucet",
+      status: "confirmed",
+      confirmations: 3,
+      timestamp: "2026-10-15T00:00:00.000Z",
+      ...over,
+    });
+    const wallet = (history) => ({ exists: true, history });
+    // Confirmed incoming tx passes.
+    assert.equal(
+      gradeStepAnswer("btc-paid-receipt", "receipt", p, { txid: "ab".repeat(32) }, wallet([tx({})])),
+      null,
+    );
+    // Pending, outgoing, and unknown txids fail.
+    assert.ok(
+      gradeStepAnswer(
+        "btc-paid-receipt", "receipt", p, { txid: "ab".repeat(32) },
+        wallet([tx({ status: "pending", confirmations: 1 })]),
+      ),
+    );
+    assert.ok(
+      gradeStepAnswer(
+        "btc-paid-receipt", "receipt", p, { txid: "ab".repeat(32) },
+        wallet([tx({ direction: "out" })]),
+      ),
+    );
+    assert.ok(
+      gradeStepAnswer("btc-paid-receipt", "receipt", p, { txid: "cd".repeat(32) }, wallet([tx({})])),
+    );
+    // No wallet: legacy stub equality still grades pure callers.
+    assert.equal(gradeStepAnswer("btc-paid-receipt", "receipt", p, { txid: p.txid }), null);
+    assert.ok(gradeStepAnswer("btc-paid-receipt", "receipt", p, { txid: "cd".repeat(32) }));
+  });
 });
 
 describe("bitcoin first drive", () => {

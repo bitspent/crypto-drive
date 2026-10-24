@@ -29,8 +29,11 @@ import { PIZZA_EXPLORER } from "@/lib/explorer-lesson";
 import {
   examReadiness,
   explorerTxUrl,
+  formatBtcTrim,
   isOnChainTx,
   truncateMiddle,
+  WALLET_DEPOSIT_SATS,
+  type TxRecord,
   type WalletState,
 } from "@/lib/wallet";
 import {
@@ -1283,56 +1286,139 @@ function ReceiptScene({
   coach: string;
   onCommit: (answer?: StepAnswer) => void;
 }) {
-  const [query, setQuery] = useState(review ? practice.txid : "");
-  const [found, setFound] = useState(review);
+  // The client's payment is a REAL wallet deposit: "Look it up" opens the
+  // learner's practice wallet, funds it, and the receipt below reads the
+  // live tx — confirmations and all — instead of a staged animation.
+  const [tx, setTx] = useState<TxRecord | null>(null);
+  const [working, setWorking] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const { confirms, label } = useConfirmations(found, review);
+  const found = tx !== null;
+  const confirms = tx?.confirmations ?? 0;
+  const landed = tx?.status === "confirmed";
+  // Review re-reads the wallet; when it was reset since, fall back to the
+  // deterministic stub so the page still reads as passed.
+  const view = tx
+    ? {
+        amount: `${formatBtcTrim(tx.amount)} BTC`,
+        conf: `${confirms} · ${landed ? "Landed" : "Confirming…"}`,
+        id: tx.id,
+      }
+    : review
+      ? { amount: practice.receivedLabel, conf: "3 · Landed", id: practice.txid }
+      : null;
 
   useEffect(() => {
-    publish("receipt-found", found);
-    publish("receipt-confirms", confirms);
-  }, [found, confirms]);
+    if (!review) return;
+    let live = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/wallet");
+        const data = (await res.json()) as { wallet?: WalletState | null };
+        const incoming =
+          data.wallet?.history.find((t) => t.direction === "in") ?? null;
+        if (live) setTx(incoming);
+      } catch {
+        if (live) setTx(null);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [review]);
 
-  function search() {
-    if (query.trim().toLowerCase() !== practice.txid) {
-      setFound(false);
-      setLocalError("Paste the full receipt number from the client.");
-      return;
-    }
+  async function lookup() {
+    setWorking(true);
     setLocalError(null);
-    setFound(true);
+    try {
+      let res = await fetch("/api/wallet");
+      let data = (await res.json()) as { wallet?: WalletState | null; error?: string };
+      if (!res.ok || !data.wallet?.exists) {
+        res = await fetch("/api/wallet", { method: "POST" });
+        data = (await res.json()) as { wallet?: WalletState | null; error?: string };
+        if (!res.ok || !data.wallet?.exists) {
+          throw new Error(data.error || "Could not open the practice wallet.");
+        }
+      }
+      // An in-flight payment is reused (retry-safe); a settled one means the
+      // client pays again, so a fresh deposit is requested.
+      let incoming =
+        data.wallet.history.find((t) => t.direction === "in" && t.status !== "confirmed") ??
+        null;
+      if (!incoming) {
+        res = await fetch("/api/wallet/deposit", { method: "POST" });
+        const funded = (await res.json()) as { tx?: TxRecord; error?: string };
+        if (!res.ok || !funded.tx) {
+          throw new Error(funded.error || "The client payment did not arrive.");
+        }
+        incoming = funded.tx;
+      }
+      setTx(incoming);
+      for (let i = 0; i < 12 && incoming.status !== "confirmed"; i++) {
+        await new Promise((r) => setTimeout(r, 1500));
+        res = await fetch("/api/wallet/tick", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ txid: incoming.id }),
+        });
+        const advanced = (await res.json()) as { tx?: TxRecord; error?: string };
+        if (!res.ok || !advanced.tx) {
+          throw new Error(advanced.error || "Could not advance.");
+        }
+        incoming = advanced.tx;
+        setTx(incoming);
+      }
+      if (incoming.status !== "confirmed") {
+        throw new Error("Still waiting on the network — try again.");
+      }
+    } catch (e) {
+      setLocalError(
+        e instanceof Error ? e.message : "Couldn't reach the practice wallet. Try again.",
+      );
+    } finally {
+      setWorking(false);
+    }
   }
 
   function confirm() {
-    if (!found || confirms < 3) {
+    if (!tx || tx.status !== "confirmed") {
       setLocalError("Wait until it says landed.");
       return;
     }
-    onCommit({ txid: practice.txid });
+    onCommit({ txid: tx.id });
   }
 
   useFootPrimary(
     review ? null : found ? (
-      <Button size="lg" disabled={busy || confirms < 3} onClick={confirm}>
+      <Button size="lg" disabled={busy || !landed} onClick={confirm}>
         {button}
       </Button>
     ) : (
-      <Button size="lg" disabled={busy} onClick={search}>
+      <Button size="lg" disabled={busy || working} onClick={lookup}>
         Look it up
       </Button>
     ),
-    [review, found, busy, button, confirms, query],
+    [review, found, busy, button, landed, working],
   );
 
   return (
-    <Split
-      coach={coach}
-    >
+    <Split coach={coach}>
       <Frame title="CLIENT'S RECEIPT">
-        <CopyChip value={practice.txid} label="receipt transaction id" />
+        <dl className="space-y-3 text-sm">
+          <div>
+            <dt className="text-[var(--mute)]">Amount on the way</dt>
+            <dd className="mt-1 font-[family-name:var(--font-display)] text-2xl text-[var(--paper)]">
+              {formatBtcTrim(WALLET_DEPOSIT_SATS)} BTC
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[var(--mute)]">To your practice wallet</dt>
+            <dd className="mt-1 font-mono text-xs">
+              <CopyChip value={practice.address} label="practice wallet address" />
+            </dd>
+          </div>
+        </dl>
         <p className="mt-3 text-sm text-[var(--mute)]">
-          Tap to copy, then paste into the receipt field below. Amount on the way:{" "}
-          {practice.receivedLabel}
+          Press Look it up — the client&apos;s payment lands as a real deposit.
         </p>
       </Frame>
       <Frame title="RECEIPT">
@@ -1340,44 +1426,30 @@ function ReceiptScene({
           <div>
             <dt className="text-[var(--mute)]">Amount</dt>
             <dd className="mt-1 font-[family-name:var(--font-display)] text-2xl text-[var(--paper)]">
-              {found ? practice.receivedLabel : "—"}
+              {view ? view.amount : "—"}
             </dd>
           </div>
           <div>
             <dt className="text-[var(--mute)]">Confirmations</dt>
-            <dd
-              className={cn(
-                "mt-1",
-                found && confirms >= 3 ? "text-[var(--go)]" : "text-[var(--fog)]",
-              )}
-            >
-              {found ? `${confirms} · ${label}` : "Paste the receipt number"}
+            <dd className={cn("mt-1", view && landed ? "text-[var(--go)]" : "text-[var(--fog)]")}>
+              {view ? view.conf : "Press Look it up"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[var(--mute)]">Receipt number</dt>
+            <dd className="mt-1 font-mono text-xs">
+              {view ? <CopyChip value={view.id} label="receipt transaction id" /> : "—"}
             </dd>
           </div>
         </dl>
       </Frame>
       {review ? (
         <p className="text-sm text-[var(--go)]">Landed. You checked it yourself.</p>
-      ) : (
-        <div className="space-y-3">
-          <label className="block text-sm text-[var(--fog)]" htmlFor="receipt">
-            Receipt number
-            <Input
-              id="receipt"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-              className="mt-1 font-mono text-xs"
-            />
-          </label>
-          {localError ? (
-            <p className="text-sm text-[var(--danger)]" role="alert">
-              {localError}
-            </p>
-          ) : null}
-        </div>
-      )}
+      ) : localError ? (
+        <p className="text-sm text-[var(--danger)]" role="alert">
+          {localError}
+        </p>
+      ) : null}
       {step.quickCheck ? <QuickCheckView check={step.quickCheck} /> : null}
     </Split>
   );
