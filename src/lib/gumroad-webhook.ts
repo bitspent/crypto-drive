@@ -3,6 +3,7 @@ import type { TierId } from "./content";
 import { sendLicenseEmail } from "./email";
 import { generateLicenseKey, type LicenseTier } from "./license";
 import {
+  findStudentByEmail,
   getWebhookEvent,
   provisionLicensedStudent,
   recordWebhookEvent,
@@ -116,6 +117,10 @@ export function parsePingRefund(form: URLSearchParams): PingRefund | null {
  * The student is found through the original sale event (payload email), with
  * the ping's own email as fallback. Unknown sales ack quietly — a refund for
  * a sale that predates the webhook is not an error.
+ * Tier-aware: one row holds one learner, so a refund for a superseded tier
+ * (Starter refunded after upgrading to Certified) must not revoke the
+ * current tier. Skips only when both tiers are known and differ; anything
+ * unknown fails closed toward revocation.
  */
 export async function processGumroadRefund(ping: PingRefund): Promise<{
   handled: boolean;
@@ -131,11 +136,11 @@ export async function processGumroadRefund(ping: PingRefund): Promise<{
     logWebhook("webhook.duplicate", { saleId: ping.saleId, event: ping.event });
     return { handled: true, revoked: false, duplicate: true };
   }
+  const original = await getWebhookEvent("gumroad", ping.saleId);
+  const originalPayload = (original?.payload as Record<string, unknown> | undefined) ?? {};
   let email = ping.email;
   if (!email) {
-    const original = await getWebhookEvent("gumroad", ping.saleId);
-    const payloadEmail = (original?.payload as Record<string, unknown> | undefined)
-      ?.email;
+    const payloadEmail = originalPayload.email;
     if (typeof payloadEmail === "string" && payloadEmail.includes("@")) {
       email = payloadEmail.trim().toLowerCase();
     }
@@ -143,6 +148,22 @@ export async function processGumroadRefund(ping: PingRefund): Promise<{
   if (!email) {
     logWebhook("webhook.revoke_unmatched", { saleId: ping.saleId, event: ping.event });
     return { handled: true, revoked: false, duplicate: false };
+  }
+  const saleTier =
+    typeof originalPayload.productRef === "string"
+      ? tierForProductRef(originalPayload.productRef)
+      : null;
+  if (saleTier) {
+    const student = await findStudentByEmail(email);
+    if (student && saleTier !== student.tier) {
+      logWebhook("webhook.revoke_tier_mismatch", {
+        saleId: ping.saleId,
+        event: ping.event,
+        saleTier,
+        currentTier: student.tier,
+      });
+      return { handled: true, revoked: false, duplicate: false };
+    }
   }
   const revoked = await revokeStudentByEmail(email, ping.event);
   if (!revoked) {
@@ -193,7 +214,19 @@ export async function processGumroadSale(sale: PingSale): Promise<PingOutcome> {
     currency: sale.currency,
   });
   if (duplicate) {
-    logWebhook("webhook.duplicate", { saleId: sale.saleId });
+    // A re-delivery shaped differently from the original (a refund ping
+    // carrying sale fields is the classic case) still acks — but loudly,
+    // so a missed revocation can't hide inside a quiet duplicate.
+    const original = await getWebhookEvent("gumroad", sale.saleId);
+    const before = (original?.payload as Record<string, unknown> | undefined) ?? {};
+    const fields = (["email", "productRef", "price", "currency"] as const).filter(
+      (k) => before[k] !== sale[k],
+    );
+    if (fields.length > 0) {
+      logWebhook("webhook.duplicate_mismatch", { saleId: sale.saleId, fields });
+    } else {
+      logWebhook("webhook.duplicate", { saleId: sale.saleId });
+    }
     return { handled: true, duplicate: true };
   }
   const licenseKey = generateLicenseKey(tier as LicenseTier);

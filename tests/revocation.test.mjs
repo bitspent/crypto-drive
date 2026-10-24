@@ -154,6 +154,61 @@ function battery(tag) {
     assert.deepEqual(await store.getSessionAccess("ses_nope"), { status: "none" });
   });
 
+  it("a refund for a superseded tier does not revoke the current one", async () => {
+    const email = `${fresh(`${tag}-upbuyer`)}@example.com`;
+    const starterSaleId = fresh(`${tag}-up-starter`);
+    const certSaleId = fresh(`${tag}-up-cert`);
+    const starter = await webhook.processGumroadSale({
+      saleId: starterSaleId,
+      email,
+      productRef: "prod_starter",
+    });
+    assert.equal(starter.duplicate, false);
+    const certified = await webhook.processGumroadSale({
+      saleId: certSaleId,
+      email,
+      productRef: "prod_cert",
+    });
+    assert.equal(certified.duplicate, false);
+    assert.equal((await store.findStudentByEmail(email)).tier, "certified");
+    // Refunding the old Starter purchase must not kill Certified access.
+    const stale = await webhook.processGumroadRefund({ saleId: starterSaleId, event: "refund" });
+    assert.deepEqual(stale, { handled: true, revoked: false, duplicate: false });
+    const kept = await store.findStudentByEmail(email);
+    assert.equal(kept.revokedAt ?? null, null);
+    assert.equal(kept.tier, "certified");
+    // Refunding the current tier still revokes.
+    const current = await webhook.processGumroadRefund({ saleId: certSaleId, event: "refund" });
+    assert.equal(current.revoked, true);
+    assert.ok((await store.findStudentByEmail(email)).revokedAt);
+  });
+
+  it("a reshaped duplicate sale acks loudly and never overwrites", async () => {
+    const { saleId, email } = await provisionedSale(`${tag}-reshape`);
+    const intruder = `other-${Date.now()}-${n++}@example.com`;
+    const lines = [];
+    const origLog = console.log;
+    console.log = (msg) => lines.push(String(msg));
+    try {
+      const again = await webhook.processGumroadSale({
+        saleId,
+        email: intruder,
+        productRef: "prod_cert",
+        price: "9999",
+        currency: "USD",
+      });
+      assert.deepEqual(again, { handled: true, duplicate: true });
+    } finally {
+      console.log = origLog;
+    }
+    const mismatch = lines.find((l) => l.includes("webhook.duplicate_mismatch"));
+    assert.ok(mismatch, "expected a duplicate_mismatch log line");
+    assert.ok(mismatch.includes(saleId));
+    // No overwrite: the original student stands, the new email has nobody.
+    assert.equal((await store.findStudentByEmail(email)).email, email);
+    assert.equal(await store.findStudentByEmail(intruder), null);
+  });
+
   it("a new sale clears an earlier revocation", async () => {
     const { email } = await provisionedSale(`${tag}-repurchase`);
     await store.revokeStudentByEmail(email, "refund");
@@ -180,6 +235,17 @@ function battery(tag) {
 
 describe("revocation (file store)", { skip: HAS_DB }, () => {
   battery("file");
+
+  it("file-mode deliveries persist in the store, not just the process", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const { saleId } = await provisionedSale("file-persist");
+    const raw = await readFile(join(root, ".data/store.json"), "utf8");
+    const data = JSON.parse(raw);
+    assert.ok(
+      data.webhookEvents?.[`gumroad:${saleId}`],
+      "expected the sale delivery in .data/store.json",
+    );
+  });
 });
 
 describe("revocation (postgres)", { skip: !HAS_DB }, () => {

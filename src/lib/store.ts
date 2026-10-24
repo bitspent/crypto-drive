@@ -74,6 +74,8 @@ type StoreData = {
   students: Record<string, Student>;
   certificates: Record<string, Certificate>;
   sessions: Record<string, string>;
+  /** Webhook deliveries by `${source}:${id}` — file-mode idempotency. */
+  webhookEvents: Record<string, Record<string, unknown>>;
 };
 
 const DATA_DIR = path.join(process.cwd(), ".data");
@@ -93,12 +95,16 @@ const emptyStore = (): StoreData => ({
   students: {},
   certificates: {},
   sessions: {},
+  webhookEvents: {},
 });
 
 async function ensureStore(): Promise<StoreData> {
   try {
     const raw = await readFile(STORE_PATH, "utf8");
-    return JSON.parse(raw) as StoreData;
+    const data = JSON.parse(raw) as StoreData;
+    // Backfill for stores written before webhook idempotency was persisted.
+    data.webhookEvents ??= {};
+    return data;
   } catch {
     const data = emptyStore();
     await mkdir(DATA_DIR, { recursive: true });
@@ -978,12 +984,11 @@ export async function provisionLicensedStudent(
   return normalizeStudent(student);
 }
 
-/** Process-wide fallback store for dev file mode (production uses Postgres). */
-const fallbackWebhookEvents = new Map<string, Record<string, unknown>>();
-
 /**
  * Record a webhook delivery. Returns true when this id was already seen —
  * callers ack the duplicate without re-provisioning or re-emailing.
+ * The file fallback persists to the store (a restart must not resurrect a
+ * delivery), matching the Postgres onConflictDoNothing semantics.
  */
 export async function recordWebhookEvent(
   source: string,
@@ -998,9 +1003,11 @@ export async function recordWebhookEvent(
       .returning({ id: webhookEvents.id });
     return inserted.length === 0;
   }
+  const data = await ensureStore();
   const key = `${source}:${id}`;
-  if (fallbackWebhookEvents.has(key)) return true;
-  fallbackWebhookEvents.set(key, payload);
+  if (data.webhookEvents[key]) return true;
+  data.webhookEvents[key] = payload;
+  await saveStore(data);
   return false;
 }
 
@@ -1019,7 +1026,8 @@ export async function getWebhookEvent(
     if (!row) return null;
     return { payload: (row.payload as Record<string, unknown>) ?? {} };
   }
-  const payload = fallbackWebhookEvents.get(`${source}:${id}`);
+  const data = await ensureStore();
+  const payload = data.webhookEvents[`${source}:${id}`];
   if (!payload) return null;
   return { payload };
 }
