@@ -12,12 +12,7 @@ import {
 
 test.setTimeout(240_000);
 
-async function clickAndWaitUrl(page: Page, name: string, urlPart: string): Promise<void> {
-  await page.getByRole("button", { name }).click();
-  await page.waitForURL(`**/${urlPart}`);
-}
-
-// For pocket-card steps: commit may stay and show a Continue link instead.
+// Every step carries a pocket card: commit may stay and show a Continue link.
 async function commitAndContinue(page: Page, buttonName: string, urlPart: string): Promise<void> {
   await page.getByRole("button", { name: buttonName }).click();
   try {
@@ -84,11 +79,11 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
   await satoshiRight.click();
   await expect(satoshiRight).toContainText("✓");
 
-  await clickAndWaitUrl(page, "Show me how scarce it is", "what-is/scarce");
-  await clickAndWaitUrl(page, "How do new coins appear?", "what-is/block");
-  await clickAndWaitUrl(page, "Does that pay stay the same?", "what-is/halving");
-  await clickAndWaitUrl(page, "What is a satoshi?", "what-is/sats");
-  await clickAndWaitUrl(page, "Show me my balance", "what-is/cheques");
+  await commitAndContinue(page, "Show me how scarce it is", "what-is/scarce");
+  await commitAndContinue(page, "How do new coins appear?", "what-is/block");
+  await commitAndContinue(page, "Does that pay stay the same?", "what-is/halving");
+  await commitAndContinue(page, "What is a satoshi?", "what-is/sats");
+  await commitAndContinue(page, "Show me my balance", "what-is/cheques");
 
   // cheques: sum the three amounts.
   const items = page.locator("li", { hasText: /Cheque \d/ });
@@ -114,7 +109,7 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
   await page.getByRole("button", { name: "Copy Bitcoin address" }).click();
   await page.fill("#first4", addr.slice(0, 4));
   await page.fill("#last4", addr.slice(-4));
-  await clickAndWaitUrl(page, "That's my address", "get-paid/receipt");
+  await commitAndContinue(page, "That's my address", "get-paid/receipt");
 
   // receipt: paste txid, wait for landed.
   const receiptChip = await page
@@ -164,7 +159,7 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
 
   await page.getByRole("button", { name: "Share address" }).click();
   await page.getByRole("button", { name: "Share key" }).click();
-  await clickAndWaitUrl(page, "I've seen both", "guard/words");
+  await commitAndContinue(page, "I've seen both", "guard/words");
 
   // words: capture order, tap through, refuse traps, recall.
   const tapFrame = page.locator("p", { hasText: "TAP ONTO THE CARD" }).locator("xpath=..");
@@ -209,15 +204,13 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
   await page.getByRole("link", { name: "Continue", exact: true }).click();
   await page.waitForURL("**/road-test/support");
 
-  await clickAndWaitUrl(page, "Close the chat", "road-test/network");
+  await commitAndContinue(page, "Close the chat", "road-test/network");
 
   await page.getByRole("button", { name: "Switch to Bitcoin" }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.waitForURL("**/road-test/mismatch");
+  await commitAndContinue(page, "Continue", "road-test/mismatch");
 
-  // No cert on mismatch anymore: it auto-advances into the capstone.
-  await page.getByRole("button", { name: "Stop the send" }).click();
-  await page.waitForURL("**/prove-it/verify");
+  // No cert on mismatch: pocket card shows, Continue leads into the capstone.
+  await commitAndContinue(page, "Stop the send", "prove-it/verify");
 
   // verify: same three checks as the explorer lesson, new commit button.
   await expectLayoutContract(page, "prove-it/verify");

@@ -33,6 +33,7 @@
           "whyItMatters": "Pros meet \"Bitcoin\" in policy decks. Knowing it began as a public paper and a live network stops the myth that a single vendor runs it.",
           "keyTerms": ["Satoshi Nakamoto", "white paper", "open network"],
           "misconception": "Bitcoin is a company you can call for support.",
+          "pocketCard": "No company, no office — just the network.",
           "quickCheck": {
             "question": "Who runs the Bitcoin network?",
             "options": [
@@ -58,6 +59,7 @@
           "whyItMatters": "Scarcity is why people treat bitcoin differently from a bank balance that can be inflated by policy.",
           "keyTerms": ["21 million", "hard cap", "scarce"],
           "misconception": "Miners can print as much bitcoin as they want whenever they like.",
+          "pocketCard": "21 million. Not one more.",
           "quickCheck": {
             "question": "How many bitcoin will ever exist?",
             "options": [
@@ -83,6 +85,7 @@
           "whyItMatters": "Waiting for a payment is waiting for that page to seal — not waiting for a bank clerk.",
           "keyTerms": ["block", "miner", "about ten minutes"],
           "misconception": "Bitcoin payments clear instantly like a card swipe every time.",
+          "pocketCard": "A sealed page every ten minutes.",
           "quickCheck": {
             "question": "What is a block?",
             "options": [
@@ -108,6 +111,7 @@
           "whyItMatters": "Issuance is mechanical, not a board decision. That is part of the scarcity story.",
           "keyTerms": ["halving", "block reward", "issuance"],
           "misconception": "Someone can vote to mint unlimited new bitcoin next quarter.",
+          "pocketCard": "New coins slow down on a schedule.",
           "quickCheck": {
             "question": "What does the halving do?",
             "options": [
@@ -133,6 +137,7 @@
           "whyItMatters": "Pros see tiny decimals on invoices. Sats are the cents — that is normal, not a glitch.",
           "keyTerms": ["satoshi", "sats", "100,000,000"],
           "misconception": "You can only send whole bitcoin.",
+          "pocketCard": "A bitcoin is 100,000,000 sats.",
           "quickCheck": {
             "question": "A coffee costs 4,000 sats. How much bitcoin is that?",
             "options": [
@@ -220,6 +225,7 @@
           "whyItMatters": "Client onboarding often stalls on the fear that sharing an address leaks control; it does not — control stays with the key.",
           "keyTerms": ["address", "receive", "private key"],
           "misconception": "Sharing your address gives the other person a way to take your bitcoin.",
+          "pocketCard": "Share the address. Never the key.",
           "quickCheck": {
             "question": "Someone needs to pay you. What do you share?",
             "options": [
@@ -399,6 +405,7 @@
           "whyItMatters": "Custody is the first question in any institutional discussion; this is the difference between an IOU and actual control.",
           "keyTerms": ["private key", "custody", "sign"],
           "misconception": "Your exchange login password is your Bitcoin private key.",
+          "pocketCard": "Password is not the key.",
           "quickCheck": {
             "question": "Who can spend the bitcoin in your exchange account?",
             "options": [
@@ -460,6 +467,7 @@
           "whyItMatters": "Social engineering, not cryptography, is how most client funds are lost; staff who know this script protect the firm.",
           "keyTerms": ["phishing", "word list", "close the chat"],
           "misconception": "A support agent may legitimately need your words to fix a stuck wallet.",
+          "pocketCard": "Support never needs your words.",
           "quickCheck": {
             "question": "Support asks for your word list to 'verify' your wallet. You...",
             "options": [
@@ -485,6 +493,7 @@
           "whyItMatters": "Wrong-network sends are unrecoverable, so network checks belong in every payment procedure alongside amount checks.",
           "keyTerms": ["network", "address format", "0x"],
           "misconception": "All addresses work on all networks, so a 0x address is fine for Bitcoin.",
+          "pocketCard": "0x is a different road.",
           "quickCheck": {
             "question": "The recipient's address starts with 0x. You...",
             "options": [
@@ -510,6 +519,7 @@
           "whyItMatters": "A maker-checker habit on addresses is the cheapest control a finance team can adopt for Bitcoin payments.",
           "keyTerms": ["verify twice", "mismatch", "stop"],
           "misconception": "One wrong character is harmless because the network will correct the address.",
+          "pocketCard": "One character off means stop.",
           "quickCheck": {
             "question": "The on-screen address differs from the recipient's by one character. You...",
             "options": [

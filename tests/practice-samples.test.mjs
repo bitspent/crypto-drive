@@ -172,6 +172,13 @@ describe("bitcoin first drive", () => {
     assert.equal(new Set(questions).size, questions.length, "duplicate quickCheck question");
   });
 
+  it("gives all 25 bitcoin steps a pocket card", () => {
+    const steps = bitcoin.drives.flatMap((d) => d.steps);
+    for (const step of steps) {
+      assert.ok(step.pocketCard?.trim(), `${step.id} missing pocketCard`);
+    }
+  });
+
   it("shapes the prove-it capstone after road-test", () => {
     assert.deepEqual(
       bitcoin.drives.map((d) => d.slug),
