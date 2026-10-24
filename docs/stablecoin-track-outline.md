@@ -1,8 +1,19 @@
-# Stablecoin track outline (Track C) — proposal, not a build
+# Stablecoin track outline (Track C) — approved direction, not yet built
 
-Status: outline only. The Bitcoin track stays the charge-quality product;
-this doc scopes what "coming next" means for `content/tracks/usdt-networks.json`
-and names the positioning decision that gates it.
+Status: direction approved by owner (see Locked decisions). The Bitcoin
+track stays the charge-quality product; this doc scopes what "coming next"
+means for `content/tracks/usdt-networks.json`.
+
+## Locked decisions
+
+- **Order:** Track C standalone with a two-step ERC-20 primer folded into
+  drive 1. Track B (Ethereum) stays scaffolded.
+- **Certificate:** one cert per track, each naming what its exam proved, all
+  verifiable at /verify.
+- **Wallet:** BTC-only for now (option A — Track C drills are view-only:
+  read, inspect, refuse; no wallet changes).
+- **ETH infra:** dedicated lightweight localnet to be spiked (see below) —
+  Track C content does not wait for it.
 
 ## The scaffold's promises (already public copy)
 
@@ -73,5 +84,19 @@ Two decisions gate this track:
    "one USDT certificate". Recommendation: keep it — per-track certs, each
    naming what its exam proved, all verifiable at /verify.
 
-Say the word on 1, 2, and wallet option A/B/C, and Track C becomes a
-content prompt in the same shape as the capstone build.
+## ETH localnet spike (next infra step)
+
+Recommendation: **Anvil** (Foundry), not Ganache. One static binary,
+starts in under a second, automines, ships 10 prefunded accounts (the
+faucet is just an account), `anvil_setBalance` for top-ups, fork mode for
+mainnet state, plain JSON-RPC so ethers/viem work unchanged. Ganache is
+heavier (Electron lineage, slower) and Hardhat Network is best in-process
+for tests rather than as a sidecar service.
+
+Integration shape mirrors Bitcoin exactly: an `EthProvider` with
+`simulated | sepolia | local` modes, Sepolia as the public-testnet analog
+of signet, and the local mode pointed at Anvil through the same infra-api
+pattern (faucet, tx status, mine, fees). Explorer reads stay Model A
+(link out to sepolia.etherscan.io / tronscan — no keys, no self-hosted
+Blockscout). Tron gets no private net: TRC-20 drills are recognition-only
+(address alphabet + picker), which needs no chain.
