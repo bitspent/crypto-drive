@@ -17,8 +17,29 @@ services:
       BITCOIN_RPC_PASSWORD: "123"
       ELECTRS_HTTP_URL: http://host.docker.internal:30000
       ESPLORA_URL: http://host.docker.internal:5000
+      ANVIL_RPC_URL: http://anvil:8545
       INFRA_SHARED_SECRET: dev
       ADMIN_MINE_TOKEN: dev
+    depends_on:
+      anvil:
+        condition: service_healthy
+
+  # Anvil (Foundry) local Ethereum devnet: automines, prefunded accounts,
+  # Anvil-native faucet (setBalance) and mining. Chain 31337, worthless coins.
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    command: ["anvil", "--port", "8545"]
+    environment:
+      # --host is ignored by this image's arg parsing; the env var binds all ifaces.
+      ANVIL_IP_ADDR: 0.0.0.0
+    ports:
+      - "${ANVIL_PORT:-8545}:8545"
+    healthcheck:
+      test: ["CMD", "cast", "block-number", "--rpc-url", "http://localhost:8545"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # Our own Esplora UI. Nigiri ships one on :5000, but on macOS AirPlay owns
   # that port — so we run the same image on :5001 (jumpable via ESPLORA_PORT)

@@ -254,6 +254,156 @@ app.get("/api/fees", async (c) => {
   }
 });
 
+// ─── ETH (Anvil local devnet) ─────────────────────────────────────────────
+// Optional sidecar: when ANVIL_RPC_URL is unset the eth routes 503 and the
+// Bitcoin routes are unaffected (BTC-only deploys never set it).
+const ANVIL_RPC_URL = process.env.ANVIL_RPC_URL?.trim() || "";
+const MAX_FUND_WEI = 10n ** 19n; // 10 ETH
+
+function requireAnvil(c) {
+  if (!ANVIL_RPC_URL) return c.json({ error: "eth devnet not configured" }, 503);
+  return null;
+}
+
+async function eth(method, params = []) {
+  const res = await fetch(ANVIL_RPC_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: "infra", method, params }),
+    signal: AbortSignal.timeout(10000),
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok || body == null || body.error) {
+    const reason = body?.error?.message ? `eth: ${body.error.message}` : `eth ${res.status}`;
+    throw new Error(reason);
+  }
+  return body.result;
+}
+
+const hexToBig = (h) => BigInt(h);
+const gweiOf = (wei) => Number(wei) / 1e9;
+
+app.get("/api/eth/status", async (c) => {
+  const missing = requireAnvil(c);
+  if (missing) return missing;
+  try {
+    const [chainId, block, gasPrice] = await Promise.all([
+      eth("eth_chainId"),
+      eth("eth_blockNumber"),
+      eth("eth_gasPrice"),
+    ]);
+    return c.json({
+      ok: true,
+      chainId: Number(hexToBig(chainId)),
+      blockNumber: Number(hexToBig(block)),
+      gasPriceGwei: gweiOf(hexToBig(gasPrice)),
+    });
+  } catch (e) {
+    log("eth.status.error", { error: String(e).slice(0, 160) });
+    return c.json({ error: "eth devnet unreachable" }, 503);
+  }
+});
+
+app.post("/api/eth/address/fund", async (c) => {
+  const missing = requireAnvil(c);
+  if (missing) return missing;
+  const body = await c.req.json().catch(() => ({}));
+  const address = typeof body.address === "string" ? body.address.trim() : "";
+  const amountWei = typeof body.amountWei === "string" ? body.amountWei.trim() : "";
+  if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
+    return c.json({ error: "invalid address" }, 400);
+  }
+  let amount;
+  try {
+    amount = BigInt(amountWei);
+  } catch {
+    return c.json({ error: "amount out of range" }, 400);
+  }
+  if (amount <= 0n || amount > MAX_FUND_WEI) {
+    return c.json({ error: "amount out of range" }, 400);
+  }
+  try {
+    // Anvil-native faucet: no signing needed, and no txid exists.
+    await eth("anvil_setBalance", [address, `0x${amount.toString(16)}`]);
+    const balance = await eth("eth_getBalance", [address, "latest"]);
+    log("eth.faucet.funded", { amountWei: amount.toString() });
+    return c.json({ balanceWei: hexToBig(balance).toString() });
+  } catch (e) {
+    log("eth.faucet.error", { error: String(e).slice(0, 160) });
+    return c.json({ error: "faucet failed" }, 503);
+  }
+});
+
+app.get("/api/eth/tx/:hash", async (c) => {
+  const missing = requireAnvil(c);
+  if (missing) return missing;
+  const hash = c.req.param("hash") ?? "";
+  if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) {
+    return c.json({ error: "tx not found" }, 404);
+  }
+  try {
+    const receipt = await eth("eth_getTransactionReceipt", [hash]);
+    if (!receipt) {
+      return c.json({ error: "tx not found" }, 404);
+    }
+    if (!receipt.blockNumber) {
+      return c.json({ confirmed: false, confirmations: 0, blockNumber: null });
+    }
+    const tip = Number(hexToBig(await eth("eth_blockNumber")));
+    const at = Number(hexToBig(receipt.blockNumber));
+    return c.json({
+      confirmed: true,
+      confirmations: Math.max(1, tip - at + 1),
+      blockNumber: at,
+    });
+  } catch {
+    return c.json({ error: "tx not found" }, 404);
+  }
+});
+
+app.post("/api/eth/mine", async (c) => {
+  const missing = requireAnvil(c);
+  if (missing) return missing;
+  const token = c.req.header("x-admin-token") ?? "";
+  if (!token || !safeEqual(token, ADMIN_MINE_TOKEN)) {
+    return c.json({ error: "forbidden" }, 403);
+  }
+  const body = await c.req.json().catch(() => ({}));
+  const blocks = body.blocks === undefined ? 1 : body.blocks;
+  if (!Number.isInteger(blocks) || blocks < 1 || blocks > 10) {
+    return c.json({ error: "blocks out of range" }, 400);
+  }
+  try {
+    await eth("anvil_mine", [`0x${blocks.toString(16)}`]);
+    const height = Number(hexToBig(await eth("eth_blockNumber")));
+    return c.json({ height });
+  } catch (e) {
+    log("eth.mine.error", { error: String(e).slice(0, 160) });
+    return c.json({ error: "mine failed" }, 503);
+  }
+});
+
+app.get("/api/eth/fees", async (c) => {
+  const missing = requireAnvil(c);
+  if (missing) return missing;
+  try {
+    // feeHistory percentiles map to slow/standard/fast; gasPrice backstops.
+    const [history, gasPrice] = await Promise.all([
+      eth("eth_feeHistory", ["0x4", "latest", [25, 50, 75]]).catch(() => null),
+      eth("eth_gasPrice"),
+    ]);
+    const base = gweiOf(hexToBig(gasPrice));
+    if (!history?.reward?.length) {
+      return c.json({ slow: base, standard: base, fast: base });
+    }
+    const last = history.reward[history.reward.length - 1].map((h) => gweiOf(hexToBig(h)));
+    return c.json({ slow: last[0], standard: last[1], fast: last[2] });
+  } catch (e) {
+    log("eth.fees.error", { error: String(e).slice(0, 120) });
+    return c.json({ error: "fees unavailable" }, 503);
+  }
+});
+
 app.notFound((c) => c.json({ error: "not found" }, 404));
 
 const port = Number(PORT);

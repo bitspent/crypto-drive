@@ -37,3 +37,52 @@ Response 403: `{ error: "forbidden" }`
 ## GET /api/fees
 
 Response 200: `{ fastest: number, halfHour: number, hour: number, economy: number, minimum: number }`
+
+## ETH appendix — Anvil local devnet (spike)
+
+Same service, same Bearer auth. All `/api/eth/*` routes 503 with
+`{ error: "eth devnet not configured" }` when `ANVIL_RPC_URL` is unset
+(BTC-only deploys never set it). Amounts are decimal wei strings; fees in
+gwei. Anvil chain 31337, worthless coins.
+
+## GET /api/eth/status
+
+Response 200: `{ ok: true, chainId: number, blockNumber: number, gasPriceGwei: number }`
+
+Response 503: `{ error: "eth devnet unreachable" }`
+
+## POST /api/eth/address/fund
+
+Anvil-native faucet (`anvil_setBalance`): no signing, no txid exists.
+
+Body: `{ address: string (0x + 40 hex), amountWei: string (decimal, max 10 ETH) }`
+
+Response 200: `{ balanceWei: string }`
+
+Response 400: `{ error: "invalid address" | "amount out of range" }`
+
+Response 503: `{ error: "faucet failed" }`
+
+## GET /api/eth/tx/:hash
+
+Response 200: `{ confirmed: bool, confirmations: number, blockNumber: number | null }`
+
+Response 404: `{ error: "tx not found" }`
+
+## POST /api/eth/mine
+
+Body: `{ blocks: number (1-10, default 1) }`
+
+Header: `X-Admin-Token: <ADMIN_MINE_TOKEN>`
+
+Response 200: `{ height: number }`
+
+Response 403: `{ error: "forbidden" }`
+
+## GET /api/eth/fees
+
+`eth_feeHistory` percentiles mapped to tiers; `eth_gasPrice` backstop.
+
+Response 200: `{ slow: number, standard: number, fast: number }`
+
+Response 503: `{ error: "fees unavailable" }`

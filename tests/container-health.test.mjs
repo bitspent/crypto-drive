@@ -22,10 +22,17 @@ describe("container healthchecks", () => {
 
   it("compose gives esplora-ui a healthcheck using its own node", () => {
     const src = read("docker-compose.infra-api.yml");
-    const block = src.slice(src.indexOf("healthcheck:"));
-    assert.match(src, /healthcheck:\s*\n\s*test: \["CMD", "node"/);
+    const block = src.slice(src.indexOf("healthcheck:", src.indexOf("esplora-ui:")));
+    assert.match(block, /test: \["CMD", "node"/);
     assert.match(block, /localhost:5000/);
     assert.doesNotMatch(block, /curl/);
+  });
+
+  it("compose gives anvil a cast-based healthcheck", () => {
+    const src = read("docker-compose.infra-api.yml");
+    const block = src.slice(src.indexOf("\n  anvil:"), src.indexOf("\n  esplora-ui:"));
+    assert.match(block, /test: \["CMD", "cast", "block-number"/);
+    assert.match(block, /localhost:8545/);
   });
 
   it("boot.sh creates crypto-drive-pg with pg_isready health flags", () => {
