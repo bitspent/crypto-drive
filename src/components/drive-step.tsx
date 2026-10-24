@@ -1894,6 +1894,10 @@ function SeedScene({
     setLocalError(null);
     setHitIdx(index);
     if (recallAt === recall.length - 1) {
+      // Marker, not a gate: the wallet is backed up once the learner has
+      // written the words and passed recall. A failed stamp must not block
+      // the lesson — the wallet's own backup flow can re-stamp later.
+      void fetch("/api/wallet/backup", { method: "POST" }).catch(() => undefined);
       onCommit({
         recallWords: recall.map((n) => words[n - 1]),
       });

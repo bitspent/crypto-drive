@@ -223,6 +223,18 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
   await page.getByRole("link", { name: "Continue", exact: true }).click();
   await page.waitForURL("**/road-test/support");
 
+  // One wallet: the words lesson stamps the wallet's backup marker.
+  await expect
+    .poll(
+      async () => {
+        const r = await page.request.get("/api/wallet");
+        const j = (await r.json()) as { wallet?: { backupAt?: string | null } | null };
+        return j.wallet?.backupAt ?? null;
+      },
+      { timeout: 10000 },
+    )
+    .not.toBeNull();
+
   await commitAndContinue(page, "Close the chat", "road-test/network");
 
   await page.getByRole("button", { name: "Switch to Bitcoin" }).click();
