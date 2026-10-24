@@ -136,6 +136,31 @@ describe("practice samples", () => {
     assert.equal(gradeStepAnswer("btc-paid-receipt", "receipt", p, { txid: p.txid }), null);
     assert.ok(gradeStepAnswer("btc-paid-receipt", "receipt", p, { txid: "cd".repeat(32) }));
   });
+
+  it("grades no-undo answers against the lesson send", () => {
+    const p = practiceFor(derivePracticeSeed("grade@example.com", "CD-DRIVE-STARTER"));
+    const lessonSats = Math.round(Number(p.sendBtc) * 100_000_000);
+    const tx = (over) => ({
+      id: "ab".repeat(32),
+      direction: "out",
+      amount: lessonSats,
+      counterparty: p.dest,
+      status: "confirmed",
+      confirmations: 3,
+      timestamp: "2026-10-15T00:00:00.000Z",
+      ...over,
+    });
+    const wallet = (history) => ({ exists: true, history });
+    const grade = (answer, w) => gradeStepAnswer("btc-send-noundo", "send-confirm", p, answer, w);
+    assert.equal(grade({ txid: "ab".repeat(32) }, wallet([tx({})])), null);
+    // Pending, wrong amount, wrong counterparty, and unknown txids fail.
+    assert.ok(grade({ txid: "ab".repeat(32) }, wallet([tx({ status: "pending" })])));
+    assert.ok(grade({ txid: "ab".repeat(32) }, wallet([tx({ amount: lessonSats + 1 })])));
+    assert.ok(grade({ txid: "ab".repeat(32) }, wallet([tx({ counterparty: "bc1qother" })])));
+    assert.ok(grade({ txid: "cd".repeat(32) }, wallet([tx({})])));
+    // No wallet: legacy ungraded path.
+    assert.equal(grade({ txid: "whatever" }), null);
+  });
 });
 
 describe("bitcoin first drive", () => {

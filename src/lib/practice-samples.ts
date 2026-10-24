@@ -276,6 +276,26 @@ export function gradeStepAnswer(
     return null;
   }
 
+  if (actionType === "send-confirm") {
+    // The no-undo step spends the real practice wallet: the committed txid
+    // must be this lesson's confirmed outgoing tx (amount + counterparty).
+    // Without a wallet there is nothing to check (legacy ungraded path).
+    if (!wallet) return null;
+    const txid = answer?.txid?.trim().toLowerCase() ?? "";
+    const lessonSats = Math.round(Number(practice.sendBtc) * 100_000_000);
+    const sent = wallet.history.find(
+      (t) =>
+        t.id.toLowerCase() === txid &&
+        t.direction === "out" &&
+        t.counterparty === practice.dest &&
+        t.amount === lessonSats,
+    );
+    if (!sent || sent.status !== "confirmed") {
+      return "Send the test from this screen and wait until it lands.";
+    }
+    return null;
+  }
+
   if (actionType === "explorer-read") {
     if (answer?.explorerConfirmed !== "yes") {
       return "Open the explorer link. Is this transaction confirmed? Pick yes when status says confirmed.";

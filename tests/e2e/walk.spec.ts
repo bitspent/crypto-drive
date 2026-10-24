@@ -163,7 +163,18 @@ test("walks unlock to verified certificate across all 25 steps", async ({ page }
     undefined,
     { polling: 100 },
   );
+  await expect(page.getByText(/· Landed/)).toBeVisible();
   await commitAndContinue(page, "It landed", "guard/key");
+  // The test send is real: a second confirmed outgoing sits in the wallet
+  // (the first is the pre-course freshness fixture).
+  const wafter = await page.request.get("/api/wallet");
+  expect(wafter.ok()).toBe(true);
+  const { wallet: afterSend } = (await wafter.json()) as {
+    wallet: { history: { direction: string; status: string }[] };
+  };
+  expect(
+    afterSend.history.filter((t) => t.direction === "out" && t.status === "confirmed").length,
+  ).toBeGreaterThanOrEqual(2);
 
   await page.getByRole("button", { name: "Share address" }).click();
   await page.getByRole("button", { name: "Share key" }).click();

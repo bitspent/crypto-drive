@@ -1246,29 +1246,6 @@ function AddressScene({
   );
 }
 
-function useConfirmations(active: boolean, immediate: boolean) {
-  const [confirms, setConfirms] = useState(immediate ? 3 : 0);
-
-  useEffect(() => {
-    if (!active || immediate) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const marks = reduce
-      ? [{ n: 3, delay: 0 }]
-      : [
-          { n: 1, delay: 700 },
-          { n: 3, delay: 1400 },
-        ];
-    const ids = marks.map((mark) => window.setTimeout(() => setConfirms(mark.n), mark.delay));
-    return () => {
-      for (const id of ids) window.clearTimeout(id);
-    };
-  }, [active, immediate]);
-
-  const shown = active ? confirms : 0;
-  const label = shown >= 3 ? "landed" : shown >= 1 ? "seen" : "in traffic";
-  return { confirms: shown, label };
-}
-
 function ReceiptScene({
   step,
   practice,
@@ -1631,34 +1608,116 @@ function SendScene({
   coach: string;
   onCommit: (answer?: StepAnswer) => void;
 }) {
-  const [sent, setSent] = useState(review);
-  const { confirms, label } = useConfirmations(sent, review);
+  // The test send is REAL: it spends the practice wallet (funded at the
+  // receipt step) to the lesson counterparty, then polls the live tx.
+  const lessonSats = Math.round(Number(practice.sendBtc) * 100_000_000);
+  const [tx, setTx] = useState<TxRecord | null>(null);
+  const [working, setWorking] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const sent = tx !== null;
+  const confirms = tx?.confirmations ?? 0;
+  const landed = tx?.status === "confirmed";
 
   useEffect(() => {
-    publish("send-sent", sent);
-    publish("send-confirms", confirms);
-  }, [sent, confirms]);
-  const [localError, setLocalError] = useState<string | null>(null);
+    if (!review) return;
+    let live = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/wallet");
+        const data = (await res.json()) as { wallet?: WalletState | null };
+        const outgoing =
+          data.wallet?.history.find(
+            (t) =>
+              t.direction === "out" &&
+              t.counterparty === practice.dest &&
+              t.amount === lessonSats,
+          ) ?? null;
+        if (live) setTx(outgoing);
+      } catch {
+        if (live) setTx(null);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- practice/lesson are mount-stable
+  }, [review]);
+
+  async function sendTest() {
+    setWorking(true);
+    setLocalError(null);
+    try {
+      let res = await fetch("/api/wallet");
+      const data = (await res.json()) as { wallet?: WalletState | null; error?: string };
+      if (!res.ok || !data.wallet?.exists) {
+        throw new Error("Complete the receipt step first — the wallet is empty.");
+      }
+      // A matching in-flight send is reused (retry-safe); otherwise send.
+      let outgoing =
+        data.wallet.history.find(
+          (t) =>
+            t.direction === "out" &&
+            t.counterparty === practice.dest &&
+            t.amount === lessonSats,
+        ) ?? null;
+      if (!outgoing) {
+        res = await fetch("/api/wallet/send", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ to: practice.dest, amountSats: lessonSats, feeTier: "economy" }),
+        });
+        const signed = (await res.json()) as { tx?: TxRecord; error?: string };
+        if (!res.ok || !signed.tx) {
+          throw new Error(signed.error || "The test send did not go through.");
+        }
+        outgoing = signed.tx;
+      }
+      setTx(outgoing);
+      for (let i = 0; i < 12 && outgoing.status !== "confirmed"; i++) {
+        await new Promise((r) => setTimeout(r, 1500));
+        res = await fetch("/api/wallet/tick", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ txid: outgoing.id }),
+        });
+        const advanced = (await res.json()) as { tx?: TxRecord; error?: string };
+        if (!res.ok || !advanced.tx) {
+          throw new Error(advanced.error || "Could not advance.");
+        }
+        outgoing = advanced.tx;
+        setTx(outgoing);
+      }
+      if (outgoing.status !== "confirmed") {
+        throw new Error("Still waiting on the network — try again.");
+      }
+    } catch (e) {
+      setLocalError(
+        e instanceof Error ? e.message : "Couldn't reach the practice wallet. Try again.",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
 
   function confirm() {
-    if (confirms < 3) {
+    if (!tx || tx.status !== "confirmed") {
       setLocalError("Wait until the receipt says landed.");
       return;
     }
-    onCommit();
+    onCommit({ txid: tx.id });
   }
 
   useFootPrimary(
     review ? null : sent ? (
-      <Button size="lg" disabled={busy || confirms < 3} onClick={confirm}>
+      <Button size="lg" disabled={busy || !landed} onClick={confirm}>
         {button}
       </Button>
     ) : (
-      <Button size="lg" onClick={() => setSent(true)}>
+      <Button size="lg" disabled={busy || working} onClick={sendTest}>
         Send the test anyway
       </Button>
     ),
-    [review, sent, busy, button, confirms],
+    [review, sent, busy, button, landed, working],
   );
 
   return (
@@ -1668,18 +1727,23 @@ function SendScene({
           <div>
             <dt className="text-[var(--mute)]">Amount</dt>
             <dd className="mt-1 font-[family-name:var(--font-display)] text-2xl text-[var(--paper)]">
-              {sent ? `${practice.sendBtc} BTC` : "—"}
+              {sent && tx ? `${formatBtcTrim(tx.amount)} BTC` : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[var(--mute)]">To</dt>
+            <dd className="mt-1 font-mono text-xs">
+              {sent && tx ? (
+                <CopyChip value={tx.counterparty} label="test send recipient" />
+              ) : (
+                "—"
+              )}
             </dd>
           </div>
           <div>
             <dt className="text-[var(--mute)]">Confirmations</dt>
-            <dd
-              className={cn(
-                "mt-1",
-                sent && confirms >= 3 ? "text-[var(--go)]" : "text-[var(--fog)]",
-              )}
-            >
-              {sent ? `${confirms} · ${label}` : "Send to start the clock"}
+            <dd className={cn("mt-1", landed ? "text-[var(--go)]" : "text-[var(--fog)]")}>
+              {sent ? `${confirms} · ${landed ? "Landed" : "Confirming…"}` : "Send to start the clock"}
             </dd>
           </div>
         </dl>
