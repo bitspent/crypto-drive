@@ -22,14 +22,14 @@ export class RegtestProvider implements BitcoinProvider {
     const baseUrl = process.env.INFRA_BASE_URL?.trim();
     const secret = process.env.INFRA_SHARED_SECRET?.trim();
     const adminToken = process.env.ADMIN_MINE_TOKEN?.trim();
-    if (!baseUrl || !secret) {
+    if (!baseUrl || !secret || !adminToken) {
       throw new Error(
-        "INFRA_BASE_URL and INFRA_SHARED_SECRET must be set for BITCOIN_MODE=regtest.",
+        "INFRA_BASE_URL, INFRA_SHARED_SECRET, and ADMIN_MINE_TOKEN must be set for BITCOIN_MODE=regtest.",
       );
     }
     this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.secret = secret;
-    this.adminToken = adminToken ?? "";
+    this.adminToken = adminToken;
   }
 
   private async call<T>(path: string, init?: RequestInit & { admin?: boolean }): Promise<T> {

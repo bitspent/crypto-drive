@@ -76,7 +76,7 @@ test("validation blocks bad address, empty amount, and short funds", async ({
   await page.getByLabel("Recipient address").fill("0xabc");
   await page.getByLabel("Amount (BTC)").click();
   await expect(
-    page.getByText("That doesn't look like a Bitcoin address. It should start with bc1."),
+    page.getByText("That doesn't look like a Bitcoin address. It should start with bc1q, tb1q, or bcrt1q."),
   ).toBeVisible();
 
   await page.getByLabel("Amount (BTC)").fill("5");

@@ -21,7 +21,8 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
-      testIgnore: ["**/mobile.spec.ts"],
+      // Regtest specs need BITCOIN_MODE=regtest (own config + stub infra).
+      testIgnore: ["**/mobile.spec.ts", "**/regtest-*.spec.ts"],
     },
     {
       name: "mobile",

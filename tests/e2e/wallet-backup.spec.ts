@@ -53,7 +53,7 @@ async function openRestoreForm(page: Page): Promise<void> {
   await expect(dialog).toBeVisible();
   await expect(
     dialog.getByText(
-      "This replaces your current wallet. You'll lose the practice balance if you don't have the words. Continue?",
+      "This checks your 12 words against the current wallet. Nothing changes unless every word matches — a wrong word leaves your wallet untouched. Continue?",
     ),
   ).toBeVisible();
   await dialog.getByRole("button", { name: "Continue" }).click();

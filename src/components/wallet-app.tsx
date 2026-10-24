@@ -154,7 +154,7 @@ function ReceiveSheet({ address, onClose }: { address: string; onClose: () => vo
             ref={closeRef}
             type="button"
             className="w-icon-btn"
-            aria-label="Close"
+            aria-label="Close receive sheet"
             onClick={onClose}
           >
             ×
@@ -237,7 +237,8 @@ export type SendDraft = {
   memo: string;
 };
 
-const ADDRESS_ERROR = "That doesn't look like a Bitcoin address. It should start with bc1.";
+const ADDRESS_ERROR =
+  "That doesn't look like a Bitcoin address. It should start with bc1q, tb1q, or bcrt1q.";
 const AMOUNT_ERROR = "Enter an amount.";
 const FUNDS_ERROR = "Not enough. Don't forget the fee.";
 
@@ -336,7 +337,7 @@ function SendSheet({
           <button
             type="button"
             className="w-icon-btn"
-            aria-label="Close"
+            aria-label="Close send sheet"
             onClick={onClose}
           >
             ×
@@ -471,12 +472,14 @@ function ReviewSheet({
   reduced,
   onCancel,
   onSent,
+  onFeeMoved,
 }: {
   balance: number;
   draft: SendDraft;
   reduced: boolean;
   onCancel: () => void;
   onSent: (wallet: WalletState, tx: TxRecord) => void;
+  onFeeMoved: (feeSats: number) => void;
 }) {
   const [checked, setChecked] = useState(false);
   const [signing, setSigning] = useState(false);
@@ -507,10 +510,23 @@ function ReviewSheet({
           to: draft.to,
           amountSats: draft.amountSats,
           feeTier: draft.feeTier,
+          quotedFeeSats: draft.feeSats,
           memo: draft.memo,
         }),
       });
-      const data = (await res.json()) as { tx?: TxRecord; wallet?: WalletState; error?: string };
+      const data = (await res.json()) as {
+        tx?: TxRecord;
+        wallet?: WalletState;
+        error?: string;
+        feeSats?: number;
+      };
+      if (res.status === 409 && typeof data.feeSats === "number") {
+        // Live tiers moved mid-review: refresh the draft, drop the tick,
+        // and make the learner re-confirm the new total.
+        onFeeMoved(data.feeSats);
+        setChecked(false);
+        throw new Error(data.error || "The fee moved — review the new total.");
+      }
       if (!res.ok || !data.tx || !data.wallet) {
         throw new Error(data.error || "Could not send.");
       }
@@ -541,7 +557,7 @@ function ReviewSheet({
             ref={cancelRef}
             type="button"
             className="w-icon-btn"
-            aria-label="Close"
+            aria-label="Close review sheet"
             onClick={onCancel}
           >
             ×
@@ -1076,7 +1092,7 @@ function RestoreSheet({ onClose }: { onClose: () => void }) {
             ref={cancelRef}
             type="button"
             className="w-icon-btn"
-            aria-label="Close"
+            aria-label="Close restore sheet"
             onClick={onClose}
           >
             ×
@@ -1085,8 +1101,9 @@ function RestoreSheet({ onClose }: { onClose: () => void }) {
         {step === "warn" ? (
           <>
             <p className="w-warn-text">
-              This replaces your current wallet. You&apos;ll lose the practice balance if
-              you don&apos;t have the words. Continue?
+              This checks your 12 words against the current wallet. Nothing
+              changes unless every word matches — a wrong word leaves your
+              wallet untouched. Continue?
             </p>
             <div className="w-review-actions">
               <button
@@ -1210,7 +1227,7 @@ function ResetSheet({ onClose, onReset }: { onClose: () => void; onReset: () => 
           <button
             type="button"
             className="w-icon-btn"
-            aria-label="Close"
+            aria-label="Close reset sheet"
             onClick={onClose}
           >
             ×
@@ -1344,7 +1361,7 @@ function TxDetailsSheet({
             ref={closeRef}
             type="button"
             className="w-icon-btn"
-            aria-label="Close"
+            aria-label="Close transaction details"
             onClick={onClose}
           >
             ×
@@ -1851,6 +1868,7 @@ export function WalletApp({
           balance={wallet.balance}
           draft={draft}
           reduced={reduced}
+          onFeeMoved={(feeSats) => setDraft({ ...draft, feeSats })}
           onCancel={() => {
             setSheet(null);
             setDraft(null);

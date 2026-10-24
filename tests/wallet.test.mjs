@@ -82,6 +82,12 @@ describe("wallet validation", () => {
     assert.equal(wallet.feeSatsForTier("standard"), 700);
     assert.equal(wallet.feeSatsForTier("priority"), 2100);
   });
+
+  it("fee quotes match only an unchanged live price", () => {
+    assert.equal(wallet.feeQuoteMatches(700, 700), true);
+    assert.equal(wallet.feeQuoteMatches(700, 750), false);
+    assert.equal(wallet.feeQuoteMatches(undefined, 750), true);
+  });
 });
 
 describe("wallet setup", () => {
@@ -119,7 +125,7 @@ describe("wallet send", () => {
     );
     assert.equal(
       wallet.validateSend(w, { to: "0xabc", amountSats: 1000, feeTier: "standard" }),
-      "That doesn't look like a Bitcoin address. It should start with bc1.",
+      "That doesn't look like a Bitcoin address. It should start with bc1q, tb1q, or bcrt1q.",
     );
     assert.equal(
       wallet.validateSend(w, { to: ADDR, amountSats: 99000, feeTier: "standard" }),

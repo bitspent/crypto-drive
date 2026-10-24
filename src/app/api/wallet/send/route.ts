@@ -12,6 +12,7 @@ import {
 import { getClientIp } from "@/lib/request-ip";
 import {
   applySend,
+  feeQuoteMatches,
   feeSatsForTier,
   validateSend,
   type FeeTierId,
@@ -54,6 +55,7 @@ export async function POST(req: Request) {
       to?: unknown;
       amountSats?: unknown;
       feeTier?: unknown;
+      quotedFeeSats?: unknown;
       memo?: unknown;
     };
     if (typeof body.to !== "string") return err("Enter a recipient address.", 400);
@@ -64,6 +66,16 @@ export async function POST(req: Request) {
     const feeTier = body.feeTier as FeeTierId;
     const tiers = await getActiveFeeTiers();
     const feeSats = feeSatsForTier(feeTier, tiers);
+    const quoted = typeof body.quotedFeeSats === "number" ? body.quotedFeeSats : undefined;
+    if (!feeQuoteMatches(quoted, feeSats)) {
+      return NextResponse.json(
+        {
+          error: "The fee moved since you reviewed — check the new total and sign again.",
+          feeSats,
+        },
+        { status: 409 },
+      );
+    }
     const verdict = validateSend(wallet, {
       to: body.to,
       amountSats: body.amountSats,

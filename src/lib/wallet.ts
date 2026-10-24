@@ -167,12 +167,23 @@ export function createWalletState(args: { seedWords: string[]; address: string }
   };
 }
 
+/**
+ * True when the client's reviewed fee still matches the live tier price.
+ * Without a quote (older clients, direct API callers) the live price stands,
+ * preserving today's behavior; with one, a moved fee rejects so the learner
+ * re-reviews an honest total instead of signing a stale one.
+ */
+export function feeQuoteMatches(quoted: number | undefined, current: number): boolean {
+  if (quoted === undefined) return true;
+  return quoted === current;
+}
+
 export function validateSend(
   wallet: WalletState,
   args: { to: string; amountSats: number; feeTier: FeeTierId; feeSats?: number },
 ): string | null {
   if (!isValidBtcAddress(args.to)) {
-    return "That doesn't look like a Bitcoin address. It should start with bc1.";
+    return "That doesn't look like a Bitcoin address. It should start with bc1q, tb1q, or bcrt1q.";
   }
   if (!Number.isSafeInteger(args.amountSats) || args.amountSats <= 0) {
     return "Enter an amount.";

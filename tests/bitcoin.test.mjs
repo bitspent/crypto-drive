@@ -49,6 +49,7 @@ describe("provider selection", () => {
     process.env.BITCOIN_MODE = "regtest";
     process.env.INFRA_BASE_URL = "https://infra.example.com";
     process.env.INFRA_SHARED_SECRET = "s3cret";
+    process.env.ADMIN_MINE_TOKEN = "adm1n";
     bitcoin.resetBitcoinProvider();
     assert.equal(bitcoin.getBitcoinProvider().network, "regtest");
   });
@@ -57,6 +58,13 @@ describe("provider selection", () => {
     process.env.BITCOIN_MODE = "regtest";
     process.env.INFRA_BASE_URL = "https://infra.example.com";
     assert.throws(() => bitcoin.getBitcoinProvider(), /INFRA_SHARED_SECRET/);
+  });
+
+  it("regtest throws fast on an empty mine token, not later at 403", () => {
+    process.env.BITCOIN_MODE = "regtest";
+    process.env.INFRA_BASE_URL = "https://infra.example.com";
+    process.env.INFRA_SHARED_SECRET = "s3cret";
+    assert.throws(() => bitcoin.getBitcoinProvider(), /ADMIN_MINE_TOKEN/);
   });
 });
 
@@ -78,6 +86,7 @@ describe("provider addresses", () => {
     process.env.BITCOIN_MODE = "regtest";
     process.env.INFRA_BASE_URL = "https://infra.example.com";
     process.env.INFRA_SHARED_SECRET = "s3cret";
+    process.env.ADMIN_MINE_TOKEN = "adm1n";
     bitcoin.resetBitcoinProvider();
     assert.match(bitcoin.getBitcoinProvider().getAddressForSeed(SEED), /^bcrt1q/);
   });

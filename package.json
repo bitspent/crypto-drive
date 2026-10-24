@@ -13,6 +13,7 @@
     "lint": "eslint",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:e2e:regtest": "playwright test --config=playwright.regtest.config.ts",
     "db:migrate": "node scripts/migrate-from-file.mjs",
     "db:test-setup": "node scripts/db-test-setup.mjs"
   },
