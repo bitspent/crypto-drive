@@ -14,6 +14,9 @@ const jiti = createJiti(join(root, "tests/exam.test.mjs"));
 const exam = jiti(join(root, "src/lib/exam.ts"));
 const wallet = jiti(join(root, "src/lib/wallet.ts"));
 const bitcoin = jiti(join(root, "src/lib/bitcoin/index.ts"));
+const store = jiti(join(root, "src/lib/store.ts"));
+
+const HAS_DB = Boolean(process.env.DATABASE_URL?.trim());
 
 const WORDS = [
   "abandon", "about", "above", "absent", "absorb", "abstract",
@@ -255,5 +258,18 @@ describe("verifyWalletExam", () => {
       exam.verifyWalletExam(studentWith(w), { examTxid: TX, examClaim: "541" }),
       /not on the chain/,
     );
+  });
+});
+
+describe("exam attempt marker (file store)", { skip: HAS_DB }, () => {
+  it("concurrent first loads share one marker", async () => {
+    const email = `exammark-${Date.now()}@example.com`;
+    const { student } = await store.unlockStudent(email, "CD-DRIVE-2026");
+    const [a, b] = await Promise.all([
+      store.ensureExamStartedAt(student.id),
+      store.ensureExamStartedAt(student.id),
+    ]);
+    assert.equal(a, b);
+    assert.equal((await store.findStudentByEmail(email)).examStartedAt, a);
   });
 });

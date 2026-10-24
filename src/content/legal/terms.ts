@@ -38,7 +38,7 @@ export const termsDoc: LegalDoc = {
       blocks: [
         {
           type: "paragraph",
-          text: "All wallet exercises use simulated data and, where enabled, the signet test network. No real Bitcoin is involved at any point. Every address, balance, and transaction shown inside the practice wallet is fictional and deterministic, generated so you can learn safely.",
+          text: "All wallet exercises use simulated data; where enabled, fee estimates come from the signet test network and the final exam runs on a private regtest chain. No real Bitcoin is involved at any point. Every address, balance, and transaction shown inside the practice wallet is valueless play money, generated so you can learn safely.",
         },
         {
           type: "paragraph",

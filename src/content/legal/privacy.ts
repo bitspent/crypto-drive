@@ -17,7 +17,7 @@ export const privacyDoc: LegalDoc = {
             "Your licence key hash and tier (we store a one-way hash, never the key itself).",
             "Purchase metadata from Gumroad: product, price, currency, and date.",
             "Your course progress: steps completed, answers submitted, certificates earned.",
-            "Your practice wallet state: simulated balances and transaction history.",
+            "Your practice wallet state: play-money balances and transaction history (simulated, or real records on a valueless private test chain).",
             "Your IP address, used for rate limiting and abuse prevention.",
             "Your user agent string, used for debugging display problems.",
           ],
@@ -78,7 +78,7 @@ export const privacyDoc: LegalDoc = {
       blocks: [
         {
           type: "paragraph",
-          text: "Nobody beyond the three subprocessors named above. There is no analytics beyond what this page discloses, no advertising network, no data broker, and no sale of personal data — ever. We disclose data to authorities only where legally compelled, and we will tell you unless the law forbids it.",
+          text: "Nobody beyond the four subprocessors named above. There is no analytics beyond what this page discloses, no advertising network, no data broker, and no sale of personal data — ever. We disclose data to authorities only where legally compelled, and we will tell you unless the law forbids it.",
         },
       ],
     },

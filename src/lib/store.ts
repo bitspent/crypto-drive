@@ -761,6 +761,13 @@ export async function passStep(
 }
 
 /**
+ * In-flight file-mode marker computations, one per student: concurrent first
+ * exam loads share a single read-modify-write instead of minting competing
+ * markers (the Postgres path is atomic SQL and needs none of this).
+ */
+const examMarkerPending = new Map<string, Promise<string>>();
+
+/**
  * Start (or resume) the prove-it exam attempt: set exam_started_at once, on
  * first exam-step load. Returns the ISO marker. Never resets — the attempt
  * has no clock, only a floor for evidence timestamps.
@@ -779,13 +786,23 @@ export async function ensureExamStartedAt(studentId: string): Promise<string> {
     if (!at) throw new Error("Unlock with your license before you continue.");
     return at.toISOString();
   }
-  const data = await ensureStore();
-  const stored = data.students[studentId];
-  if (!stored) throw new Error("Unlock with your license before you continue.");
-  stored.examStartedAt = stored.examStartedAt ?? new Date().toISOString();
-  data.students[studentId] = stored;
-  await saveStore(data);
-  return stored.examStartedAt;
+  const pending = examMarkerPending.get(studentId);
+  if (pending) return pending;
+  const task = (async () => {
+    const data = await ensureStore();
+    const stored = data.students[studentId];
+    if (!stored) throw new Error("Unlock with your license before you continue.");
+    stored.examStartedAt = stored.examStartedAt ?? new Date().toISOString();
+    data.students[studentId] = stored;
+    await saveStore(data);
+    return stored.examStartedAt;
+  })();
+  examMarkerPending.set(studentId, task);
+  try {
+    return await task;
+  } finally {
+    examMarkerPending.delete(studentId);
+  }
 }
 
 export async function getPracticeForSession(

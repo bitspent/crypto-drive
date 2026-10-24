@@ -2740,6 +2740,7 @@ function ExamScene({
       {review ? null : (
         <p className="text-sm text-[var(--fog)]">
           Only work done after opening this exam counts — earlier practice does not carry over.
+          Resetting the wallet does not restart the exam.
         </p>
       )}
       <IdeaPanel step={step} />
