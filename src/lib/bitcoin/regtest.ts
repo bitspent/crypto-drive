@@ -22,14 +22,17 @@ export class RegtestProvider implements BitcoinProvider {
     const baseUrl = process.env.INFRA_BASE_URL?.trim();
     const secret = process.env.INFRA_SHARED_SECRET?.trim();
     const adminToken = process.env.ADMIN_MINE_TOKEN?.trim();
-    if (!baseUrl || !secret || !adminToken) {
+    if (!baseUrl || !secret) {
       throw new Error(
-        "INFRA_BASE_URL, INFRA_SHARED_SECRET, and ADMIN_MINE_TOKEN must be set for BITCOIN_MODE=regtest.",
+        "INFRA_BASE_URL and INFRA_SHARED_SECRET must be set for BITCOIN_MODE=regtest.",
       );
     }
     this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.secret = secret;
-    this.adminToken = adminToken;
+    // The mine token is only needed to mine: reads (fees, status, fund)
+    // work without it, and mineBlocks fails fast below instead of late
+    // at the infra's 403.
+    this.adminToken = adminToken ?? "";
   }
 
   private async call<T>(path: string, init?: RequestInit & { admin?: boolean }): Promise<T> {
@@ -94,6 +97,9 @@ export class RegtestProvider implements BitcoinProvider {
   }
 
   async mineBlocks(count: number): Promise<{ height: number }> {
+    if (!this.adminToken) {
+      throw new Error("ADMIN_MINE_TOKEN must be set to mine on BITCOIN_MODE=regtest.");
+    }
     return this.call<{ height: number }>("/api/mine", {
       method: "POST",
       headers: { "content-type": "application/json" },

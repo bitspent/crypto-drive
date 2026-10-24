@@ -39,6 +39,7 @@ export default defineConfig({
         "**/walk.spec.ts",
         "**/wallet-*.spec.ts",
         "**/bitcoin-modes.spec.ts",
+        "**/keyboard.spec.ts",
       ],
     },
   ],

@@ -49,12 +49,25 @@ our_container_on() {
   local port=$1
   have docker || return 1
   docker ps --format '{{.Names}}\t{{.Ports}}\t{{.Label "com.docker.compose.service"}}' 2>/dev/null |
-    while IFS=$'\t' read -r name ports svc; do
+    while read -r line; do
+      # Real docker prints name\tports\tlabel; space-separated legacy
+      # lines parse too. Split accordingly.
+      case "$line" in
+        *$'\t'*)
+          name="${line%%$'\t'*}"
+          mid="${line#*$'\t'}"
+          ports="${mid%$'\t'*}"
+          svc="${line##*$'\t'}" ;;
+        *)
+          name="${line%% *}"
+          ports="${line#* }"
+          svc="" ;;
+      esac
       # Match single ports (:8081->, :8081,) and range ends (:18443-, -18444->).
       case "$ports" in
         *":$port->"*|*":$port,"*|*":$port-"*|*"-$port->"*)
           case "$name" in
-            bitcoin|electrs|electrum-ws|chopsticks|esplora|crypto-drive-pg)
+            bitcoin|electrs|electrum-ws|chopsticks|esplora|crypto-drive-pg|crypto-drive-infra-api-1|crypto-drive-esplora-ui-1)
               echo "$name" ;;
           esac
           case "$svc" in

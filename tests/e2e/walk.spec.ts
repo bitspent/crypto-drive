@@ -1,4 +1,4 @@
-// Full walk: unlock -> all 18 steps -> certificate -> verify page.
+// Full walk: unlock -> all 25 steps -> certificate -> verify page.
 // Ported from the operator validate.mjs (screenshots dropped, explorer step added:
 // the operator script predates the get-paid/explorer lesson).
 import { expect, test, type Page } from "@playwright/test";

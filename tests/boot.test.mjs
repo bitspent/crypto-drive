@@ -771,4 +771,36 @@ exit 0
       fs.rmSync(fakebin, { recursive: true, force: true });
     }
   });
+
+  it("recognizes our compose services by label in a renamed checkout", async () => {
+    const port = await freePort();
+    const fakebin = writeFakeBin({
+      docker: FAKE_DOCKER,
+      lsof: `#!/usr/bin/env bash\nfor a in "$@"; do\n  case "$a" in\n    -iTCP:${port}) printf 'p12345\\ncnode\\n'; exit 0 ;;\n  esac\ndone\nexit 0\n`,
+    });
+    try {
+      await withNoLock(() => {
+        const env = {
+          PATH: `${fakebin}:${process.env.PATH}`,
+          // Real docker format: name, ports, compose service label.
+          FAKE_PS: `renamed-checkout-infra-api-1\t0.0.0.0:${port}->8081/tcp\tinfra-api`,
+        };
+        const r = run(
+          ["regtest", "--app-port", "43981", "--infra-port", String(port), "--yes", "--dry-run"],
+          undefined,
+          env,
+        );
+        assert.equal(r.status, 0);
+        assert.ok(
+          r.stdout.includes(
+            `:${port} (infra-api) is ours already (container renamed-checkout-infra-api-1)`,
+          ),
+          "renamed checkout recognized as ours",
+        );
+        assert.doesNotMatch(r.stdout, /FOREIGN container renamed-checkout-infra-api-1/);
+      });
+    } finally {
+      fs.rmSync(fakebin, { recursive: true, force: true });
+    }
+  });
 });

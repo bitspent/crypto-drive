@@ -66,8 +66,9 @@ async function focusZone(page: Page): Promise<string> {
 }
 
 test("tab order runs header, rail, content, footer", async ({ page }) => {
-  // The drive-head contributes no stops (progress dots are role=img); every
-  // other zone must appear in DOM order.
+  // Desktop: the drive-head contributes no stops (progress dots are
+  // role=img, Route trigger hidden); every other zone appears in DOM order.
+  // Mobile: the rail hides and the Route trigger adds a head stop instead.
   await unlock(page, uniqueEmail("kbtab"));
   await page.goto("/track/bitcoin/what-is/satoshi", { waitUntil: "networkidle" });
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
@@ -77,7 +78,12 @@ test("tab order runs header, rail, content, footer", async ({ page }) => {
     seen.push(await focusZone(page));
   }
   const order = [...new Set(seen.filter((z) => z !== "none" && z !== "other"))];
-  expect(order).toEqual(["siteheader", "backlink", "rail", "content", "foot"]);
+  const narrow = (page.viewportSize()?.width ?? 1440) < 1024;
+  expect(order).toEqual(
+    narrow
+      ? ["siteheader", "backlink", "head", "content", "foot"]
+      : ["siteheader", "backlink", "rail", "content", "foot"],
+  );
 });
 
 test("route drawer traps focus and returns it on close", async ({

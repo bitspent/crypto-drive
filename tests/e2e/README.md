@@ -8,7 +8,7 @@ or computed style.
 
 | File | What it proves |
 | --- | --- |
-| `walk.spec.ts` | Unlock → all 24 steps → certificate issue → verify page, zero console/page/network errors, zero 429s, layout contract on every prove-it step |
+| `walk.spec.ts` | Unlock → all 25 steps → certificate issue → verify page, zero console/page/network errors, zero 429s, layout contract on every prove-it step |
 | `layout.spec.ts` | Left column and illustration card stay within the drive-head width, desktop + mobile viewports, both themes |
 | `keyboard.spec.ts` | ArrowRight advances, ArrowLeft goes back, Up/Down rove focus, arrows never hijack typing |
 | `reduced-motion.spec.ts` | Under `prefers-reduced-motion`, no animation runs and end poses pin |
@@ -21,20 +21,29 @@ or computed style.
 | `bitcoin-modes.spec.ts` | Regtest routes 404 in simulated mode; static fee tiers resolve |
 | `legal.spec.ts` | Terms/privacy/refund reachable from the unlock footer, render clean, link home, no horizontal scroll |
 | `health.spec.ts` | `GET /api/health` reports ok with db backend + bitcoin mode |
+| `cert-gate.spec.ts` | Direct POST to `/api/complete` with no exam pass fails closed |
+| `wallet-details.spec.ts` | Tx details sheet: rows, txid copy, focus return, simulated block |
+| `wallet-modal.spec.ts` | In-course wallet dialog: drag, resize, sheets, trap, drawer sheet |
+| `regtest-deposit.spec.ts` | Regtest faucet deposit links to the explorer (regtest project only) |
 
-Projects: `chromium` (1440×900, everything except `mobile.spec.ts`) and
-`mobile` (390×844: `layout`, `legal`, `mobile`, `walk`, `wallet-*`,
-`bitcoin-modes`). Runs are serial (`workers: 1`) because specs share one
-app server and database.
+Projects: `chromium` (1440×900, everything except `mobile.spec.ts` and
+`regtest-*`) and `mobile` (390×844: `layout`, `legal`, `mobile`, `walk`,
+`wallet-*`, `bitcoin-modes`, `keyboard`). The `regtest` project lives in
+`playwright.regtest.config.ts` (own server + stub infra, see below). Runs
+are serial (`workers: 1`) because specs share one app server and database.
 
 ## Run locally (file store)
 
 ```sh
 npm ci
 npx playwright install chromium   # once per machine
-npm run build                     # webServer serves `next start`
+CERT_HASH_SECRET=e2e npm run build   # webServer serves `next start`
 npm run test:e2e                  # or: npm run test:e2e:ui
 ```
+
+`next build` runs in production mode, which refuses to boot without a
+signing secret — the `CERT_HASH_SECRET=e2e` prefix is required, not
+optional. Any value works here; it signs disposable test data only.
 
 To run against an already-running server instead (e.g. `npm run dev`), start
 it on the same port first — it is reused automatically outside CI. Use a
@@ -63,16 +72,37 @@ serial — file-store writers race across files otherwise).
 
 ## Run in CI
 
+`.github/workflows/ci.yml` runs the fast gates on every push and PR: lint,
+unit (`npm run test:unit`), and `next build` with a throwaway secret. The
+browser suite stays manual (runners need browsers + minutes); to run it in
+CI yourself:
+
 ```sh
 npm ci
 npx playwright install --with-deps chromium
-npm run build
+CERT_HASH_SECRET=ci npm run build
 npm run test:e2e
 ```
 
 `CI=true` forces a fresh `next start` on the default port (43127). Traces are
 kept only for failed tests (`trace: retain-on-failure`); open one with
 `npx playwright show-report`.
+
+## Regtest link spec
+
+`regtest-deposit.spec.ts` needs `BITCOIN_MODE=regtest`, so it runs under its
+own config with its own app server (default port 43207) and a stub infra-api
+the spec boots itself on 127.0.0.1:43981 (fixed port, fails fast with the
+squatter hunt command when taken):
+
+```sh
+CERT_HASH_SECRET=e2e npm run build   # same artifact, runtime-switched mode
+npm run test:e2e:regtest
+```
+
+It proves the full on-chain path — faucet fund → `onChain: true` deposit →
+explorer link in tx details — without Nigiri. Override the app port with
+`E2E_PORT=xxxx` (start nothing yourself; the config boots the server).
 
 ## Notes
 

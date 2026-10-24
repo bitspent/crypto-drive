@@ -128,11 +128,12 @@ without it). `DATABASE_URL` unset means the dev-only file store.
 | `npm run boot -- [mode]` | Interactive full-stack boot: ports, Nigiri, infra-api, app (`--help` for flags) |
 | `bash scripts/check-ports.sh [mode]` | Diagnose port conflicts without changing anything |
 | `npm run status [-- --json\|--watch N]` | Full-stack report: app, heights, faucet, db counts, warnings |
-| `npm run build` | Production build |
+| `CERT_HASH_SECRET=... npm run build` | Production build (secret required: production boot refuses without one) |
 | `npm start` | Production server on **43127** |
 | `npm run lint` | ESLint |
-| `node --test --test-concurrency=1 tests/` | Unit tests (serial: file-store writers race across files) |
+| `npm run test:unit` | Unit tests (serial: file-store writers race across files) |
 | `npm run test:e2e` | Playwright suite (build first; `test:e2e:ui` for interactive) |
+| `npm run test:e2e:regtest` | Regtest explorer-link spec (own config + stub infra) |
 | `npm run db:test-setup` | Apply migrations + truncate (needs `DATABASE_URL`) |
 
 ## Ports

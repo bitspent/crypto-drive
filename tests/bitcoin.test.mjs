@@ -60,11 +60,11 @@ describe("provider selection", () => {
     assert.throws(() => bitcoin.getBitcoinProvider(), /INFRA_SHARED_SECRET/);
   });
 
-  it("regtest throws fast on an empty mine token, not later at 403", () => {
+  it("mineBlocks throws fast on an empty mine token, not later at 403", async () => {
     process.env.BITCOIN_MODE = "regtest";
     process.env.INFRA_BASE_URL = "https://infra.example.com";
     process.env.INFRA_SHARED_SECRET = "s3cret";
-    assert.throws(() => bitcoin.getBitcoinProvider(), /ADMIN_MINE_TOKEN/);
+    await assert.rejects(bitcoin.getBitcoinProvider().mineBlocks(1), /ADMIN_MINE_TOKEN/);
   });
 });
 
