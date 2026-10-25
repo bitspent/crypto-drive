@@ -74,9 +74,9 @@ serial — file-store writers race across files otherwise).
 ## Run in CI
 
 `.github/workflows/ci.yml` runs the fast gates on every push and PR: lint,
-unit (`npm run test:unit`), and `next build` with a throwaway secret. The
-browser suite stays manual (runners need browsers + minutes); to run it in
-CI yourself:
+unit (`npm run test:unit`), `next build` with a throwaway secret, plus the
+Chromium browser suite (`browsers` job installs Chromium and runs
+`npm run test:e2e`, keeping traces on failure). To run it self-hosted:
 
 ```sh
 npm ci

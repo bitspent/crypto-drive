@@ -1,6 +1,5 @@
-# Fast gates on every push and PR: lint, unit, production build.
-# The browser suite stays manual (needs browsers + minutes) — see
-# tests/e2e/README.md "Run in CI" for the self-hosted commands.
+# Fast gates on every push and PR: lint, unit, production build,
+# plus the Chromium browser suite (needs browsers + minutes).
 name: ci
 
 on:
@@ -20,3 +19,21 @@ jobs:
       - run: npm run lint
       - run: npm run test:unit
       - run: CERT_HASH_SECRET=ci npm run build
+
+  browsers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: CERT_HASH_SECRET=ci npm run build
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/
