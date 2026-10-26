@@ -26,6 +26,9 @@ const bitcoin = JSON.parse(
 const usdt = JSON.parse(
   readFileSync(join(root, "content/tracks/usdt-networks.json"), "utf8"),
 );
+const money = JSON.parse(
+  readFileSync(join(root, "content/tracks/money-map.json"), "utf8"),
+);
 const bip39 = new Set(
   readFileSync(join(root, "src/lib/data/bip39-english.txt"), "utf8")
     .split("\n")
@@ -578,10 +581,11 @@ describe("usdt track", () => {
     }
   });
 
-  it("keeps idea bodies and quick checks unique across both tracks", () => {
+  it("keeps idea bodies and quick checks unique across all tracks", () => {
     const all = bitcoin.drives
       .flatMap((d) => d.steps)
       .concat(steps)
+      .concat(money.drives.flatMap((d) => d.steps))
       .filter((s) => typeof s.ideaBody === "string" && s.ideaBody.trim());
     const bodies = all.map((s) => s.ideaBody.trim());
     assert.equal(new Set(bodies).size, bodies.length, "duplicate ideaBody across tracks");
@@ -626,6 +630,72 @@ describe("usdt track", () => {
           );
           assert.ok(t.why?.trim(), `${step.id}/${t.id} missing why`);
         }
+      }
+    }
+  });
+});
+
+describe("money primer", () => {
+  const steps = money.drives.flatMap((d) => d.steps);
+
+  it("ships 1 drive and 5 steps, ready, with no certificate", () => {
+    assert.equal(money.status, "ready");
+    assert.equal(money.number, 0);
+    assert.deepEqual(
+      money.drives.map((d) => d.slug),
+      ["first"],
+    );
+    assert.equal(steps.length, 5);
+    assert.equal(
+      steps.filter((s) => s.cert).length,
+      0,
+      "primer hands off to Bitcoin instead of certifying",
+    );
+  });
+
+  it("gives all 5 money steps the full idea panel", () => {
+    for (const step of steps) {
+      assert.ok(step.ideaTitle?.trim(), `${step.id} missing ideaTitle`);
+      assert.ok(step.ideaBody?.trim(), `${step.id} missing ideaBody`);
+      assert.ok(step.objective?.trim(), `${step.id} missing objective`);
+      assert.ok(step.whyItMatters?.trim(), `${step.id} missing whyItMatters`);
+      assert.ok(Array.isArray(step.keyTerms) && step.keyTerms.length >= 1, `${step.id} keyTerms`);
+      assert.ok(step.misconception?.trim(), `${step.id} missing misconception`);
+      assert.ok(step.pocketCard?.trim(), `${step.id} missing pocketCard`);
+      const qc = step.quickCheck;
+      assert.ok(qc?.question?.trim(), `${step.id} quickCheck question`);
+      assert.ok(
+        Array.isArray(qc.options) && qc.options.length >= 3,
+        `${step.id} quickCheck options`,
+      );
+      assert.ok(
+        Number.isInteger(qc.answerIndex) && qc.options[qc.answerIndex],
+        `${step.id} quickCheck answerIndex`,
+      );
+      assert.ok(qc.explanation?.trim(), `${step.id} quickCheck explanation`);
+    }
+  });
+
+  it("uses only network-pick recognize with well-formed tickets", () => {
+    for (const step of steps) {
+      const action = step.action;
+      assert.equal(action.type, "network-pick", `${step.id} action ${action.type}`);
+      assert.equal(action.mode, "recognize", `${step.id} mode ${action.mode}`);
+      assert.ok(
+        Array.isArray(action.tickets) && action.tickets.length >= 2,
+        `${step.id} needs at least 2 tickets`,
+      );
+      for (const t of action.tickets) {
+        assert.ok(t.id?.trim(), `${step.id} ticket missing id`);
+        assert.ok(t.prompt?.trim(), `${step.id}/${t.id} missing prompt`);
+        assert.ok(
+          Array.isArray(t.choices) && t.choices.length >= 2,
+          `${step.id}/${t.id} choices`,
+        );
+        assert.ok(
+          Number.isInteger(t.answer) && t.choices[t.answer],
+          `${step.id}/${t.id} answer out of range`,
+        );
       }
     }
   });

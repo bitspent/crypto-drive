@@ -38,6 +38,7 @@ export default defineConfig({
         "**/mobile.spec.ts",
         "**/walk.spec.ts",
         "**/usdt-walk.spec.ts",
+        "**/money-walk.spec.ts",
         "**/wallet-*.spec.ts",
         "**/bitcoin-modes.spec.ts",
         "**/keyboard.spec.ts",

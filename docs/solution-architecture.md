@@ -90,6 +90,7 @@ flowchart TB
 | Unlock / access gate | Accept email + license; grant tier path | Vercel app | **Now** (demo keys; Gumroad verify later) |
 | Drive + step UI (Bitcoin: 6 drives, 26 steps) | Coach cues + graded drills + capstone | Vercel app (in-app content) | **Now** |
 | Track C (USDT: 3 drives, 10 steps) | Network-picker drills + capstone cert | Vercel app (in-app content) | **Now** |
+| Primer (Money map: 1 drive, 5 steps) | Money-first onboarding, no cert, hands off to Bitcoin | Vercel app (in-app content) | **Now** |
 | Tracks ETH / Tron / Solana | Later tracks | Vercel app | **Scaffold** (`status: "coming"`) |
 | Cert generator | Name, date, unique id/hash → PNG | Vercel (`@vercel/og` / satori) | **Now** |
 | `/verify/[certId]` | Public attestation page | Vercel (public route) | **Now** |
@@ -298,14 +299,22 @@ Nine steps use the `network-pick` ticket drill (recognize / approve-refuse),
 `picker/custody` reuses `model-compare`, and the certificate issues on
 `road/capstone`. One cert per track, each verifiable at /verify.
 
+Primer — 1 drive, 5 steps, all `network-pick` recognize, no wallet touchpoints:
+
+| Drive | Title | Steps |
+| --- | --- | --- |
+| `first` | Money before Bitcoin | 5 — do, melt, promise, distance, bearer |
+
+Story-first beats (five jobs of money, inflation melt, bank promises, remittance toll, bearer money). The final step commits into `/course` with a "Start the Bitcoin road" handoff instead of a certificate — one fewer cert path to maintain, and the primer stays open to every tier.
+
 ---
 
 ## 9. Test surface
 
 | Suite | Command | Covers |
 | --- | --- | --- |
-| Unit | `node --test --test-concurrency=1 tests/` | Practice determinism + grading (incl. capstone rubric + network-pick), content shape (26 BTC + 10 USDT steps, idea panels, cert targets), tier flags, module redirects, `CERT_HASH_SECRET` production gate, wallet lib (formatting, send/deposit/restore, fee tiers), commerce + revocation + hashing (serial: file-store writers race across files) |
-| E2E | `CERT_HASH_SECRET=… npm run build` then `npx playwright test` (once: `npx playwright install chromium`) | Full 26-step BTC walk + 10-step USDT walk on desktop + mobile viewports, layout contract, keyboard drive, reduced-motion, no-WebGL, mobile smoke, wallet sandbox flows (setup, deposit, send, backup/restore/reset), legal pages, health, bitcoin modes — in file-store and Postgres modes (`E2E_DATABASE_URL`, see `tests/e2e/README.md`). Config: `playwright.config.ts`; specs: `tests/e2e/` |
+| Unit | `node --test --test-concurrency=1 tests/` | Practice determinism + grading (incl. capstone rubric + network-pick), content shape (26 BTC + 10 USDT + 5 primer steps, idea panels, cert targets), tier flags, module redirects, `CERT_HASH_SECRET` production gate, wallet lib (formatting, send/deposit/restore, fee tiers), commerce + revocation + hashing (serial: file-store writers race across files) |
+| E2E | `CERT_HASH_SECRET=… npm run build` then `npx playwright test` (once: `npx playwright install chromium`) | Full 26-step BTC walk + 10-step USDT walk + 5-step primer walk on desktop + mobile viewports, layout contract, keyboard drive, reduced-motion, no-WebGL, mobile smoke, wallet sandbox flows (setup, deposit, send, backup/restore/reset), legal pages, health, bitcoin modes — in file-store and Postgres modes (`E2E_DATABASE_URL`, see `tests/e2e/README.md`). Config: `playwright.config.ts`; specs: `tests/e2e/` |
 
 Both suites must pass before any charge-readiness review. Pre-launch
 blockers live in `docs/charge-ready-checklist.md`.

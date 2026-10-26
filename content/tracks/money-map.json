@@ -1,0 +1,345 @@
+{
+  "id": "money-map",
+  "slug": "money-map",
+  "number": 0,
+  "title": "Money map",
+  "shortTitle": "MAP",
+  "status": "ready",
+  "eyebrow": "PRIMER · MONEY FIRST",
+  "headline": "Money first. Bitcoin second.",
+  "summary": "What money must do, why savings melt, who really moves your card payments, what the road home costs — and the one idea that makes Bitcoin click. No jargon, no real money.",
+  "coachPitch": "Start here if money itself feels foggy. Five short stops, then the Bitcoin road opens.",
+  "symbol": "cash",
+  "lessons": [],
+  "drives": [
+    {
+      "id": "money-first",
+      "slug": "first",
+      "title": "Money before Bitcoin",
+      "minutes": "10 min",
+      "job": "Learn what money must do before you touch crypto",
+      "outcome": "You'll judge any money — cash, bank balance, or bitcoin — by the same five jobs, and you'll know why distance and permission matter.",
+      "steps": [
+        {
+          "id": "money-first-do",
+          "slug": "do",
+          "job": "What money must do",
+          "coachLine": "Before roads, the car: money has five jobs. Meet them through a market stall, not a textbook.",
+          "button": "Test the five jobs",
+          "action": {
+            "type": "network-pick",
+            "mode": "recognize",
+            "tickets": [
+              {
+                "id": "t1",
+                "prompt": "A street vendor must give change for a large note at a busy stall. Which money does the job?",
+                "choices": [
+                  "Small coins and notes",
+                  "A live goat",
+                  "Half a house"
+                ],
+                "answer": 0
+              },
+              {
+                "id": "t2",
+                "prompt": "A family saves for next winter's heating. Which savings still buys heat in six months?",
+                "choices": [
+                  "A jar of fresh tomatoes",
+                  "Coins and notes in a tin box",
+                  "A promise from a stranger"
+                ],
+                "answer": 1
+              },
+              {
+                "id": "t3",
+                "prompt": "A shop prices bread, milk, and soap. What must all three prices share?",
+                "choices": [
+                  "The same unit of counting",
+                  "The same colour ink",
+                  "The same paper size"
+                ],
+                "answer": 0
+              }
+            ]
+          },
+          "ideaTitle": "Money has five jobs",
+          "ideaBody": "Good money is accepted wherever you trade, keeps its value until you spend it, splits into small pieces, travels with you, and prices everything in one shared unit. When any job fails — the shop refuses it, savings melt, or you cannot make change — people quietly switch to a money that works.",
+          "objective": "After this screen you can name the five jobs and spot which one fails in a story.",
+          "whyItMatters": "Every crypto pitch claims to be money. The five jobs are your roadworthiness test — run any coin through them before you trust it.",
+          "keyTerms": [
+            "medium of exchange",
+            "store of value",
+            "unit of account"
+          ],
+          "misconception": "Money is valuable because the paper or the app says so.",
+          "pocketCard": "Accepted, holds, splits, travels, counts — five jobs.",
+          "quickCheck": {
+            "question": "A village accepts salt for every trade, but last year's salt buys half the grain today. Which money job failed?",
+            "options": [
+              "It stopped holding value",
+              "It stopped splitting",
+              "It stopped travelling"
+            ],
+            "answerIndex": 0,
+            "explanation": "Salt still trades and splits — but savings melt, so the store-of-value job failed."
+          }
+        },
+        {
+          "id": "money-first-melt",
+          "slug": "melt",
+          "job": "Inflation melts savings",
+          "coachLine": "Your aunt's savings jar buys less every year. Nobody stole it — prices moved.",
+          "button": "Feel the melt",
+          "action": {
+            "type": "network-pick",
+            "mode": "recognize",
+            "tickets": [
+              {
+                "id": "t1",
+                "prompt": "Ten years ago a jar of coins bought a winter coat. Today it buys a scarf. What happened?",
+                "choices": [
+                  "Someone took coins from the jar",
+                  "Prices rose while the jar sat still",
+                  "Coats got heavier"
+                ],
+                "answer": 1
+              },
+              {
+                "id": "t2",
+                "prompt": "Prices rise every year. Which savings melts fastest?",
+                "choices": [
+                  "Cash folded in a drawer",
+                  "A savings account paying less than prices rise",
+                  "A house the family lives in"
+                ],
+                "answer": 0
+              },
+              {
+                "id": "t3",
+                "prompt": "A shopkeeper raises prices every month to keep up. Who feels it first?",
+                "choices": [
+                  "People holding cash savings",
+                  "People who own their shop",
+                  "People paid in bread"
+                ],
+                "answer": 0
+              }
+            ]
+          },
+          "ideaTitle": "Savings can melt",
+          "ideaBody": "Inflation means prices creep up while saved money sits still — so each note buys a little less every year. A salary that never rises and a jar that never grows are both quietly shrinking. People feel it at the market first: the same basket, more notes.",
+          "objective": "After this screen you can explain inflation as savings melting while prices move.",
+          "whyItMatters": "Crypto promises 'hard money' that resists the melt. You cannot judge that promise until you have felt the melt in your own basket.",
+          "keyTerms": [
+            "inflation",
+            "purchasing power"
+          ],
+          "misconception": "If I don't spend my savings, they keep their value.",
+          "pocketCard": "Still money can shrink. Prices move; jars don't.",
+          "quickCheck": {
+            "question": "A worker's pay rises 3% but market prices rise 8%. What happened to her?",
+            "options": [
+              "She can buy less than last year",
+              "She is 3% richer",
+              "Nothing changed for her"
+            ],
+            "answerIndex": 0,
+            "explanation": "Her pay grew, but prices grew faster — her basket shrank."
+          }
+        },
+        {
+          "id": "money-first-promise",
+          "slug": "promise",
+          "job": "Banks and cards move promises",
+          "coachLine": "Tap a card and no coin travels. Your bank and the shop's bank swap promises — and settle up later.",
+          "button": "Follow the promise",
+          "action": {
+            "type": "network-pick",
+            "mode": "recognize",
+            "tickets": [
+              {
+                "id": "t1",
+                "prompt": "You tap your card for bread. What actually travels in that second?",
+                "choices": [
+                  "A coin from your pocket to the till",
+                  "A promise between banks, settled later",
+                  "A paper receipt with value inside"
+                ],
+                "answer": 1
+              },
+              {
+                "id": "t2",
+                "prompt": "Your salary 'arrives' but you never touch it. Where is it?",
+                "choices": [
+                  "A pile of notes with your name on it",
+                  "Numbers in the bank's promise ledger",
+                  "A truck on its way to you"
+                ],
+                "answer": 1
+              },
+              {
+                "id": "t3",
+                "prompt": "Everyone queues to withdraw on the same morning. Why might the bank run out?",
+                "choices": [
+                  "It printed too few notes, ever",
+                  "It lent the promises out and keeps only a fraction",
+                  "Coins evaporate overnight"
+                ],
+                "answer": 1
+              }
+            ]
+          },
+          "ideaTitle": "Your balance is a promise",
+          "ideaBody": "A bank balance is not a box of your notes — it is the bank's promise to pay you back. Card taps and transfers just rewrite who is promised what; real settlement happens behind the curtain, later. Promises are convenient, which is exactly why you must know who made them.",
+          "objective": "After this screen you can say what moves in a card payment and where your salary really sits.",
+          "whyItMatters": "Crypto wallets cut the bank out of the promise chain. That is freedom and risk at once — both start from this screen.",
+          "keyTerms": [
+            "ledger",
+            "settlement",
+            "bank promise"
+          ],
+          "misconception": "The numbers in my banking app are my cash, sitting somewhere.",
+          "pocketCard": "Balance = the bank's promise, not a box of cash.",
+          "quickCheck": {
+            "question": "The power fails and card machines die, but cash still buys bread. What does that prove?",
+            "options": [
+              "Cash needs no one's permission to work",
+              "Cash is heavier than cards",
+              "Bread prefers paper"
+            ],
+            "answerIndex": 0,
+            "explanation": "Cash settles on the spot with no network and no bank in the middle."
+          }
+        },
+        {
+          "id": "money-first-distance",
+          "slug": "distance",
+          "job": "Sending money home costs a cut",
+          "coachLine": "Your brother works two borders away. Every payday he sends money home — and the road takes a toll.",
+          "button": "Price the road",
+          "action": {
+            "type": "network-pick",
+            "mode": "recognize",
+            "tickets": [
+              {
+                "id": "t1",
+                "prompt": "He sends 200 home; 184 arrives three days later. Where did the rest go?",
+                "choices": [
+                  "Fees and the exchange-rate cut",
+                  "The truck burned it as fuel",
+                  "His family spent it early"
+                ],
+                "answer": 0
+              },
+              {
+                "id": "t2",
+                "prompt": "Two agents quote the same 200 transfer. Which costs the family more?",
+                "choices": [
+                  "Agent A: 8% fee, arrives in 3 days",
+                  "Agent B: 2% fee, arrives tonight",
+                  "They cost exactly the same"
+                ],
+                "answer": 0
+              },
+              {
+                "id": "t3",
+                "prompt": "His mother needs medicine tonight. What matters most?",
+                "choices": [
+                  "The lowest fee, whenever it arrives",
+                  "Money arriving before the pharmacy closes",
+                  "The prettiest receipt"
+                ],
+                "answer": 1
+              }
+            ]
+          },
+          "ideaTitle": "Distance charges a toll",
+          "ideaBody": "Moving money across borders means paying the road: a flat fee, a worse exchange rate than the market, and days of waiting. On a 200 transfer the toll can eat a week's groceries. Speed is part of the price — money that arrives after the need has passed arrived too expensive.",
+          "objective": "After this screen you can price a remittance in fee, rate cut, and waiting time.",
+          "whyItMatters": "Stablecoins and Bitcoin sell themselves as cheap fast rails. This screen is how you check whether that claim survives contact with your family's pharmacy run.",
+          "keyTerms": [
+            "remittance",
+            "exchange-rate cut",
+            "flat fee"
+          ],
+          "misconception": "Sending 200 means 200 arrives.",
+          "pocketCard": "Every border takes a cut — fee, rate, and waiting.",
+          "quickCheck": {
+            "question": "Shop A charges 8% and takes 3 days; shop B charges 2% and arrives tonight. Which family keeps more?",
+            "options": [
+              "Shop B's family",
+              "Shop A's family",
+              "Both keep the same"
+            ],
+            "answerIndex": 0,
+            "explanation": "Lower fee and same-evening arrival — B wins on both parts of the toll."
+          }
+        },
+        {
+          "id": "money-first-bearer",
+          "slug": "bearer",
+          "job": "Cash is bearer money",
+          "coachLine": "A banknote in your hand asks no permission. Lose it and it's gone — that trade is the whole idea.",
+          "button": "Start the Bitcoin road",
+          "action": {
+            "type": "network-pick",
+            "mode": "recognize",
+            "tickets": [
+              {
+                "id": "t1",
+                "prompt": "Which of these spends with nobody's permission?",
+                "choices": [
+                  "A banknote in your hand",
+                  "Your bank balance",
+                  "A gift card with your name on it"
+                ],
+                "answer": 0
+              },
+              {
+                "id": "t2",
+                "prompt": "What makes the banknote different from the balance?",
+                "choices": [
+                  "Holding it IS owning it — no account to ask",
+                  "It is printed on better paper",
+                  "It never loses value"
+                ],
+                "answer": 0
+              },
+              {
+                "id": "t3",
+                "prompt": "Which of these is most like cash, but works on the internet?",
+                "choices": [
+                  "Bitcoin, held in your own wallet",
+                  "Airline miles",
+                  "A screenshot of money"
+                ],
+                "answer": 0
+              }
+            ]
+          },
+          "ideaTitle": "Holding is owning",
+          "ideaBody": "Cash is bearer money: whoever holds it owns it. No account, no password, no permission — but also no refunds and no one to call. A bank balance is the opposite: permission-gated and reversible. Bitcoin was built as bearer money for the internet — the next road teaches you to drive it without crashing.",
+          "objective": "After this screen you can explain bearer money and why Bitcoin copies cash, not banks.",
+          "whyItMatters": "Self-custody is the whole exam at the end of the Bitcoin road. This is the first time you meet the trade: freedom in, permission out.",
+          "keyTerms": [
+            "bearer money",
+            "permission",
+            "self-custody"
+          ],
+          "misconception": "Digital money always has a company that can reverse it.",
+          "pocketCard": "Cash: holding is owning. Bitcoin: same idea, online.",
+          "quickCheck": {
+            "question": "A friend's wallet app freezes her account. Could that happen with a banknote in her pocket?",
+            "options": [
+              "No — no one can freeze what she holds",
+              "Yes — pockets freeze too",
+              "Only on weekends"
+            ],
+            "answerIndex": 0,
+            "explanation": "Bearer money has no account to freeze; the trade is that no one can rescue it either."
+          }
+        }
+      ]
+    }
+  ]
+}

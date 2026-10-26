@@ -11,6 +11,6 @@
     "verifyLink": false,
     "liveCall": false
   },
-  "tracks": ["bitcoin", "ethereum", "usdt-networks", "tron", "solana"],
+  "tracks": ["money-map", "bitcoin", "ethereum", "usdt-networks", "tron", "solana"],
   "upgradeHint": "Certified Practitioner adds the verify link for the road test."
 }

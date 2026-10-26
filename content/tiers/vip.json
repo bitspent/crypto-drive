@@ -11,7 +11,7 @@
     "verifyLink": true,
     "liveCall": true
   },
-  "tracks": ["bitcoin", "ethereum", "usdt-networks", "tron", "solana"],
+  "tracks": ["money-map", "bitcoin", "ethereum", "usdt-networks", "tron", "solana"],
   "support": {
     "callLabel": "Book your 30-min ride-along",
     "callHint": "Wallet setup review and first-miles Q&A. Scheduling link goes live with Gumroad fulfillment.",

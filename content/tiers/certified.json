@@ -12,6 +12,6 @@
     "verifyLink": true,
     "liveCall": false
   },
-  "tracks": ["bitcoin", "ethereum", "usdt-networks", "tron", "solana"],
+  "tracks": ["money-map", "bitcoin", "ethereum", "usdt-networks", "tron", "solana"],
   "upgradeHint": "Want a coach on the call? VIP Vault adds a 30-min ride-along and a private Q&A lane."
 }
