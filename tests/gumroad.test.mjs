@@ -52,6 +52,24 @@ describe("license keys", () => {
     assert.notEqual(license.generateLicenseKey("vip"), license.generateLicenseKey("vip"));
   });
 
+  it("derives deterministic per-sale keys", () => {
+    const a1 = license.deriveLicenseKeyForSale("sale_1", "certified");
+    const a2 = license.deriveLicenseKeyForSale("sale_1", "certified");
+    assert.equal(a1, a2);
+    assert.match(a1, /^CD-CERTIFIED-[A-HJ-NP-Z2-9]{8}$/);
+    assert.equal(license.validateLicenseFormat(a1), true);
+    assert.notEqual(
+      a1,
+      license.deriveLicenseKeyForSale("sale_2", "certified"),
+      "different sales get different keys",
+    );
+    assert.notEqual(
+      a1,
+      license.deriveLicenseKeyForSale("sale_1", "vip"),
+      "different tiers get different keys",
+    );
+  });
+
   it("rejects malformed keys", () => {
     assert.equal(license.validateLicenseFormat("CD-DRIVE-2026"), false);
     assert.equal(license.validateLicenseFormat("CD-CERTIFIED-SHORT"), false);
@@ -149,6 +167,7 @@ describe("gumroad license API client (stubbed fetch)", () => {
     stashEnv();
     realFetch = global.fetch;
     process.env.GUMROAD_ACCESS_TOKEN = "tok";
+    gumroad.resetLicenseVerdicts();
   });
   afterEach(() => {
     global.fetch = realFetch;
@@ -166,7 +185,7 @@ describe("gumroad license API client (stubbed fetch)", () => {
         json: async () => ({ success: true, purchase: { email: "Paid@Example.com" } }),
       };
     };
-    assert.deepEqual(await gumroad.verifyGumroadLicense("prod_cert", "CD-X"), {
+    assert.deepEqual(await gumroad.verifyGumroadLicense("prod_cert", "CD-X1"), {
       ok: true,
       email: "paid@example.com",
     });
@@ -176,12 +195,51 @@ describe("gumroad license API client (stubbed fetch)", () => {
       status: 200,
       json: async () => ({ success: false }),
     });
-    assert.deepEqual(await gumroad.verifyGumroadLicense("prod_cert", "CD-X"), { ok: false });
+    assert.deepEqual(await gumroad.verifyGumroadLicense("prod_cert", "CD-X2"), { ok: false });
 
     global.fetch = async () => {
       throw new Error("down");
     };
-    assert.deepEqual(await gumroad.verifyGumroadLicense("prod_cert", "CD-X"), { ok: false });
+    assert.deepEqual(await gumroad.verifyGumroadLicense("prod_cert", "CD-X3"), { ok: false });
+  });
+
+  it("caches accepted and refused verdicts per key", async () => {
+    let calls = 0;
+    global.fetch = async () => {
+      calls += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, purchase: { email: "cached@example.com" } }),
+      };
+    };
+    assert.deepEqual(await gumroad.verifyGumroadLicense("prod_a", "CD-CACHED-1"), {
+      ok: true,
+      email: "cached@example.com",
+    });
+    assert.deepEqual(await gumroad.verifyGumroadLicense("prod_a", "CD-CACHED-1"), {
+      ok: true,
+      email: "cached@example.com",
+    });
+    assert.equal(calls, 1);
+
+    global.fetch = async () => {
+      calls += 1;
+      return { ok: true, status: 200, json: async () => ({ success: false }) };
+    };
+    assert.deepEqual(await gumroad.verifyGumroadLicense("prod_a", "CD-CACHED-2"), {
+      ok: false,
+    });
+    assert.deepEqual(await gumroad.verifyGumroadLicense("prod_a", "CD-CACHED-2"), {
+      ok: false,
+    });
+    assert.equal(calls, 2);
+
+    // Same key under another product re-verifies (the cache is keyed per product+key).
+    assert.deepEqual(await gumroad.verifyGumroadLicense("prod_b", "CD-CACHED-1"), {
+      ok: false,
+    });
+    assert.equal(calls, 3);
   });
 
   it("still calls the API without a token, minus the header", async () => {
@@ -253,6 +311,7 @@ describe("webhook processing (needs DB)", { skip: !HAS_DB }, () => {
 
     const second = await webhook.processGumroadSale(sale);
     assert.equal(second.duplicate, true);
+    assert.equal(second.licenseKey, first.licenseKey);
     assert.equal(resendCalls.length, 1);
     const stillOne = await store.findStudentByLicenseKey(first.licenseKey);
     assert.equal(stillOne?.id, student?.id);

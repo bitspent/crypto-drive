@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "crypto";
+import { createHash, createHmac, randomBytes } from "crypto";
 
 export type LicenseTier = "starter" | "certified" | "vip";
 
@@ -20,6 +20,26 @@ export function generateLicenseKey(tier: LicenseTier): string {
 
 export function validateLicenseFormat(key: string): boolean {
   return LICENSE_RE.test(key.trim());
+}
+
+/**
+ * Deterministic key for one sale: HMAC(sale_id, tier) under the webhook
+ * secret, mapped onto the same alphabet as random keys. Re-delivery of the
+ * same sale — same payment, same key — by construction, so a retried ping
+ * can never mint a second key for one purchase. Falls back to the license
+ * pepper when the webhook secret is unset (dev/test); the route rejects
+ * unauthenticated pings before this is ever reached.
+ */
+export function deriveLicenseKeyForSale(saleId: string, tier: LicenseTier): string {
+  const secret = process.env.GUMROAD_WEBHOOK_SECRET?.trim() || licensePepper();
+  const mac = createHmac("sha256", secret)
+    .update(`${tier}:${saleId.trim()}`)
+    .digest();
+  let suffix = "";
+  for (let i = 0; suffix.length < 8; i++) {
+    suffix += KEY_ALPHABET[mac[i % mac.length] % KEY_ALPHABET.length];
+  }
+  return `CD-${tier.toUpperCase()}-${suffix}`;
 }
 
 let warnedPepper = false;

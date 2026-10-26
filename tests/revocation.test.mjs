@@ -197,7 +197,11 @@ function battery(tag) {
         price: "9999",
         currency: "USD",
       });
-      assert.deepEqual(again, { handled: true, duplicate: true });
+      assert.equal(again.handled, true);
+      assert.equal(again.duplicate, true);
+      assert.equal(again.tier, "certified");
+      assert.equal(again.email, intruder);
+      assert.ok(again.licenseKey, "duplicate reuses the stored key");
     } finally {
       console.log = origLog;
     }

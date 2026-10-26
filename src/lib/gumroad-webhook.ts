@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "crypto";
 import type { TierId } from "./content";
 import { sendLicenseEmail } from "./email";
-import { generateLicenseKey, type LicenseTier } from "./license";
+import { deriveLicenseKeyForSale, type LicenseTier } from "./license";
 import {
   findStudentByEmail,
   getWebhookEvent,
@@ -207,11 +207,15 @@ export async function processGumroadSale(sale: PingSale): Promise<PingOutcome> {
     });
     return { handled: false, reason: "unknown-product" };
   }
+  const licenseKey = deriveLicenseKeyForSale(sale.saleId, tier as LicenseTier);
   const duplicate = await recordWebhookEvent("gumroad", sale.saleId, {
     email: sale.email,
     productRef: sale.productRef,
     price: sale.price,
     currency: sale.currency,
+    // Stored (never logged) so a duplicate re-delivery reuses the exact key
+    // the first delivery minted — even across a webhook-secret rotation.
+    licenseKey,
   });
   if (duplicate) {
     // A re-delivery shaped differently from the original (a refund ping
@@ -227,9 +231,18 @@ export async function processGumroadSale(sale: PingSale): Promise<PingOutcome> {
     } else {
       logWebhook("webhook.duplicate", { saleId: sale.saleId });
     }
-    return { handled: true, duplicate: true };
+    // Reuse the stored key; fall back to the deterministic derivation for
+    // sales recorded before the mapping was stored. Re-provisioning is
+    // idempotent (keyed by email) and closes the record-then-crash gap —
+    // but only when the re-delivery names the original buyer. A reshaped
+    // duplicate (different email) must never mint a student for a stranger.
+    const stored = before.licenseKey;
+    const reuseKey = typeof stored === "string" && stored ? stored : licenseKey;
+    if (before.email === sale.email) {
+      await provisionLicensedStudent(sale.email, tier, reuseKey);
+    }
+    return { handled: true, duplicate: true, tier, email: sale.email, licenseKey: reuseKey };
   }
-  const licenseKey = generateLicenseKey(tier as LicenseTier);
   await provisionLicensedStudent(sale.email, tier, licenseKey);
   logWebhook("webhook.provisioned", { saleId: sale.saleId, tier });
   try {
