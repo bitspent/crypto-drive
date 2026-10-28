@@ -91,7 +91,9 @@ function Tome({ track, numeral, style, active, hidden, dim, onSelectBook, onFocu
       <span aria-hidden="true" className="tome-spine" />
       <span aria-hidden="true" className="tome-pages" />
       <span className="tome-head">
-        <TrackSymbol symbol={track.symbol} className="h-6 w-6 shrink-0" />
+        <span className="tome-coin">
+          <TrackSymbol symbol={track.symbol} className="h-5 w-5 shrink-0" />
+        </span>
         <span className="tome-eyebrow">{track.eyebrow}</span>
       </span>
       <span className="tome-title">

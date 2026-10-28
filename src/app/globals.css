@@ -3057,8 +3057,27 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
 .tome-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   color: #e8dcc0;
+}
+
+/* Coin medallion: each track icon set in a gilt ring so it reads at a glance. */
+.tome-coin {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1.5px solid #d8b24a;
+  background:
+    radial-gradient(circle at 35% 30%, rgb(255 240 200 / 0.22), transparent 55%),
+    radial-gradient(circle at 50% 50%, rgb(0 0 0 / 0.15), rgb(0 0 0 / 0.55));
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--leather) 60%, black),
+    0 0 0 4px rgb(216 178 74 / 0.5),
+    0 3px 8px -2px rgb(0 0 0 / 0.7),
+    0 0 12px -2px rgb(240 201 94 / 0.45);
 }
 
 .tome-eyebrow {
