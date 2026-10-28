@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { Button } from "@/components/ui/button";
 import { TrackSymbol } from "@/components/crypto-marks";
+import { TrackBookshelf } from "@/components/track-bookshelf";
 import { getTracksForTier, getTier } from "@/lib/content";
 import { countFinishedDrives, resumeHref } from "@/lib/drive";
 import { getSessionId } from "@/lib/session";
@@ -135,6 +136,24 @@ export default async function CoursePage() {
             →
           </span>
         </Link>
+
+        <section aria-label="Pick your track" className="mb-10">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="font-[family-name:var(--font-display)] text-sm tracking-[0.16em] text-[var(--amber)]">
+              PICK YOUR TRACK
+            </h2>
+          </div>
+          <TrackBookshelf
+            tracks={tracks.map((track) => ({
+              slug: track.slug,
+              title: track.title,
+              eyebrow: track.eyebrow,
+              summary: track.summary,
+              status: track.status,
+              symbol: track.symbol,
+            }))}
+          />
+        </section>
 
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-[family-name:var(--font-display)] text-sm tracking-[0.16em] text-[var(--amber)]">

@@ -2650,3 +2650,132 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   font-size: 1.05rem;
   font-weight: 600;
 }
+
+/* —— Course bookshelf (CSS-3D track picker) —— */
+
+.bookshelf {
+  outline: none;
+  /* Horizontal swipes belong to the shelf; vertical pans still scroll. */
+  touch-action: pan-y;
+}
+
+.bookshelf-viewport {
+  position: relative;
+  height: 380px;
+  perspective: 1200px;
+  overflow: clip;
+}
+
+.bookshelf-book {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  width: min(228px, 64vw);
+  height: 330px;
+  transform-style: preserve-3d;
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.45s ease;
+  box-shadow: 0 24px 48px -28px rgb(0 0 0 / 0.65);
+}
+
+.bookshelf-book > a:hover {
+  border-color: color-mix(in oklab, var(--amber) 55%, var(--lane));
+}
+
+.bookshelf-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -9px;
+  width: 18px;
+  border-radius: 4px 0 0 4px;
+  background: linear-gradient(90deg, rgb(0 0 0 / 0.55), color-mix(in oklab, var(--amber) 30%, transparent) 55%, rgb(0 0 0 / 0.55));
+  transform: rotateY(-72deg) translateX(-4px);
+  transform-origin: right center;
+}
+
+.bookshelf-coming {
+  opacity: 0.62;
+  filter: saturate(0.4);
+}
+
+.bookshelf-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.bookshelf-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--lane);
+  background: var(--cabin);
+  color: var(--paper);
+  font-size: 1.1rem;
+}
+
+.bookshelf-arrow:hover {
+  border-color: color-mix(in oklab, var(--amber) 55%, var(--lane));
+  color: var(--amber);
+}
+
+.bookshelf-dots {
+  display: flex;
+  gap: 10px;
+}
+
+.bookshelf-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--lane);
+}
+
+.bookshelf-dot[aria-current="true"] {
+  background: var(--amber);
+}
+
+.bookshelf-hint {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--mute);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bookshelf-viewport {
+    display: flex;
+    gap: 12px;
+    height: auto;
+    overflow-x: auto;
+    perspective: none;
+    padding-bottom: 8px;
+  }
+
+  .bookshelf-book {
+    position: relative;
+    top: auto;
+    left: auto;
+    flex: 0 0 auto;
+    transform: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transition: none;
+  }
+
+  .bookshelf-spine {
+    display: none;
+  }
+
+  .bookshelf-controls,
+  .bookshelf-hint {
+    display: none;
+  }
+}
