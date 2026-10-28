@@ -23,7 +23,7 @@ function placement(offset: number) {
   const dist = Math.abs(o);
   return {
     // Pushed sideways, turned to face the reader, sunk back with distance.
-    transform: `translateX(-50%) translateX(${o * 62}%) rotateY(${-o * 34}deg) translateZ(${-dist * 130}px) scale(${1 - dist * 0.07})`,
+    transform: `translateX(-50%) translateX(${o * 62}%) rotateY(${-o * 34}deg) rotateX(2deg) translateZ(${-dist * 130}px) scale(${1 - dist * 0.07})`,
     opacity: dist > MAX_SIDE ? 0 : 1 - dist * 0.28,
     zIndex: 10 - Math.round(dist),
     hidden: dist > MAX_SIDE,
@@ -75,6 +75,7 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
       aria-roledescription="carousel"
       className="bookshelf select-none"
       data-testid="track-bookshelf"
+      style={{ cursor: glide !== null ? "grabbing" : "grab" }}
       onKeyDown={(e) => {
         if (e.key === "ArrowLeft") go(active - 1);
         if (e.key === "ArrowRight") go(active + 1);
@@ -105,7 +106,7 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
     >
       <div className="bookshelf-viewport" aria-live="off">
         {tracks.map((track, i) => {
-          const offset = i - active - (glide ?? 0) / GLIDE_STEP;
+          const offset = i - active + (glide ?? 0) / GLIDE_STEP;
           const p = placement(offset);
           const ready = track.status === "ready";
           const isActive = i === active;
@@ -133,7 +134,10 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
               aria-hidden={isActive || calm ? undefined : true}
               aria-label={`${i + 1} of ${tracks.length}: ${track.title}`}
               aria-roledescription="slide"
-              className={cn("bookshelf-book group flex flex-col p-5 text-left", !ready && "bookshelf-coming")}
+              className={cn(
+                "bookshelf-book group flex flex-col rounded-r-xl rounded-l-sm border border-[var(--lane)] bg-[var(--cabin)] p-5 text-left",
+                !ready && "bookshelf-coming",
+              )}
               data-active={isActive}
               data-testid={`shelf-book-${track.slug}`}
               style={{
