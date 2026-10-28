@@ -57,38 +57,100 @@ test("arrow keys browse the shelf", async ({ page }) => {
   );
 });
 
-test("tapping a ready book opens its track", async ({ page }) => {
+test("the footer button opens its track", async ({ page }) => {
   await page.getByTestId("shelf-next").click();
   await page
     .getByTestId("shelf-book-bitcoin")
-    .getByRole("link", { name: "Open Bitcoin" })
+    .getByRole("link", { name: "Open Bitcoin — first drive" })
     .click();
   await page.waitForURL("**/track/bitcoin");
 });
 
-test("swipe left advances the shelf", async ({ page }) => {
-  // Synthetic touches: CDP gesture injection is swallowed over links in
-  // mobile emulation, so drive the real React touch path directly.
+test("dragging over the footer button does not navigate", async ({ page }) => {
   await page.evaluate(() => {
-    const link = document.querySelector('[data-testid="shelf-book-money-map"] a')!;
-    const r = link.getBoundingClientRect();
+    const shelf = document.querySelector('[data-testid="track-bookshelf"]')!;
+    const cta = document.querySelector('[data-testid="shelf-book-money-map"] .bookshelf-cta')!;
+    const r = cta.getBoundingClientRect();
     const x = r.x + r.width / 2;
     const y = r.y + r.height / 2;
-    const send = (type: string, tx: number) => {
-      const t = new Touch({ identifier: 7, target: link, clientX: tx, clientY: y });
-      link.dispatchEvent(
-        new TouchEvent(type, {
+    const send = (type: string, tx: number) =>
+      shelf.dispatchEvent(
+        new PointerEvent(type, {
           bubbles: true,
           cancelable: true,
-          touches: type === "touchend" ? [] : [t],
-          changedTouches: [t],
+          buttons: 1,
+          clientX: tx,
+          clientY: y,
+          pointerId: 7,
+          pointerType: "touch",
         }),
       );
-    };
-    send("touchstart", x);
-    send("touchend", x - 120);
+    send("pointerdown", x);
+    send("pointermove", x - 120);
+    window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+    (cta as HTMLElement).click();
+  });
+  await page.waitForURL("**/course");
+  await expect(page.getByTestId("shelf-book-bitcoin")).toHaveAttribute(
+    "data-active",
+    "true",
+  );
+});
+
+test("drag left glides the shelf to the next book", async ({ page }) => {
+  // Synthetic pointers: CDP gesture injection is swallowed over links in
+  // mobile emulation, so drive the real React pointer path directly.
+  await page.evaluate(() => {
+    const shelf = document.querySelector('[data-testid="track-bookshelf"]')!;
+    const r = shelf.getBoundingClientRect();
+    const x = r.x + r.width / 2;
+    const y = r.y + 200;
+    const send = (type: string, tx: number) =>
+      shelf.dispatchEvent(
+        new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          buttons: 1,
+          clientX: tx,
+          clientY: y,
+          pointerId: 7,
+          pointerType: "touch",
+        }),
+      );
+    send("pointerdown", x);
+    send("pointermove", x - 60);
+    send("pointermove", x - 120);
+    window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
   });
   await expect(page.getByTestId("shelf-book-bitcoin")).toHaveAttribute(
+    "data-active",
+    "true",
+  );
+});
+
+test("a short drag snaps back without moving", async ({ page }) => {
+  await page.evaluate(() => {
+    const shelf = document.querySelector('[data-testid="track-bookshelf"]')!;
+    const r = shelf.getBoundingClientRect();
+    const x = r.x + r.width / 2;
+    const y = r.y + 200;
+    const send = (type: string, tx: number) =>
+      shelf.dispatchEvent(
+        new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          buttons: 1,
+          clientX: tx,
+          clientY: y,
+          pointerId: 7,
+          pointerType: "touch",
+        }),
+      );
+    send("pointerdown", x);
+    send("pointermove", x - 20);
+    window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+  });
+  await expect(page.getByTestId("shelf-book-money-map")).toHaveAttribute(
     "data-active",
     "true",
   );
@@ -104,7 +166,7 @@ test.describe("reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
 
   test("shelf flattens to a browsable row", async ({ page }) => {
-    // Controls hide; every book lays flat and stays tappable.
+    // Flattened row exposes every book, so every CTA opens directly.
     await expect(page.getByTestId("shelf-next")).toBeHidden();
     for (const slug of [
       "money-map",
@@ -118,7 +180,7 @@ test.describe("reduced motion", () => {
     }
     await page
       .getByTestId("shelf-book-bitcoin")
-      .getByRole("link", { name: "Open Bitcoin" })
+      .getByRole("link", { name: "Open Bitcoin — first drive" })
       .click();
     await page.waitForURL("**/track/bitcoin");
   });

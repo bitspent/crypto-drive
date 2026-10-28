@@ -2685,14 +2685,64 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
 
 .bookshelf-spine {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: -9px;
-  width: 18px;
-  border-radius: 4px 0 0 4px;
-  background: linear-gradient(90deg, rgb(0 0 0 / 0.55), color-mix(in oklab, var(--amber) 30%, transparent) 55%, rgb(0 0 0 / 0.55));
-  transform: rotateY(-72deg) translateX(-4px);
+  top: -1px;
+  bottom: -1px;
+  left: -13px;
+  width: 26px;
+  border-radius: 6px 0 0 6px;
+  background:
+    linear-gradient(90deg, rgb(0 0 0 / 0.6) 0 3px, transparent 3px),
+    linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--amber) 42%, black),
+      color-mix(in oklab, var(--amber) 22%, black) 45%,
+      rgb(0 0 0 / 0.55)
+    );
+  transform: rotateY(-68deg) translateX(-5px);
   transform-origin: right center;
+}
+
+.bookshelf-pages {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  right: -11px;
+  width: 22px;
+  border-radius: 0 3px 3px 0;
+  background: repeating-linear-gradient(
+    90deg,
+    #fbf8f1 0 2px,
+    #d9d2bf 2px 3px
+  );
+  box-shadow: inset -3px 0 5px -3px rgb(0 0 0 / 0.45);
+  transform: rotateY(66deg) translateX(5px);
+  transform-origin: left center;
+}
+
+.bookshelf-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--amber) 60%, transparent);
+  color: var(--amber);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bookshelf-cta:hover {
+  background: color-mix(in oklab, var(--amber) 12%, transparent);
+}
+
+.bookshelf-coming-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 0.8rem;
+  color: var(--mute);
 }
 
 .bookshelf-coming {
@@ -2770,7 +2820,8 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
     transition: none;
   }
 
-  .bookshelf-spine {
+  .bookshelf-spine,
+  .bookshelf-pages {
     display: none;
   }
 
