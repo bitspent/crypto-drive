@@ -92,6 +92,43 @@ test("a short slow drag snaps back and does not open", async ({ page }) => {
   await expect(page).toHaveURL(/\/course$/);
 });
 
+test("slides announce their position in the set", async ({ page }) => {
+  await expect(page.getByTestId("shelf-book-money-map")).toHaveAccessibleName("1 of 6");
+  await expect(page.getByTestId("shelf-book-bitcoin")).toHaveAccessibleName("2 of 6");
+  await expect(page.getByTestId("shelf-book-ethereum")).toHaveAccessibleName("3 of 6");
+  // Far wings stay out of the a11y tree until they glide in.
+  await expect(page.getByTestId("shelf-book-solana")).toHaveAttribute("aria-hidden", "true");
+});
+
+test("only the centred book's button is in the tab order", async ({ page }) => {
+  const money = page.getByRole("link", { name: "Money map — not opened" });
+  const bitcoin = page.getByRole("link", { name: "Bitcoin — not opened" });
+  await expect(bitcoin).toHaveAttribute("tabindex", "-1");
+  await expect(money).not.toHaveAttribute("tabindex", "-1");
+  await page.getByRole("button", { name: "Next book" }).click();
+  await expect(page.getByTestId("shelf-book-bitcoin")).toHaveAttribute("data-active", "true");
+  await expect(money).toHaveAttribute("tabindex", "-1");
+  await expect(bitcoin).not.toHaveAttribute("tabindex", "-1");
+});
+
+test("arrow keys work from the dot controls", async ({ page }) => {
+  // Arrows move relative to the current slide, wherever focus sits.
+  await page.getByRole("button", { name: "Show Solana" }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("shelf-book-bitcoin")).toHaveAttribute("data-active", "true");
+  await expect(page.getByRole("link", { name: "Bitcoin — not opened" })).toBeFocused();
+});
+
+test("Home and End jump to the first and last book", async ({ page }) => {
+  await page.getByRole("link", { name: "Money map — not opened" }).focus();
+  await page.keyboard.press("End");
+  await expect(page.getByTestId("shelf-book-solana")).toHaveAttribute("data-active", "true");
+  await expect(page.getByRole("link", { name: "Solana — coming next" })).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(page.getByTestId("shelf-book-money-map")).toHaveAttribute("data-active", "true");
+  await expect(page.getByRole("link", { name: "Money map — not opened" })).toBeFocused();
+});
+
 test("a quick flick advances on momentum alone", async ({ page }) => {
   const stage = page.getByRole("group", { name: "Course books slider" });
   const box = await stage.boundingBox();

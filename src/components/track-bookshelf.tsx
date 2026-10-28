@@ -52,10 +52,14 @@ function statusText(track: ShelfTrack): string {
 /** Volume numerals in shelf order: the primer plus five tracks. */
 const NUMERALS = ["I", "II", "III", "IV", "V", "VI"];
 
-function Tome({ track, numeral, style, active, hidden, dim, onSelectBook, onFocusBook, onHoverBook }: {
+function Tome({ track, numeral, slideLabel, ctaFocusable, style, active, hidden, dim, onSelectBook, onFocusBook, onHoverBook }: {
   track: ShelfTrack;
   /** Sequential volume number printed before the title, e.g. "II". */
   numeral?: string;
+  /** "2 of 6" slide position for assistive tech; set on slider slides only. */
+  slideLabel?: string;
+  /** Roving tabindex: only the centred slide's CTA is in the tab order. */
+  ctaFocusable?: boolean;
   style?: CSSProperties;
   active?: boolean;
   hidden?: boolean;
@@ -76,6 +80,9 @@ function Tome({ track, numeral, style, active, hidden, dim, onSelectBook, onFocu
   return (
     <div
       aria-hidden={hidden || undefined}
+      role={slideLabel ? "group" : undefined}
+      aria-roledescription={slideLabel ? "slide" : undefined}
+      aria-label={slideLabel}
       className={cn("tome", !ready && "tome-coming")}
       data-testid={`shelf-book-${track.slug}`}
       data-active={active ? "true" : undefined}
@@ -123,7 +130,7 @@ function Tome({ track, numeral, style, active, hidden, dim, onSelectBook, onFocu
         <Link
           href={`/track/${track.slug}`}
           aria-label={`${track.title} — ${statusText(track)}`}
-          tabIndex={hidden ? -1 : undefined}
+          tabIndex={hidden || !ctaFocusable ? -1 : undefined}
           className="tome-cta"
           data-testid={`shelf-open-${track.slug}`}
           onFocus={onFocusBook}
@@ -161,7 +168,7 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const posRef = useRef(initial);
   const velRef = useRef(0); // books per second, for lean-into-motion tilt
-  const springRef = useRef<{ target: number; vel: number; raf: number } | null>(null);
+  const springRef = useRef<{ target: number; vel: number; raf: number; afterSettle?: () => void } | null>(null);
   const pointers = useRef(new Map<number, number>());
   const drag = useRef<{
     startX: number;
@@ -218,16 +225,18 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
   };
 
   /** Spring the shelf from the current position to `target` books. */
-  const springTo = (target: number, initialVel = 0) => {
+  const springTo = (target: number, initialVel = 0, afterSettle?: () => void) => {
     stopSpring();
     const t = clampIdx(target);
     setActive(t);
+    springRef.current = { target: t, vel: initialVel, raf: 0, afterSettle };
     let vel = initialVel;
     let last: number | null = null;
     const step = (now: number) => {
       if (last === null) {
         last = now;
-        springRef.current = { target: t, vel, raf: requestAnimationFrame(step) };
+        const ref = springRef.current;
+        if (ref) ref.raf = requestAnimationFrame(step);
         return;
       }
       const dt = Math.min(0.032, (now - last) / 1000);
@@ -237,14 +246,18 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
       vel += accel * dt;
       const next = p + vel * dt;
       if (Math.abs(t - next) < 0.001 && Math.abs(vel) < 0.02) {
+        const ref = springRef.current;
         springRef.current = null;
         applyPos(t, 0);
+        ref?.afterSettle?.();
         return;
       }
       applyPos(next, vel);
-      springRef.current = { target: t, vel, raf: requestAnimationFrame(step) };
+      const ref = springRef.current;
+      if (ref) ref.raf = requestAnimationFrame(step);
     };
-    springRef.current = { target: t, vel, raf: requestAnimationFrame(step) };
+    const ref = springRef.current;
+    if (ref) ref.raf = requestAnimationFrame(step);
   };
 
   useEffect(() => stopSpring, []);
@@ -257,13 +270,25 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
       ?.focus({ preventScroll: true });
   };
 
+  // WAI-ARIA carousel keyboard contract: arrows move between slides from
+  // anywhere inside the widget, Home/End jump to the ends, and focus
+  // follows the centred slide's action.
   const onKeyDown = (e: ReactKeyboardEvent) => {
-    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-    const next = clampIdx(active + (e.key === "ArrowRight" ? 1 : -1));
-    if (next === active) return;
+    let next = active;
+    if (e.key === "ArrowRight") next = clampIdx(active + 1);
+    else if (e.key === "ArrowLeft") next = clampIdx(active - 1);
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = max;
+    else return;
+    if (next === active && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
+      // At an end: let the key do nothing rather than scroll the page.
+      e.preventDefault();
+      return;
+    }
     e.preventDefault();
-    springTo(next);
-    requestAnimationFrame(() => focusBook(next));
+    // Focus follows on settle: mid-flight the target can still be hidden,
+    // which would make the browser drop the focus.
+    springTo(next, 0, () => focusBook(next));
   };
 
   const spacingPx = () => {
@@ -385,7 +410,7 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
         <div className="library-grid" role="list">
           {tracks.map((track, i) => (
             <div key={track.slug} className="tome-cell" role="listitem">
-              <Tome track={track} numeral={NUMERALS[i] ?? String(i + 1)} />
+              <Tome track={track} numeral={NUMERALS[i] ?? String(i + 1)} ctaFocusable />
             </div>
           ))}
         </div>
@@ -397,7 +422,12 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
   const tilt = Math.max(-7, Math.min(7, frame.v * 1.1));
 
   return (
-    <nav aria-label="Course tracks" className="library-scene library-scene-slider" data-testid="track-bookshelf">
+    <nav
+      aria-label="Course tracks"
+      className="library-scene library-scene-slider"
+      data-testid="track-bookshelf"
+      onKeyDown={onKeyDown}
+    >
       <div
         ref={stageRef}
         className={cn("library-stage", dragging && "library-stage-dragging")}
@@ -405,7 +435,6 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
         aria-label="Course books slider"
         aria-roledescription="carousel"
         tabIndex={0}
-        onKeyDown={onKeyDown}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={(e) => endPointer(e, false)}
@@ -439,6 +468,8 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
               key={track.slug}
               track={track}
               numeral={NUMERALS[i] ?? String(i + 1)}
+              slideLabel={`${i + 1} of ${tracks.length}`}
+              ctaFocusable={i === active}
               active={i === active}
               hidden={hidden}
               dim={dim}
