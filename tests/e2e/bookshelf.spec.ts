@@ -156,6 +156,18 @@ test("a short drag snaps back without moving", async ({ page }) => {
   );
 });
 
+test("fresh learner sees not-opened and coming stamps", async ({ page }) => {
+  await expect(page.getByTestId("shelf-stamp-money-map")).toHaveText(
+    "NOT OPENED",
+  );
+  await expect(page.getByTestId("shelf-stamp-bitcoin")).toHaveText(
+    "NOT OPENED",
+  );
+  await expect(page.getByTestId("shelf-stamp-ethereum")).toHaveText(
+    "COMING NEXT",
+  );
+});
+
 test("coming tracks sit greyed out with no link", async ({ page }) => {
   const eth = page.getByTestId("shelf-book-ethereum");
   await expect(eth.getByRole("link")).toHaveCount(0);

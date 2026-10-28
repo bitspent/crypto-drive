@@ -76,6 +76,30 @@ export function countFinishedDrives(
   return drives.filter((drive) => driveComplete(drive, passed)).length;
 }
 
+export type TrackSealKind = "done" | "progress" | "new" | "coming";
+
+/** Cover-stamp state for one track, from the learner's passed steps. */
+export function trackSeal(
+  status: string,
+  drives: Drive[],
+  passed: Record<string, string>,
+): { kind: TrackSealKind; label: string; done: number; total: number; pct: number } {
+  if (status !== "ready") {
+    return { kind: "coming", label: "COMING NEXT", done: 0, total: 0, pct: 0 };
+  }
+  const steps = drives.flatMap((drive) => drive.steps);
+  const total = steps.length;
+  const done = steps.filter((step) => Boolean(passed[step.id])).length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  if (total > 0 && done === total) {
+    return { kind: "done", label: "DONE", done, total, pct };
+  }
+  if (done > 0) {
+    return { kind: "progress", label: `${done}/${total} · IN PROGRESS`, done, total, pct };
+  }
+  return { kind: "new", label: "NOT OPENED", done, total, pct };
+}
+
 export function stepHref(trackSlug: string, drive: Drive, step: Step): string {
   return `/track/${trackSlug}/${drive.slug}/${step.slug}`;
 }

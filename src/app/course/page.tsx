@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { TrackSymbol } from "@/components/crypto-marks";
 import { TrackBookshelf } from "@/components/track-bookshelf";
 import { getTracksForTier, getTier } from "@/lib/content";
-import { countFinishedDrives, resumeHref } from "@/lib/drive";
+import { countFinishedDrives, resumeHref, trackSeal } from "@/lib/drive";
 import { getSessionId } from "@/lib/session";
 import { getStudentBySession } from "@/lib/store";
 
@@ -27,6 +27,16 @@ export default async function CoursePage() {
   const tracks = await getTracksForTier(tier);
   const callUrl = process.env.NEXT_PUBLIC_VIP_CALL_URL;
   const qaUrl = process.env.NEXT_PUBLIC_VIP_QA_URL;
+
+  const shelfTracks = tracks.map((track) => ({
+    slug: track.slug,
+    title: track.title,
+    eyebrow: track.eyebrow,
+    summary: track.summary,
+    status: track.status,
+    symbol: track.symbol,
+    seal: trackSeal(track.status, track.drives ?? [], student.modulesPassed),
+  }));
 
   const btc = tracks.find((t) => t.slug === "bitcoin");
   const btcDrives = btc?.drives ?? [];
@@ -60,6 +70,15 @@ export default async function CoursePage() {
             Switch license
           </Link>
         </div>
+
+        <section aria-label="Pick your track" className="mb-10">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="font-[family-name:var(--font-display)] text-sm tracking-[0.16em] text-[var(--amber)]">
+              PICK YOUR TRACK
+            </h2>
+          </div>
+          <TrackBookshelf tracks={shelfTracks} />
+        </section>
 
         {tier.features.liveCall && tier.support ? (
           <section className="mb-10 grid gap-4 rounded-2xl border border-[var(--amber)]/40 bg-[var(--cabin)] p-5 sm:grid-cols-2 sm:p-6">
@@ -136,24 +155,6 @@ export default async function CoursePage() {
             →
           </span>
         </Link>
-
-        <section aria-label="Pick your track" className="mb-10">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="font-[family-name:var(--font-display)] text-sm tracking-[0.16em] text-[var(--amber)]">
-              PICK YOUR TRACK
-            </h2>
-          </div>
-          <TrackBookshelf
-            tracks={tracks.map((track) => ({
-              slug: track.slug,
-              title: track.title,
-              eyebrow: track.eyebrow,
-              summary: track.summary,
-              status: track.status,
-              symbol: track.symbol,
-            }))}
-          />
-        </section>
 
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-[family-name:var(--font-display)] text-sm tracking-[0.16em] text-[var(--amber)]">

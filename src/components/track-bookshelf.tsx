@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TrackSymbol } from "@/components/crypto-marks";
+import type { TrackSealKind } from "@/lib/drive";
 import { cn } from "@/lib/utils";
 
 export type ShelfTrack = {
@@ -12,6 +13,17 @@ export type ShelfTrack = {
   summary: string;
   status: string;
   symbol: string;
+  seal: { kind: TrackSealKind; label: string; pct: number };
+};
+
+/** Aged-leather dyes, one binding per track. */
+const LEATHERS: Record<string, string> = {
+  "money-map": "#7c5a2e",
+  bitcoin: "#571f24",
+  ethereum: "#26355c",
+  "usdt-networks": "#1f4d3a",
+  tron: "#6e1423",
+  solana: "#3b2d4d",
 };
 
 const MAX_SIDE = 2;
@@ -110,6 +122,7 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
           const p = placement(offset);
           const ready = track.status === "ready";
           const isActive = i === active;
+          const seal = track.seal;
           const footer = ready ? (
             <Link
               aria-label={`Open ${track.title} — first drive`}
@@ -135,12 +148,13 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
               aria-label={`${i + 1} of ${tracks.length}: ${track.title}`}
               aria-roledescription="slide"
               className={cn(
-                "bookshelf-book group flex flex-col rounded-r-xl rounded-l-sm border border-[var(--lane)] bg-[var(--cabin)] p-5 text-left",
+                "bookshelf-book group flex flex-col rounded-r-lg rounded-l-sm p-5 text-left",
                 !ready && "bookshelf-coming",
               )}
               data-active={isActive}
               data-testid={`shelf-book-${track.slug}`}
               style={{
+                ["--leather" as string]: LEATHERS[track.slug] ?? "#4a3521",
                 opacity: p.opacity,
                 transform: p.transform,
                 transition: glide !== null ? "none" : undefined,
@@ -150,19 +164,33 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
             >
               <span aria-hidden="true" className="bookshelf-spine" />
               <span aria-hidden="true" className="bookshelf-pages" />
-              <span className="flex items-start justify-between gap-2">
-                <span className="font-[family-name:var(--font-display)] text-[10px] tracking-[0.18em] text-[var(--amber)]">
+              <span
+                className={cn("bookshelf-stamp", `bookshelf-stamp-${seal.kind}`)}
+                data-testid={`shelf-stamp-${track.slug}`}
+              >
+                {seal.label}
+              </span>
+              <span className="flex items-center gap-2 text-[#e8dcc0]">
+                <TrackSymbol symbol={track.symbol} className="h-6 w-6 shrink-0" />
+                <span className="font-[family-name:var(--font-display)] text-[10px] tracking-[0.22em] text-[#d8b45a]">
                   {track.eyebrow}
                 </span>
-                <TrackSymbol symbol={track.symbol} className="h-7 w-7 shrink-0" />
               </span>
-              <span className="mt-2 block font-[family-name:var(--font-display)] text-xl leading-tight text-[var(--paper)]">
+              <span className="mt-3 block font-[family-name:var(--font-display)] text-[1.7rem] leading-tight text-[#f0d9a0]">
                 {track.title}
               </span>
-              <span className="mt-2 block line-clamp-4 text-sm leading-snug text-[var(--fog)]">
+              <span aria-hidden="true" className="bookshelf-rule" />
+              <span className="mt-2 block line-clamp-4 text-sm leading-snug text-[#e6d9bd]/85">
                 {track.summary}
               </span>
-              <span className="mt-auto block pt-3">{footer}</span>
+              <span className="mt-auto block pt-3">
+                {seal.kind === "progress" || seal.kind === "done" ? (
+                  <span aria-hidden="true" className="bookshelf-meter">
+                    <span style={{ width: `${seal.pct}%` }} />
+                  </span>
+                ) : null}
+                <span className="mt-3 block">{footer}</span>
+              </span>
             </div>
           );
         })}
