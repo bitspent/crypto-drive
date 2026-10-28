@@ -119,6 +119,37 @@ test("arrow keys work from the dot controls", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Bitcoin — not opened" })).toBeFocused();
 });
 
+test("Up, Down and Space never browse or open", async ({ page }) => {
+  await page.getByRole("link", { name: "Money map — not opened" }).focus();
+  for (const key of ["ArrowUp", "ArrowDown", " "]) {
+    await page.keyboard.press(key);
+  }
+  await expect(page.getByTestId("shelf-book-money-map")).toHaveAttribute("data-active", "true");
+  await expect(page).toHaveURL(/\/course$/);
+});
+
+test("Left at the first book goes nowhere", async ({ page }) => {
+  await page.getByRole("link", { name: "Money map — not opened" }).focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("shelf-book-money-map")).toHaveAttribute("data-active", "true");
+  await expect(page).toHaveURL(/\/course$/);
+});
+
+test("Escape returns focus to the slider from its controls", async ({ page }) => {
+  await page.getByRole("button", { name: "Show Bitcoin" }).focus();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("group", { name: "Course books slider" })).toBeFocused();
+  await expect(page.getByTestId("shelf-book-money-map")).toHaveAttribute("data-active", "true");
+  await expect(page).toHaveURL(/\/course$/);
+});
+
+test("Escape on the slider itself is a no-op", async ({ page }) => {
+  await page.getByRole("group", { name: "Course books slider" }).focus();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("group", { name: "Course books slider" })).toBeFocused();
+  await expect(page.getByTestId("shelf-book-money-map")).toHaveAttribute("data-active", "true");
+});
+
 test("Home and End jump to the first and last book", async ({ page }) => {
   await page.getByRole("link", { name: "Money map — not opened" }).focus();
   await page.keyboard.press("End");

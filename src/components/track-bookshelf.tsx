@@ -166,6 +166,7 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
   const [dragging, setDragging] = useState(false);
 
   const stageRef = useRef<HTMLDivElement>(null);
+  const shelfRef = useRef<HTMLElement>(null);
   const posRef = useRef(initial);
   const velRef = useRef(0); // books per second, for lean-into-motion tilt
   const springRef = useRef<{ target: number; vel: number; raf: number; afterSettle?: () => void } | null>(null);
@@ -272,8 +273,21 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
 
   // WAI-ARIA carousel keyboard contract: arrows move between slides from
   // anywhere inside the widget, Home/End jump to the ends, and focus
-  // follows the centred slide's action.
+  // follows the centred slide's action. Enter/Space/Up/Down are left to
+  // their native scope (links open on Enter, buttons click on Space,
+  // Up/Down scroll the page). Escape hands focus back to the slider from
+  // any of its controls.
   const onKeyDown = (e: ReactKeyboardEvent) => {
+    if (e.key === "Escape") {
+      // Anywhere inside the widget except the slider itself: hand focus
+      // back to the slider's single tab stop.
+      const t = e.target as HTMLElement;
+      if (t !== stageRef.current && shelfRef.current?.contains(t)) {
+        e.preventDefault();
+        stageRef.current?.focus({ preventScroll: true });
+      }
+      return;
+    }
     let next = active;
     if (e.key === "ArrowRight") next = clampIdx(active + 1);
     else if (e.key === "ArrowLeft") next = clampIdx(active - 1);
@@ -423,6 +437,7 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
 
   return (
     <nav
+      ref={shelfRef}
       aria-label="Course tracks"
       className="library-scene library-scene-slider"
       data-testid="track-bookshelf"
