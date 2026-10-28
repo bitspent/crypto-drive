@@ -40,7 +40,7 @@ test("walks unlock through all 5 primer steps to the course handoff", async ({ p
     if (res.status() === 429) throttled.push(res.url());
   });
   await unlock(page, uniqueEmail("money"));
-  await page.getByRole("link", { name: /Money map/ }).click();
+  await page.getByRole("link", { name: "Money map — not opened" }).click();
   await page.waitForURL("**/track/money-map");
   await expect(page.getByText("0 / 1 stops done")).toBeVisible();
   await page.getByRole("link", { name: "Start the drive" }).click();
@@ -97,7 +97,9 @@ test("walks unlock through all 5 primer steps to the course handoff", async ({ p
   await page.getByRole("button", { name: "Start the Bitcoin road" }).click();
   await page.getByRole("link", { name: "Back to your course" }).click();
   await page.waitForURL("**/course");
-  await expect(page.getByRole("link", { name: /Money map/ })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Money map — done" }),
+  ).toBeVisible();
   await expect(page.getByRole("link", { name: /Bitcoin/ }).first()).toBeVisible();
 
   assertNoPageErrors(failures);

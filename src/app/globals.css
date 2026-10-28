@@ -2650,49 +2650,93 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   font-size: 1.05rem;
   font-weight: 600;
 }
+/* —— Course library (single-light scriptorium scene) —— */
+/* Light: warm raking light from upper-left. Gilt catches top-left,
+   cast shadows fall down-right onto the plank. */
 
-/* —— Course bookshelf (CSS-3D track picker) —— */
-
-.bookshelf {
-  outline: none;
-  /* Horizontal swipes belong to the shelf; vertical pans still scroll. */
-  touch-action: pan-y;
-  cursor: grab;
-}
-
-.bookshelf:active {
-  cursor: grabbing;
-}
-
-.bookshelf button,
-.bookshelf a {
-  cursor: pointer;
-}
-
-.bookshelf-viewport {
-  position: relative;
-  height: 380px;
-  perspective: 1200px;
+.library-scene {
+  --book-h: 360px;
+  --row-gap: 62px;
+  --plank-h: 26px;
+  border-radius: 20px;
+  padding: 30px 22px calc(var(--row-gap) + 6px);
+  background-color: #17100b;
+  background-image:
+    linear-gradient(115deg, rgb(255 244 220 / 0.1), transparent 55%),
+    radial-gradient(120% 105% at 50% 38%, transparent 55%, rgb(8 5 2 / 0.6)),
+    repeating-linear-gradient(93deg, rgb(255 255 255 / 0.015) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, #2b2015 0%, #191009 60%, #100a06 100%);
+  background-repeat: no-repeat;
+  border: 1px solid rgb(0 0 0 / 0.65);
+  box-shadow:
+    inset 0 1px 0 rgb(255 235 190 / 0.09),
+    0 24px 60px -30px rgb(0 0 0 / 0.7);
+  transform: rotateX(1.5deg);
+  transform-origin: 50% 100%;
   overflow: clip;
 }
 
-.bookshelf-book {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  width: min(228px, 64vw);
-  height: 330px;
-  transform-style: preserve-3d;
-  transition:
-    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.45s ease;
-  box-shadow: 0 24px 48px -28px rgb(0 0 0 / 0.65);
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--row-gap) 14px;
+  padding: 6px 2px 0;
+  background-image:
+    linear-gradient(
+      180deg,
+      transparent 0 var(--book-h),
+      rgb(255 236 190 / 0.28) 0 calc(var(--book-h) + 2px),
+      transparent calc(var(--book-h) + 2px) calc(var(--book-h) + 8px),
+      rgb(0 0 0 / 0.45) calc(var(--book-h) + 8px) calc(var(--book-h) + 10px),
+      transparent calc(var(--book-h) + 10px)
+    ),
+    repeating-linear-gradient(
+      0deg,
+      #7a5a35 0 5px,
+      #5c4225 5px 8px,
+      #6d5030 8px 11px,
+      #4a3421 11px 13px
+    ),
+    linear-gradient(180deg, #8a6a3e 0, #4a3421 100%);
+  background-size:
+    100% calc(var(--book-h) + var(--row-gap)),
+    100% var(--plank-h),
+    100% var(--plank-h);
+  background-position:
+    0 0,
+    0 var(--book-h),
+    0 var(--book-h);
+  background-repeat: repeat-y;
 }
 
-.bookshelf-book {
+/* The last volume leans against the shelf end. */
+.library-grid > :last-child .tome {
+  transform: rotate(-5deg);
+  transform-origin: 50% 100%;
+}
+
+.library-grid > :last-child .tome:hover,
+.library-grid > :last-child .tome:focus-visible {
+  transform: translateY(-5px) rotate(-5deg);
+}
+
+.tome-cell {
+  min-width: 0;
+}
+
+.tome {
   --leather: #4a3521;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: var(--book-h);
+  padding: 18px 14px 14px;
+  text-align: left;
+  text-decoration: none;
+  border-radius: 5px 12px 12px 5px;
+  border: 1px solid color-mix(in oklab, var(--leather) 52%, black);
   background:
-    radial-gradient(120% 90% at 18% 0%, rgb(255 255 255 / 0.14), transparent 52%),
+    radial-gradient(120% 90% at 18% 0%, rgb(255 255 255 / 0.13), transparent 52%),
     radial-gradient(110% 100% at 88% 102%, rgb(0 0 0 / 0.42), transparent 58%),
     repeating-linear-gradient(93deg, rgb(255 255 255 / 0.018) 0 2px, transparent 2px 5px),
     repeating-linear-gradient(4deg, rgb(0 0 0 / 0.03) 0 1px, transparent 1px 4px),
@@ -2702,10 +2746,32 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
       var(--leather) 46%,
       color-mix(in oklab, var(--leather) 64%, black) 100%
     );
-  border: 1px solid color-mix(in oklab, var(--leather) 52%, black);
+  box-shadow:
+    10px 18px 30px -12px rgb(0 0 0 / 0.6),
+    3px 5px 10px -4px rgb(0 0 0 / 0.4);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease;
 }
 
-.bookshelf-book::before {
+.tome:hover,
+.tome:focus-visible {
+  transform: translateY(-5px);
+  box-shadow:
+    14px 26px 38px -12px rgb(0 0 0 / 0.65),
+    0 0 0 1px rgb(240 217 140 / 0.55),
+    3px 5px 10px -4px rgb(0 0 0 / 0.4);
+  filter: brightness(1.05);
+}
+
+.tome:focus-visible {
+  outline: 3px solid #f5d67a;
+  outline-offset: 3px;
+}
+
+/* Gilt double frame + hinge and fore-edge shading. */
+.tome::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -2713,28 +2779,88 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   pointer-events: none;
   background: linear-gradient(
     115deg,
-    rgb(255 255 255 / 0.13) 0%,
-    rgb(255 255 255 / 0) 42%,
-    rgb(0 0 0 / 0.08) 100%
+    rgb(255 244 214 / 0.16) 0%,
+    rgb(255 244 214 / 0) 42%,
+    rgb(0 0 0 / 0.1) 100%
   );
   box-shadow:
-    inset 0 0 0 2px rgb(216 178 74 / 0.5),
+    inset 0 0 0 2px rgb(216 178 74 / 0.55),
     inset 0 0 0 5px color-mix(in oklab, var(--leather) 72%, black),
     inset 0 0 0 6px rgb(216 178 74 / 0.38),
-    inset 18px 0 30px -20px rgb(0 0 0 / 0.55),
+    inset 18px 0 32px -20px rgb(0 0 0 / 0.55),
     inset -12px 0 22px -16px rgb(0 0 0 / 0.35);
 }
 
-.bookshelf-rule {
+.tome-spine {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: -1px;
+  width: 16px;
+  border-radius: 5px 0 0 5px;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 34px,
+      rgb(0 0 0 / 0.45) 34px 37px,
+      rgb(240 217 160 / 0.32) 37px 38px,
+      transparent 38px 76px
+    ),
+    linear-gradient(90deg, rgb(0 0 0 / 0.55), color-mix(in oklab, var(--leather) 55%, black));
+}
+
+.tome-pages {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  right: 0;
+  width: 9px;
+  border-radius: 0 10px 10px 0;
+  background: repeating-linear-gradient(
+    180deg,
+    #f4ecda 0 2px,
+    #cfc0a3 2px 3px
+  );
+  box-shadow: -3px 0 6px -2px rgb(0 0 0 / 0.5);
+}
+
+.tome-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e8dcc0;
+}
+
+.tome-eyebrow {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: #d8b45a;
+  text-transform: uppercase;
+}
+
+.tome-title {
+  display: block;
+  margin-top: 8px;
+  font-family: var(--font-display);
+  font-size: clamp(1.05rem, 1.4vw + 0.9rem, 1.55rem);
+  line-height: 1.15;
+  color: #f0d9a0;
+  text-shadow:
+    0 -1px 0 rgb(255 240 200 / 0.35),
+    0 2px 3px rgb(0 0 0 / 0.6);
+}
+
+.tome-rule {
   display: block;
   width: 44px;
   height: 2px;
-  margin-top: 10px;
+  margin-top: 8px;
   background: linear-gradient(90deg, #d8b24a, rgb(216 178 74 / 0.15));
   position: relative;
 }
 
-.bookshelf-rule::after {
+.tome-rule::after {
   content: "";
   position: absolute;
   right: -9px;
@@ -2745,15 +2871,28 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   background: #d8b24a;
 }
 
-.bookshelf-stamp {
+.tome-summary {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: rgb(230 217 189 / 0.85);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+
+/* Postage-stamp seal, lower-right, grazing like a postmark. */
+.tome-stamp {
   position: absolute;
-  top: 14px;
-  right: 12px;
+  right: 10px;
+  bottom: 92px;
   z-index: 3;
   padding: 4px 8px;
   border: 1.5px solid currentColor;
   border-radius: 4px;
-  transform: rotate(7deg);
+  transform: rotate(6deg);
   font-family: var(--font-display), serif;
   font-size: 9px;
   font-weight: 700;
@@ -2766,27 +2905,33 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   text-shadow: 0 1px 0 rgb(0 0 0 / 0.45);
 }
 
-.bookshelf-stamp-done {
+.tome-stamp-done {
   color: #8fe3a0;
   background: rgb(16 52 30 / 0.62);
 }
 
-.bookshelf-stamp-progress {
+.tome-stamp-progress {
   color: #ffc95e;
   background: rgb(84 56 8 / 0.55);
 }
 
-.bookshelf-stamp-new {
+.tome-stamp-new {
   color: #d9cba6;
   background: rgb(0 0 0 / 0.28);
 }
 
-.bookshelf-stamp-coming {
+.tome-stamp-coming {
   color: #a8b6cc;
   background: rgb(10 16 30 / 0.5);
 }
 
-.bookshelf-meter {
+.tome-foot {
+  display: block;
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+.tome-meter {
   display: block;
   height: 4px;
   border-radius: 999px;
@@ -2795,169 +2940,82 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   box-shadow: inset 0 0 0 1px rgb(216 178 74 / 0.25);
 }
 
-.bookshelf-meter > span {
+.tome-meter > span {
   display: block;
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, #a87c1c, #f0d98c);
 }
 
-.bookshelf-book[data-active="true"] {
-  box-shadow: 0 34px 60px -30px rgb(0 0 0 / 0.75);
-}
-
-.bookshelf-spine {
-  position: absolute;
-  top: -1px;
-  bottom: -1px;
-  left: -13px;
-  width: 26px;
-  border-radius: 6px 0 0 6px;
-  background:
-    repeating-linear-gradient(
-      180deg,
-      transparent 0 30px,
-      rgb(0 0 0 / 0.42) 30px 33px,
-      rgb(240 217 160 / 0.3) 33px 34px,
-      transparent 34px 64px
-    ),
-    linear-gradient(90deg, rgb(0 0 0 / 0.6) 0 3px, transparent 3px),
-    linear-gradient(
-      90deg,
-      color-mix(in oklab, var(--amber) 42%, black),
-      color-mix(in oklab, var(--amber) 22%, black) 45%,
-      rgb(0 0 0 / 0.55)
-    );
-  transform: rotateY(-68deg) translateX(-5px);
-  transform-origin: right center;
-}
-
-.bookshelf-pages {
-  position: absolute;
-  top: 3px;
-  bottom: 3px;
-  right: -11px;
-  width: 22px;
-  border-radius: 0 3px 3px 0;
-  background: repeating-linear-gradient(
-    90deg,
-    #fbf8f1 0 2px,
-    #d9d2bf 2px 3px
-  );
-  box-shadow: inset -3px 0 5px -3px rgb(0 0 0 / 0.45);
-  transform: rotateY(66deg) translateX(5px);
-  transform-origin: left center;
-}
-
-.bookshelf-cta {
+.tome-cta {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-height: 44px;
+  margin-top: 10px;
   padding: 8px 18px;
   border-radius: 999px;
   border: 1px solid rgb(240 201 94 / 0.65);
+  background: rgb(0 0 0 / 0.25);
   color: #f0c95e;
-  background: rgb(0 0 0 / 0.22);
   font-size: 0.85rem;
   font-weight: 600;
   white-space: nowrap;
 }
 
-.bookshelf-cta:hover {
-  background: rgb(240 201 94 / 0.16);
+.tome-coming {
+  filter: saturate(0.45);
 }
 
-.bookshelf-coming-label {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  font-size: 0.8rem;
-  color: #cbbd97;
+.tome-coming .tome-title {
+  color: #e2d9c2;
 }
 
-.bookshelf-coming {
-  opacity: 0.62;
-  filter: saturate(0.4);
+@media (max-width: 1000px) {
+  .library-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .library-scene {
+    --book-h: 330px;
+  }
 }
 
-.bookshelf-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  margin-top: 4px;
-}
+@media (max-width: 560px) {
+  .library-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--row-gap) 10px;
+  }
 
-.bookshelf-arrow {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
-  border: 1px solid var(--lane);
-  background: var(--cabin);
-  color: var(--paper);
-  font-size: 1.1rem;
-}
+  .library-scene {
+    --book-h: 300px;
+    --row-gap: 56px;
+    padding: 22px 14px calc(var(--row-gap) + 4px);
+  }
 
-.bookshelf-arrow:hover {
-  border-color: color-mix(in oklab, var(--amber) 55%, var(--lane));
-  color: var(--amber);
-}
-
-.bookshelf-dots {
-  display: flex;
-  gap: 10px;
-}
-
-.bookshelf-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--lane);
-}
-
-.bookshelf-dot[aria-current="true"] {
-  background: var(--amber);
-}
-
-.bookshelf-hint {
-  margin-top: 10px;
-  text-align: center;
-  font-size: 0.8rem;
-  color: var(--mute);
+  .tome-summary {
+    -webkit-line-clamp: 2;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bookshelf-viewport {
-    display: flex;
-    gap: 12px;
-    height: auto;
-    overflow-x: auto;
-    perspective: none;
-    padding-bottom: 8px;
+  .library-scene {
+    transform: none;
   }
 
-  .bookshelf-book {
-    position: relative;
-    top: auto;
-    left: auto;
-    flex: 0 0 auto;
-    transform: none !important;
-    opacity: 1 !important;
-    visibility: visible !important;
+  .tome {
     transition: none;
   }
 
-  .bookshelf-spine,
-  .bookshelf-pages {
-    display: none;
+  .tome:hover,
+  .tome:focus-visible {
+    transform: none;
+    filter: none;
   }
 
-  .bookshelf-controls,
-  .bookshelf-hint {
-    display: none;
+  .library-grid > :last-child .tome,
+  .library-grid > :last-child .tome:hover,
+  .library-grid > :last-child .tome:focus-visible {
+    transform: none;
   }
 }

@@ -43,7 +43,7 @@ test("walks unlock to verified USDT certificate across all 10 steps", async ({ p
     if (res.status() === 429) throttled.push(res.url());
   });
   await unlock(page, uniqueEmail("usdt"));
-  await page.getByRole("link", { name: /USDT \+ networks/ }).click();
+  await page.getByRole("link", { name: "USDT + networks — not opened" }).click();
   await page.waitForURL("**/track/usdt-networks");
   await expect(page.getByText("0 / 3 stops done")).toBeVisible();
   await page.getByRole("link", { name: "Start the drive" }).click();
