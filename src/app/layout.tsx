@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Figtree, Syne } from "next/font/google";
-import Script from "next/script";
 import { RouteStage } from "@/components/route-stage";
+import { ThemeBoot } from "@/components/theme-boot";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
@@ -40,9 +40,7 @@ export default function RootLayout({
       className={`${display.variable} ${body.variable} min-h-dvh antialiased`}
     >
       <body className="flex min-h-dvh flex-col road-atmosphere">
-        <Script id="cd-theme-boot" strategy="beforeInteractive">
-          {themeBoot}
-        </Script>
+        <ThemeBoot code={themeBoot} />
         <ThemeProvider>
           <RouteStage>{children}</RouteStage>
         </ThemeProvider>
