@@ -40,13 +40,58 @@ async function commitForward(page: Page, buttonName: string, urlPart: string): P
   }
 }
 
-test("shelf opens with six books, primer first", async ({ page }) => {
+test("shelf opens with six books, primer centred", async ({ page }) => {
   await expect(page.getByTestId(/shelf-book-/)).toHaveCount(6);
+  await expect(page.getByTestId("shelf-book-money-map")).toHaveAttribute("data-active", "true");
   await expect(page.getByTestId("shelf-book-money-map")).toContainText("Money map");
   await expect(page.getByTestId("shelf-book-bitcoin")).toContainText("Bitcoin");
 });
 
-test("the footer button opens its track", async ({ page }) => {
+test("next arrow and dots browse the slider", async ({ page }) => {
+  await page.getByRole("button", { name: "Next book" }).click();
+  await expect(page.getByTestId("shelf-book-bitcoin")).toHaveAttribute("data-active", "true");
+  await page.getByRole("button", { name: "Show Solana" }).click();
+  await expect(page.getByTestId("shelf-book-solana")).toHaveAttribute("data-active", "true");
+  await page.getByRole("button", { name: "Previous book" }).click();
+  await expect(page.getByTestId("shelf-book-tron")).toHaveAttribute("data-active", "true");
+});
+
+test("arrow keys browse and move focus", async ({ page }) => {
+  await page.getByRole("link", { name: "Money map — not opened" }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("shelf-book-bitcoin")).toHaveAttribute("data-active", "true");
+  await expect(page.getByRole("link", { name: "Bitcoin — not opened" })).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("shelf-book-money-map")).toHaveAttribute("data-active", "true");
+});
+
+test("dragging glides to the next book without opening it", async ({ page }) => {
+  const stage = page.getByRole("group", { name: "Course books slider" });
+  const box = await stage.boundingBox();
+  if (!box) throw new Error("slider has no box");
+  const cy = box.y + box.height / 2;
+  await page.mouse.move(box.x + box.width / 2, cy);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 - 140, cy, { steps: 12 });
+  await page.mouse.up();
+  await expect(page.getByTestId("shelf-book-bitcoin")).toHaveAttribute("data-active", "true");
+  await expect(page).toHaveURL(/\/course$/);
+});
+
+test("a short drag snaps back and does not open", async ({ page }) => {
+  const stage = page.getByRole("group", { name: "Course books slider" });
+  const box = await stage.boundingBox();
+  if (!box) throw new Error("slider has no box");
+  const cy = box.y + box.height / 2;
+  await page.mouse.move(box.x + box.width / 2, cy);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 - 30, cy, { steps: 6 });
+  await page.mouse.up();
+  await expect(page.getByTestId("shelf-book-money-map")).toHaveAttribute("data-active", "true");
+  await expect(page).toHaveURL(/\/course$/);
+});
+
+test("a book tap opens its track", async ({ page }) => {
   await page.getByRole("link", { name: "Bitcoin — not opened" }).click();
   await page.waitForURL("**/track/bitcoin");
 });
@@ -58,6 +103,8 @@ test("keyboard opens the focused book", async ({ page }) => {
 });
 
 test("coming books open their teaser page", async ({ page }) => {
+  await page.getByRole("button", { name: "Show Ethereum" }).click();
+  await expect(page.getByTestId("shelf-book-ethereum")).toHaveAttribute("data-active", "true");
   await page.getByRole("link", { name: "Ethereum — coming next" }).click();
   await page.waitForURL("**/track/ethereum");
   await expect(
