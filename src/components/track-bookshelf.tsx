@@ -7,6 +7,7 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type SyntheticEvent as ReactSyntheticEvent,
 } from "react";
@@ -48,28 +49,37 @@ function statusText(track: ShelfTrack): string {
         : "coming next";
 }
 
-function Tome({ track, style, active, hidden, onFocusBook, onHoverBook }: {
+function Tome({ track, style, active, hidden, dim, onSelectBook, onFocusBook, onHoverBook }: {
   track: ShelfTrack;
   style?: CSSProperties;
   active?: boolean;
   hidden?: boolean;
+  /** Spotlight dimming for the wings: 1 on the centred book, darker outward. */
+  dim?: number;
+  onSelectBook?: () => void;
   onFocusBook?: () => void;
   onHoverBook?: (slug: string | null) => void;
 }) {
   const ready = track.status === "ready";
   const seal = track.seal;
+  const onSelect = (e: ReactMouseEvent<HTMLDivElement>) => {
+    // The cover itself never navigates: a tap centres the book. Only the
+    // CTA pill below opens the track.
+    if ((e.target as HTMLElement).closest("a")) return;
+    onSelectBook?.();
+  };
   return (
-    <Link
-      draggable={false}
-      href={`/track/${track.slug}`}
-      aria-label={`${track.title} — ${statusText(track)}`}
+    <div
       aria-hidden={hidden || undefined}
-      tabIndex={hidden ? -1 : undefined}
       className={cn("tome", !ready && "tome-coming")}
       data-testid={`shelf-book-${track.slug}`}
       data-active={active ? "true" : undefined}
-      style={{ ["--leather" as string]: LEATHERS[track.slug] ?? "#4a3521", ...style }}
-      onFocus={onFocusBook}
+      style={{
+        ["--leather" as string]: LEATHERS[track.slug] ?? "#4a3521",
+        filter: `brightness(${dim ?? 1})${ready ? "" : " saturate(0.45)"}`,
+        ...style,
+      }}
+      onClick={onSelect}
       onMouseEnter={() => onHoverBook?.(track.slug)}
       onMouseLeave={() => onHoverBook?.(null)}
     >
@@ -98,15 +108,22 @@ function Tome({ track, style, active, hidden, onFocusBook, onHoverBook }: {
             <span style={{ width: `${seal.pct}%` }} />
           </span>
         ) : null}
-        <span className="tome-cta">
+        <Link
+          href={`/track/${track.slug}`}
+          aria-label={`${track.title} — ${statusText(track)}`}
+          tabIndex={hidden ? -1 : undefined}
+          className="tome-cta"
+          data-testid={`shelf-open-${track.slug}`}
+          onFocus={onFocusBook}
+        >
           {ready ? (
             <>First drive <span aria-hidden="true">→</span></>
           ) : (
             <>Take a peek <span aria-hidden="true">→</span></>
           )}
-        </span>
+        </Link>
       </span>
-    </Link>
+    </div>
   );
 }
 
@@ -117,7 +134,8 @@ type Sample = { x: number; t: number };
  * scene. Books move with physics — finger-following drag with rubber-band
  * ends, momentum flicks, and a spring settle. One finger, two fingers
  * (which overrides pinch/scroll), mouse, arrows, dots and keys all browse;
- * a tap opens the centred book. Reduced motion gets the static shelf.
+ * a tap on a cover centres it — only the CTA pill opens a track.
+ * Reduced motion gets the static shelf.
  */
 export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
   const firstProgress = tracks.findIndex((t) => t.seal.kind === "progress");
@@ -223,7 +241,7 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
 
   const focusBook = (i: number) => {
     stageRef.current
-      ?.querySelector<HTMLElement>(`[data-testid="shelf-book-${tracks[clampIdx(i)].slug}"]`)
+      ?.querySelector<HTMLElement>(`[data-testid="shelf-open-${tracks[clampIdx(i)].slug}"]`)
       ?.focus({ preventScroll: true });
   };
 
@@ -238,7 +256,7 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
 
   const spacingPx = () => {
     const book = stageRef.current?.querySelector<HTMLElement>('[data-testid^="shelf-book-"]');
-    return (book?.offsetWidth ?? 248) * 0.54;
+    return (book?.offsetWidth ?? 248) * 0.3;
   };
 
   const centroid = () => {
@@ -333,8 +351,8 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
     suppressClick.current = true;
     const velPerMs = releaseVelocity(d, e.timeStamp);
     const projected = posRef.current + velPerMs * 90;
-    const flicked = Math.abs((d.samples[d.samples.length - 1]?.x ?? d.startX) - d.startX) < d.spacing;
-    const range = flicked ? 1 : 2; // a short fast flick skips at most one book
+    const shortDrag = Math.abs((d.samples[d.samples.length - 1]?.x ?? d.startX) - d.startX) < d.spacing * 1.5;
+    const range = shortDrag ? 1 : 2; // short drags and flicks move at most one book
     const target = clampIdx(
       Math.max(d.startActive - range, Math.min(d.startActive + range, Math.round(projected))),
     );
@@ -387,19 +405,31 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
           const abs = Math.abs(offset);
           const hidden = abs > 2.6;
           const boost = hovered === track.slug && abs < 0.5;
+          // Convergent fan: the wings tuck in close, angle steeply, drop
+          // back and down so they slide underneath the centred book.
+          // Floats are quantized: the browser normalizes long-precision
+          // style attributes on parse, which React would flag as a
+          // hydration mismatch.
+          const q = (n: number) => Math.round(n * 100) / 100;
           const transform = [
             "translate(-50%, 0)",
-            `translateX(${offset * 54}%)`,
-            `rotateY(${offset * -32 + tilt}deg)`,
+            `translateX(${q(offset * 30)}%)`,
+            `translateY(${q(Math.pow(abs, 1.6) * 14)}px)`,
+            `rotateY(${q(offset * -34 + tilt)}deg)`,
             "rotateX(2deg)",
-            `translateZ(${-abs * 150 + (boost ? 64 : 0)}px)`,
+            `translateZ(${q(-abs * 170 + (boost ? 64 : 0))}px)`,
           ].join(" ");
+          // Centre-spotlight: the focused book takes the beam, the wings
+          // fall off into the room's dark.
+          const dim = abs < 0.5 ? 1.07 : abs < 1.5 ? 0.82 : 0.66;
           return (
             <Tome
               key={track.slug}
               track={track}
               active={i === active}
               hidden={hidden}
+              dim={dim}
+              onSelectBook={() => go(i)}
               onFocusBook={() => go(i)}
               onHoverBook={setHovered}
               style={{
@@ -412,6 +442,7 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
             />
           );
         })}
+        <span aria-hidden="true" className="library-spot" />
         <span aria-hidden="true" className="library-rail" />
       </div>
 
@@ -451,7 +482,7 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
           <span aria-hidden="true">→</span>
         </button>
       </div>
-      <p className="library-hint">Drag or flick — one finger or two — or use ← → keys. Tap a book to open it</p>
+      <p className="library-hint">Drag or flick — one finger or two — or use ← → keys. Tap a cover to centre it, tap its button to open</p>
     </nav>
   );
 }

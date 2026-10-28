@@ -2732,6 +2732,22 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
     6px 10px 16px -6px rgb(0 0 0 / 0.45);
 }
 
+/* Spotlight beam pinned to the centre: the focused book takes the light,
+   the wings fall off. Books glide through it as the shelf moves. */
+.library-spot {
+  position: absolute;
+  left: 50%;
+  top: -12px;
+  bottom: 44px;
+  width: min(420px, 90%);
+  transform: translateX(-50%);
+  z-index: 2;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 46% 34% at 50% 30%, rgb(255 238 196 / 0.22), transparent 70%),
+    radial-gradient(ellipse 60% 12% at 50% 88%, rgb(255 226 160 / 0.12), transparent 70%);
+}
+
 /* Wooden display rail the volumes stand on; cast shadows land here. */
 .library-rail {
   position: absolute;
@@ -3116,6 +3132,17 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   font-size: 0.85rem;
   font-weight: 600;
   white-space: nowrap;
+  text-decoration: none;
+  transition: filter 0.2s ease;
+}
+
+.tome-cta:hover {
+  filter: brightness(1.25);
+}
+
+.tome-cta:focus-visible {
+  outline: 3px solid #f5d67a;
+  outline-offset: 3px;
 }
 
 .tome-coming {

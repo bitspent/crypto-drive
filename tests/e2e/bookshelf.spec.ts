@@ -72,7 +72,7 @@ test("dragging glides to the next book without opening it", async ({ page }) => 
   const cy = box.y + box.height / 2;
   await page.mouse.move(box.x + box.width / 2, cy);
   await page.mouse.down();
-  await page.mouse.move(box.x + box.width / 2 - 140, cy, { steps: 12 });
+  await page.mouse.move(box.x + box.width / 2 - 90, cy, { steps: 12 });
   await page.mouse.up();
   await expect(page.getByTestId("shelf-book-bitcoin")).toHaveAttribute("data-active", "true");
   await expect(page).toHaveURL(/\/course$/);
@@ -118,14 +118,23 @@ test("two fingers glide the shelf, overriding OS gestures", async ({ page }) => 
   ];
   await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: touches(0) });
   for (let i = 1; i <= 6; i++) {
-    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: touches(-i * 22) });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: touches(-i * 15) });
   }
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await expect(page.getByTestId("shelf-book-bitcoin")).toHaveAttribute("data-active", "true");
   await expect(page).toHaveURL(/\/course$/);
 });
 
-test("a book tap opens its track", async ({ page }) => {
+test("tapping a cover centres it without opening", async ({ page }) => {
+  await page.getByTestId("shelf-book-bitcoin").locator(".tome-title").click();
+  await expect(page.getByTestId("shelf-book-bitcoin")).toHaveAttribute("data-active", "true");
+  await expect(page).toHaveURL(/\/course$/);
+});
+
+test("the CTA pill opens its track", async ({ page }) => {
+  // Like a reader: centre the book first, then tap its button.
+  await page.getByRole("button", { name: "Show Bitcoin" }).click();
+  await expect(page.getByTestId("shelf-book-bitcoin")).toHaveAttribute("data-active", "true");
   await page.getByRole("link", { name: "Bitcoin — not opened" }).click();
   await page.waitForURL("**/track/bitcoin");
 });
