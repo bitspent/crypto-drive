@@ -78,7 +78,7 @@ test("dragging glides to the next book without opening it", async ({ page }) => 
   await expect(page).toHaveURL(/\/course$/);
 });
 
-test("a short drag snaps back and does not open", async ({ page }) => {
+test("a short slow drag snaps back and does not open", async ({ page }) => {
   const stage = page.getByRole("group", { name: "Course books slider" });
   const box = await stage.boundingBox();
   if (!box) throw new Error("slider has no box");
@@ -86,8 +86,42 @@ test("a short drag snaps back and does not open", async ({ page }) => {
   await page.mouse.move(box.x + box.width / 2, cy);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 - 30, cy, { steps: 6 });
+  await page.waitForTimeout(180); // hold still: momentum must die
   await page.mouse.up();
   await expect(page.getByTestId("shelf-book-money-map")).toHaveAttribute("data-active", "true");
+  await expect(page).toHaveURL(/\/course$/);
+});
+
+test("a quick flick advances on momentum alone", async ({ page }) => {
+  const stage = page.getByRole("group", { name: "Course books slider" });
+  const box = await stage.boundingBox();
+  if (!box) throw new Error("slider has no box");
+  const cy = box.y + box.height / 2;
+  await page.mouse.move(box.x + box.width / 2, cy);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 - 38, cy, { steps: 2 });
+  await page.mouse.up();
+  await expect(page.getByTestId("shelf-book-bitcoin")).toHaveAttribute("data-active", "true");
+  await expect(page).toHaveURL(/\/course$/);
+});
+
+test("two fingers glide the shelf, overriding OS gestures", async ({ page }) => {
+  const stage = page.getByRole("group", { name: "Course books slider" });
+  const box = await stage.boundingBox();
+  if (!box) throw new Error("slider has no box");
+  const cy = box.y + box.height / 2;
+  const cx = box.x + box.width / 2;
+  const cdp = await page.context().newCDPSession(page);
+  const touches = (dx: number) => [
+    { x: cx - 40 + dx, y: cy, id: 1 },
+    { x: cx + 40 + dx, y: cy, id: 2 },
+  ];
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: touches(0) });
+  for (let i = 1; i <= 6; i++) {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: touches(-i * 22) });
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await expect(page.getByTestId("shelf-book-bitcoin")).toHaveAttribute("data-active", "true");
   await expect(page).toHaveURL(/\/course$/);
 });
 

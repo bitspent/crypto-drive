@@ -2689,6 +2689,7 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   overflow: clip;
   cursor: grab;
   touch-action: pan-y;
+  overscroll-behavior: contain;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -2714,11 +2715,11 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
   width: min(248px, 62vw);
   cursor: pointer;
   transform-style: preserve-3d;
+  /* Transform is driven by the physics loop, never CSS transitions. */
   transition:
-    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.3s ease,
     filter 0.3s ease,
-    opacity 0.4s ease;
+    opacity 0.25s ease;
   box-shadow:
     22px 34px 38px -14px rgb(0 0 0 / 0.68),
     6px 10px 16px -6px rgb(0 0 0 / 0.45);

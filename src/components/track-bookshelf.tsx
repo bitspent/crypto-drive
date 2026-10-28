@@ -33,6 +33,10 @@ const LEATHERS: Record<string, string> = {
   solana: "#3b2d4d",
 };
 
+/* Spring settle: slightly underdamped so a book lands with weight. */
+const SPRING_K = 165;
+const SPRING_C = 21;
+
 function statusText(track: ShelfTrack): string {
   const seal = track.seal;
   return seal.kind === "done"
@@ -106,21 +110,42 @@ function Tome({ track, style, active, hidden, onFocusBook, onHoverBook }: {
   );
 }
 
+type Sample = { x: number; t: number };
+
 /**
- * Course library: leather volumes in a 3D glide slider inside one
- * single-light scene. Drag, arrows, dots or arrow keys browse; the
- * centred volume is the large one. Reduced motion gets the static shelf.
+ * Course library: leather volumes in a 3D slider inside one single-light
+ * scene. Books move with physics — finger-following drag with rubber-band
+ * ends, momentum flicks, and a spring settle. One finger, two fingers
+ * (which overrides pinch/scroll), mouse, arrows, dots and keys all browse;
+ * a tap opens the centred book. Reduced motion gets the static shelf.
  */
 export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
   const firstProgress = tracks.findIndex((t) => t.seal.kind === "progress");
-  const [active, setActive] = useState(firstProgress >= 0 ? firstProgress : 0);
+  const initial = firstProgress >= 0 ? firstProgress : 0;
+  const [active, setActive] = useState(initial);
+  const [frame, setFrame] = useState({ p: initial, v: 0 });
   const [calm, setCalm] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
-  const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const drag = useRef<{ startX: number; moved: boolean; pointerId: number } | null>(null);
-  const suppressClick = useRef(false);
+
   const stageRef = useRef<HTMLDivElement>(null);
+  const posRef = useRef(initial);
+  const velRef = useRef(0); // books per second, for lean-into-motion tilt
+  const springRef = useRef<{ target: number; vel: number; raf: number } | null>(null);
+  const pointers = useRef(new Map<number, number>());
+  const drag = useRef<{
+    startX: number;
+    startPos: number;
+    startActive: number;
+    spacing: number;
+    samples: Sample[];
+    moved: boolean;
+    twoFinger: boolean;
+  } | null>(null);
+  const suppressClick = useRef(false);
+
+  const max = tracks.length - 1;
+  const clampIdx = (i: number) => Math.max(0, Math.min(max, i));
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -130,33 +155,132 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
     return () => mq.removeEventListener("change", apply);
   }, []);
 
-  const clamp = (i: number) => Math.max(0, Math.min(tracks.length - 1, i));
-  const go = (i: number) => setActive(clamp(i));
+  /* Two-finger gestures belong to the shelf, not the OS: block pinch-zoom,
+     scroll and pull-refresh at the source (non-passive, plus Safari's
+     gesturestart) whenever two fingers are on the stage. */
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const block = (e: Event) => {
+      const t = e as TouchEvent;
+      if (t.touches && t.touches.length >= 2) e.preventDefault();
+    };
+    const blockGesture = (e: Event) => e.preventDefault();
+    el.addEventListener("touchstart", block, { passive: false });
+    el.addEventListener("touchmove", block, { passive: false });
+    el.addEventListener("gesturestart", blockGesture as EventListener, { passive: false } as AddEventListenerOptions);
+    return () => {
+      el.removeEventListener("touchstart", block);
+      el.removeEventListener("touchmove", block);
+      el.removeEventListener("gesturestart", blockGesture as EventListener);
+    };
+  }, [calm]);
+
+  const applyPos = (p: number, vel = 0) => {
+    posRef.current = p;
+    velRef.current = vel;
+    setFrame({ p, v: vel });
+  };
+
+  const stopSpring = () => {
+    if (springRef.current) cancelAnimationFrame(springRef.current.raf);
+    springRef.current = null;
+  };
+
+  /** Spring the shelf from the current position to `target` books. */
+  const springTo = (target: number, initialVel = 0) => {
+    stopSpring();
+    const t = clampIdx(target);
+    setActive(t);
+    let vel = initialVel;
+    let last: number | null = null;
+    const step = (now: number) => {
+      if (last === null) {
+        last = now;
+        springRef.current = { target: t, vel, raf: requestAnimationFrame(step) };
+        return;
+      }
+      const dt = Math.min(0.032, (now - last) / 1000);
+      last = now;
+      const p = posRef.current;
+      const accel = SPRING_K * (t - p) - SPRING_C * vel;
+      vel += accel * dt;
+      const next = p + vel * dt;
+      if (Math.abs(t - next) < 0.001 && Math.abs(vel) < 0.02) {
+        springRef.current = null;
+        applyPos(t, 0);
+        return;
+      }
+      applyPos(next, vel);
+      springRef.current = { target: t, vel, raf: requestAnimationFrame(step) };
+    };
+    springRef.current = { target: t, vel, raf: requestAnimationFrame(step) };
+  };
+
+  useEffect(() => stopSpring, []);
+
+  const go = (i: number) => springTo(i, velRef.current * 0.25);
 
   const focusBook = (i: number) => {
     stageRef.current
-      ?.querySelector<HTMLElement>(`[data-testid="shelf-book-${tracks[clamp(i)].slug}"]`)
+      ?.querySelector<HTMLElement>(`[data-testid="shelf-book-${tracks[clampIdx(i)].slug}"]`)
       ?.focus({ preventScroll: true });
   };
 
   const onKeyDown = (e: ReactKeyboardEvent) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-    const next = clamp(active + (e.key === "ArrowRight" ? 1 : -1));
+    const next = clampIdx(active + (e.key === "ArrowRight" ? 1 : -1));
     if (next === active) return;
     e.preventDefault();
-    setActive(next);
+    springTo(next);
     requestAnimationFrame(() => focusBook(next));
+  };
+
+  const spacingPx = () => {
+    const book = stageRef.current?.querySelector<HTMLElement>('[data-testid^="shelf-book-"]');
+    return (book?.offsetWidth ?? 248) * 0.54;
+  };
+
+  const centroid = () => {
+    const xs = [...pointers.current.values()];
+    return xs.reduce((a, b) => a + b, 0) / xs.length;
   };
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    drag.current = { startX: e.clientX, moved: false, pointerId: e.pointerId };
+    stopSpring();
+    pointers.current.set(e.pointerId, e.clientX);
+    /* No capture yet: capturing on press would retarget a plain tap/click
+       onto the stage. Capture only once a real glide starts (see move). */
+    if (pointers.current.size === 1) {
+      drag.current = {
+        startX: e.clientX,
+        startPos: posRef.current,
+        startActive: active,
+        spacing: spacingPx(),
+        samples: [{ x: e.clientX, t: e.timeStamp }],
+        moved: false,
+        twoFinger: false,
+      };
+    } else if (pointers.current.size === 2 && drag.current) {
+      // Second finger lands: re-anchor on the centroid, keep gliding.
+      drag.current.twoFinger = true;
+      drag.current.startX = centroid();
+      drag.current.startPos = posRef.current;
+      drag.current.samples = [{ x: centroid(), t: e.timeStamp }];
+      setDragging(true);
+    }
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
-    if (!d || d.pointerId !== e.pointerId) return;
-    const dx = e.clientX - d.startX;
+    if (!d || !pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, e.clientX);
+    const x = pointers.current.size >= 2 ? centroid() : e.clientX;
+    const now = e.timeStamp;
+    d.samples.push({ x, t: now });
+    d.samples = d.samples.filter((s) => now - s.t <= 140);
+    const dx = x - d.startX;
     if (!d.moved && Math.abs(dx) > 6) {
       d.moved = true;
       setDragging(true);
@@ -164,20 +288,57 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       } catch { /* capture is best-effort */ }
     }
-    if (d.moved) setDragX(dx);
+    if (!d.moved) return;
+    const raw = d.startPos - dx / d.spacing;
+    // Rubber-band past either end.
+    const banded = raw < 0 ? raw * 0.35 : raw > max ? max + (raw - max) * 0.35 : raw;
+    const prev = d.samples.length > 1 ? d.samples[d.samples.length - 2] : d.samples[0];
+    const lastS = d.samples[d.samples.length - 1];
+    const vel = lastS.t > prev.t ? -((lastS.x - prev.x) / (lastS.t - prev.t)) / d.spacing * 1000 : 0;
+    applyPos(banded, vel);
   };
 
-  const endDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
+  const releaseVelocity = (d: NonNullable<typeof drag.current>, now: number): number => {
+    const fresh = d.samples.filter((s) => now - s.t <= 120);
+    if (fresh.length < 2) return 0;
+    const first = fresh[0];
+    const lastS = fresh[fresh.length - 1];
+    if (now - lastS.t > 60 || lastS.t === first.t) return 0; // held still: no flick
+    return -((lastS.x - first.x) / (lastS.t - first.t)) / d.spacing; // books per ms
+  };
+
+  const endPointer = (e: ReactPointerEvent<HTMLDivElement>, cancelled: boolean) => {
+    pointers.current.delete(e.pointerId);
     const d = drag.current;
-    drag.current = null;
-    if (!d || d.pointerId !== e.pointerId) return;
-    if (d.moved) {
-      suppressClick.current = true;
-      if (dragX <= -56) go(active + 1);
-      else if (dragX >= 56) go(active - 1);
+    if (pointers.current.size > 0) {
+      // One finger lifted from a two-finger glide: re-anchor, keep going.
+      if (d) {
+        d.startX = centroid();
+        d.startPos = posRef.current;
+        d.samples = [{ x: centroid(), t: e.timeStamp }];
+      }
+      return;
     }
+    if (cancelled) {
+      // The browser took the gesture (e.g. a scroll): the drag is dead.
+      // Settle where we are and ignore the eventual release entirely.
+      drag.current = null;
+      setDragging(false);
+      if (d?.moved) springTo(Math.round(posRef.current));
+      return;
+    }
+    drag.current = null;
     setDragging(false);
-    setDragX(0);
+    if (!d || !d.moved) return;
+    suppressClick.current = true;
+    const velPerMs = releaseVelocity(d, e.timeStamp);
+    const projected = posRef.current + velPerMs * 90;
+    const flicked = Math.abs((d.samples[d.samples.length - 1]?.x ?? d.startX) - d.startX) < d.spacing;
+    const range = flicked ? 1 : 2; // a short fast flick skips at most one book
+    const target = clampIdx(
+      Math.max(d.startActive - range, Math.min(d.startActive + range, Math.round(projected))),
+    );
+    springTo(target, velPerMs * 1000);
   };
 
   const onClickCapture = (e: ReactSyntheticEvent) => {
@@ -203,6 +364,7 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
   }
 
   const current = tracks[active];
+  const tilt = Math.max(-7, Math.min(7, frame.v * 1.1));
 
   return (
     <nav aria-label="Course tracks" className="library-scene library-scene-slider" data-testid="track-bookshelf">
@@ -216,23 +378,21 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
         onKeyDown={onKeyDown}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
+        onPointerUp={(e) => endPointer(e, false)}
+        onPointerCancel={(e) => endPointer(e, true)}
         onClickCapture={onClickCapture}
       >
         {tracks.map((track, i) => {
-          const offset = i - active;
+          const offset = i - frame.p;
           const abs = Math.abs(offset);
-          const hidden = abs > 2;
-          const isHovered = hovered === track.slug;
-          const boost = isHovered || undefined;
-          const shift = offset * 54 + (dragging ? (dragX / 248) * 54 : 0);
+          const hidden = abs > 2.6;
+          const boost = hovered === track.slug && abs < 0.5;
           const transform = [
             "translate(-50%, 0)",
-            `translateX(${shift}%)`,
-            `rotateY(${offset * -32 + (dragging ? Math.max(-8, Math.min(8, dragX * -0.03)) : 0)}deg)`,
+            `translateX(${offset * 54}%)`,
+            `rotateY(${offset * -32 + tilt}deg)`,
             "rotateX(2deg)",
-            `translateZ(${-abs * 150 + (boost && abs === 0 ? 64 : 0)}px)`,
+            `translateZ(${-abs * 150 + (boost ? 64 : 0)}px)`,
           ].join(" ");
           return (
             <Tome
@@ -244,11 +404,10 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
               onHoverBook={setHovered}
               style={{
                 transform,
-                zIndex: 20 - abs,
-                opacity: hidden ? 0 : abs === 2 ? 0.55 : abs === 1 ? 0.9 : 1,
+                zIndex: 20 - Math.round(abs),
+                opacity: hidden ? 0 : abs > 2 ? Math.max(0, 0.6 - (abs - 2) * 0.8) : abs > 1 ? 0.92 : 1,
                 visibility: hidden ? "hidden" : "visible",
                 pointerEvents: hidden ? "none" : "auto",
-                transition: dragging ? "none" : undefined,
               }}
             />
           );
@@ -292,7 +451,7 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
           <span aria-hidden="true">→</span>
         </button>
       </div>
-      <p className="library-hint">Drag, tap the arrows, or use ← → keys — tap a book to open it</p>
+      <p className="library-hint">Drag or flick — one finger or two — or use ← → keys. Tap a book to open it</p>
     </nav>
   );
 }
