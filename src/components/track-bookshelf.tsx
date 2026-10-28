@@ -49,8 +49,13 @@ function statusText(track: ShelfTrack): string {
         : "coming next";
 }
 
-function Tome({ track, style, active, hidden, dim, onSelectBook, onFocusBook, onHoverBook }: {
+/** Volume numerals in shelf order: the primer plus five tracks. */
+const NUMERALS = ["I", "II", "III", "IV", "V", "VI"];
+
+function Tome({ track, numeral, style, active, hidden, dim, onSelectBook, onFocusBook, onHoverBook }: {
   track: ShelfTrack;
+  /** Sequential volume number printed before the title, e.g. "II". */
+  numeral?: string;
   style?: CSSProperties;
   active?: boolean;
   hidden?: boolean;
@@ -89,7 +94,12 @@ function Tome({ track, style, active, hidden, dim, onSelectBook, onFocusBook, on
         <TrackSymbol symbol={track.symbol} className="h-6 w-6 shrink-0" />
         <span className="tome-eyebrow">{track.eyebrow}</span>
       </span>
-      <span className="tome-title">{track.title}</span>
+      <span className="tome-title">
+        {numeral ? (
+          <span aria-hidden="true" className="tome-numeral">{numeral} · </span>
+        ) : null}
+        {track.title}
+      </span>
       <span aria-hidden="true" className="tome-rule" />
       <span className="tome-summary">{track.summary}</span>
       <span aria-hidden="true" className={cn("tome-stamp", `tome-stamp-${seal.kind}`)} data-testid={`shelf-stamp-${track.slug}`}>
@@ -371,9 +381,9 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
     return (
       <nav aria-label="Course tracks" className="library-scene" data-testid="track-bookshelf">
         <div className="library-grid" role="list">
-          {tracks.map((track) => (
+          {tracks.map((track, i) => (
             <div key={track.slug} className="tome-cell" role="listitem">
-              <Tome track={track} />
+              <Tome track={track} numeral={NUMERALS[i] ?? String(i + 1)} />
             </div>
           ))}
         </div>
@@ -426,6 +436,7 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
             <Tome
               key={track.slug}
               track={track}
+              numeral={NUMERALS[i] ?? String(i + 1)}
               active={i === active}
               hidden={hidden}
               dim={dim}
@@ -442,6 +453,8 @@ export function TrackBookshelf({ tracks }: { tracks: ShelfTrack[] }) {
             />
           );
         })}
+        <span aria-hidden="true" className="library-end" />
+        <span aria-hidden="true" className="library-end library-end-right" />
         <span aria-hidden="true" className="library-spot" />
         <span aria-hidden="true" className="library-rail" />
       </div>
