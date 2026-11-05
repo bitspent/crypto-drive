@@ -11,11 +11,18 @@ import {
 
 const initialState: UnlockState = { error: null };
 
-export function UnlockForm() {
+export function UnlockForm({
+  email,
+  onEmailChange,
+}: {
+  email?: string;
+  onEmailChange?: (value: string) => void;
+}) {
   const [state, formAction, pending] = useActionState(
     unlockAction,
     initialState,
   );
+  const controlled = typeof onEmailChange === "function";
 
   return (
     <form action={formAction} className="flex w-full max-w-md flex-col gap-4">
@@ -30,6 +37,13 @@ export function UnlockForm() {
           required
           autoComplete="email"
           placeholder="you@company.com"
+          {...(controlled
+            ? {
+                value: email,
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+                  onEmailChange?.(e.target.value),
+              }
+            : {})}
         />
       </div>
       <div className="space-y-2">
