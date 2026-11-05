@@ -2,7 +2,7 @@
 
 Wallet coaching for professionals — learn to use crypto the way you’d learn to drive.
 
-**Product packaging is by tier** (Starter / Certified Practitioner / VIP). The curriculum spine is **tracks**: Bitcoin (ready) → Ethereum / USDT+networks / Tron / Solana (coming-next scaffolds).
+**Product packaging is by tier** (Starter / Certified Practitioner / VIP). The curriculum spine is **tracks**: money-map primer (ready) → Bitcoin (ready) → Ethereum / USDT+networks / Tron / Solana (coming-next scaffolds).
 
 ## Stack
 
@@ -107,7 +107,7 @@ Product and curriculum briefs live in `docs/` (kept in sync with Project Context
 ```
 content/
   tiers/          # starter | certified | vip (+ index demo map)
-  tracks/         # bitcoin first drive (ready) · ethereum · usdt-networks · tron · solana (scaffolds)
+  tracks/         # money map (primer) · bitcoin first drive (ready) · usdt-networks (ready) · ethereum · tron · solana (scaffolds)
 ```
 
 ## Environment

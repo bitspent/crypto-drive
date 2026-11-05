@@ -1,6 +1,6 @@
 # Crypto Drive — Course agenda (v2)
 
-**Status:** The Bitcoin track is **content-complete** (6 drives, 26 steps, capstone included), and the USDT track is **content-complete** (3 drives, 10 steps, capstone cert). Ethereum, Tron, and Solana remain scaffolds. Charge-readiness requires the checklist in `docs/charge-ready-checklist.md` — this agenda stays the qualitative bar below it.
+**Status:** The money-map primer is **content-complete** (1 drive, 5 steps, no cert), the Bitcoin track is **content-complete** (6 drives, 26 steps, capstone included), and the USDT track is **content-complete** (3 drives, 10 steps, capstone cert). Ethereum, Tron, and Solana remain scaffolds. Charge-readiness requires the checklist in `docs/charge-ready-checklist.md` — this agenda stays the qualitative bar below it.
 
 **Audience:** Non-tech professionals. Coach tone (learn to drive), never academic.
 
@@ -25,6 +25,18 @@ Until then: free demo / waitlist only. No paid Gumroad.
 ---
 
 ## Curriculum spine (what everyone learns)
+
+### Primer — Money map (before Track A)
+
+Money first, protocol second. One drive, five screens, every tier, no wallet touched:
+
+1. What money must **do** (five jobs: hold, move, keep, count, agree)  
+2. Why savings **melt** (inflation, plain language)  
+3. Bank **promises** (what a deposit balance really is)  
+4. **Distance** costs (remittance toll on the road home)  
+5. Bearer money (the one idea that makes Bitcoin click)  
+
+Hands off to `/course` with a "Start the Bitcoin road" commit — no certificate, so the primer stays open to every tier.
 
 ### Track A — Bitcoin (start here)
 
@@ -97,10 +109,11 @@ Phishing, fake apps, seed screenshots, “connect wallet” traps, test-send sma
 
 1. ~~Rewrite **Track A (Bitcoin)** fully in app + Context guides~~ — done (6 drives, 26 steps, capstone cert)  
 2. ~~Track C (USDT + networks)~~ — done (3 drives, 10 steps, capstone cert, BTC wallet untouched)  
-3. Track B (Ethereum)  
-4. Track D (Solana)  
-5. Polish hygiene + Certified certs per major milestone  
-6. Only then: live Gumroad — gated by `docs/charge-ready-checklist.md`  
+3. ~~Money-map primer before Track A~~ — done (1 drive, 5 steps, hands off to the Bitcoin road)  
+4. Track B (Ethereum)  
+5. Track D (Solana)  
+6. Polish hygiene + Certified certs per major milestone  
+7. Only then: live Gumroad — gated by `docs/charge-ready-checklist.md`  
 
 ---
 
@@ -116,3 +129,4 @@ Phishing, fake apps, seed screenshots, “connect wallet” traps, test-send sma
 ## Decision log
 
 - 2026-10-13: User rejected thin module content as not chargeable; agenda reset to BTC → ETH → USDT/Tron → Solana for non-tech pros.
+- 2026-10-28: Money-map primer (money before Bitcoin) added ahead of Track A — 5 steps, no cert, hands every tier into the Bitcoin road.
