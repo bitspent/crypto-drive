@@ -32,7 +32,15 @@ export default async function WalletPage() {
   return (
     <div className="flex min-h-full flex-col">
       <SiteHeader />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-10 pt-0 sm:px-8 sm:pb-14">
+      <main className="wallet-cluster mx-auto w-full max-w-5xl flex-1 px-5 pb-10 pt-0 sm:px-8 sm:pb-14">
+        <header className="cluster-head">
+          <p className="cluster-eyebrow">SANDBOX · PLAY MONEY ONLY</p>
+          <h1 className="cluster-title">Instrument cluster</h1>
+          <p className="cluster-sub">
+            The wallet you drive with — receive, send, back up, restore.
+            Same address on every drive.
+          </p>
+        </header>
         <WalletApp initial={wallet} network={network} esploraBase={esploraBase} />
       </main>
     </div>
