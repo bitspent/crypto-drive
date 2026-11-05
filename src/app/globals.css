@@ -3553,3 +3553,241 @@ wallet sheets are viewport-fixed descendants and must stay that way. */
     transition: none;
   }
 }
+
+/* —— Track road (drive list as a route) —— */
+/* One asphalt lane behind the shields, a dashed centerline, the car
+   pinned under the current shield, and a pennant at the destination.
+   Theme-aware: the lane reads as asphalt in light and dark. */
+
+.road-scene {
+  position: relative;
+}
+
+.road-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 18px;
+}
+
+.road-head-line {
+  flex: 1;
+  border-top: 2px dashed var(--lane);
+}
+
+.road-head-label {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.road-map {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 16px;
+}
+
+/* The lane: 6px of asphalt with a 2px dashed centreline, running behind
+   the shields from start to the flag. */
+.road-map::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 26px;
+  width: 6px;
+  border-radius: 3px;
+  background: var(--lane);
+}
+
+.road-map::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 28px;
+  width: 2px;
+  background: repeating-linear-gradient(
+    180deg,
+    var(--paper) 0 12px,
+    transparent 12px 26px
+  );
+  opacity: 0.55;
+}
+
+.road-stop {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.road-marker {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.road-shield {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--amber);
+  border-radius: 12px 12px 12px 4px;
+  background: var(--cabin);
+  color: var(--amber);
+  font-family: var(--font-display);
+  font-size: 16px;
+  box-shadow: 0 3px 10px -4px rgb(0 0 0 / 0.35);
+}
+
+.road-stop[data-state="done"] .road-shield {
+  border-color: var(--go);
+  color: var(--go);
+}
+
+.road-stop[data-state="locked"] .road-shield {
+  border-style: dashed;
+  border-color: var(--lane);
+  color: var(--mute);
+  box-shadow: none;
+}
+
+.road-stop[data-state="here"] .road-shield {
+  background: var(--amber);
+  border-color: var(--amber-hot);
+  color: var(--on-accent);
+  animation: road-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes road-pulse {
+  0%,
+  100% {
+    box-shadow: 0 3px 10px -4px rgb(0 0 0 / 0.35),
+      0 0 0 0 color-mix(in oklab, var(--amber) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 3px 10px -4px rgb(0 0 0 / 0.35),
+      0 0 0 8px color-mix(in oklab, var(--amber) 0%, transparent);
+  }
+}
+
+.road-you {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--on-accent);
+  background: var(--amber);
+  border-radius: 999px;
+  padding: 3px 8px;
+  box-shadow: 0 2px 6px -2px rgb(0 0 0 / 0.4);
+}
+
+.road-card {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--lane);
+  border-radius: 16px;
+  background: var(--cabin);
+  padding: 16px 18px;
+  text-decoration: none;
+}
+
+@media (min-width: 640px) {
+  .road-card {
+    padding: 18px 22px;
+  }
+}
+
+.road-card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.road-card-top h2 {
+  margin: 0;
+}
+
+.road-card-state {
+  margin: 0;
+  flex-shrink: 0;
+  font-size: 0.875rem;
+  color: var(--mute);
+}
+
+.road-card-locked {
+  opacity: 0.7;
+  background: color-mix(in oklab, var(--cabin) 60%, transparent);
+  border-style: dashed;
+}
+
+.road-finish {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.road-flag {
+  position: relative;
+  flex-shrink: 0;
+  width: 58px;
+  height: 46px;
+}
+
+.road-flag::before {
+  content: "";
+  position: absolute;
+  left: 27px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--fog);
+}
+
+.road-flag::after {
+  content: "";
+  position: absolute;
+  left: 30px;
+  top: 1px;
+  border-top: 11px solid var(--amber);
+  border-right: 16px solid transparent;
+  border-bottom: 11px solid var(--amber);
+  border-left: 0 solid transparent;
+}
+
+.road-finish[data-arrived="true"] .road-flag::after {
+  border-top-color: var(--go);
+  border-bottom-color: var(--go);
+}
+
+.road-finish-label {
+  font-size: 12px;
+  color: var(--mute);
+}
+
+.road-finish[data-arrived="true"] .road-finish-label {
+  color: var(--go);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .road-stop[data-state="here"] .road-shield {
+    animation: none;
+  }
+}

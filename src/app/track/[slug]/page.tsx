@@ -4,12 +4,10 @@ import { notFound, redirect } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { TrackSymbol } from "@/components/crypto-marks";
+import { RoadMap } from "@/components/road-map";
 import { getTrack, getTier } from "@/lib/content";
 import {
   countFinishedDrives,
-  driveComplete,
-  driveEntryHref,
-  driveUnlocked,
   resumeHref,
 } from "@/lib/drive";
 import { getSessionId } from "@/lib/session";
@@ -127,53 +125,11 @@ export default async function TrackPage({ params }: Props) {
           <p className="mb-8 text-sm text-[var(--go)]">You finished this drive.</p>
         )}
 
-        <ol className="stage-stagger space-y-3">
-          {drives.map((drive, index) => {
-            const unlocked = driveUnlocked(drives, index, student.modulesPassed);
-            const complete = driveComplete(drive, student.modulesPassed);
-            const body = (
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--lane)] font-[family-name:var(--font-display)] text-sm text-[var(--amber)]">
-                    {index + 1}
-                  </span>
-                  <div>
-                    <h2 className="font-[family-name:var(--font-display)] text-lg text-[var(--paper)]">
-                      {drive.title}
-                    </h2>
-                    <p className="mt-1 text-sm text-[var(--fog)]">{drive.job}</p>
-                  </div>
-                </div>
-                <p className="shrink-0 text-sm text-[var(--mute)]">
-                  {complete ? (
-                    <span className="text-[var(--go)]">Done</span>
-                  ) : unlocked ? (
-                    <span>{drive.minutes}</span>
-                  ) : (
-                    <span>Locked</span>
-                  )}
-                </p>
-              </div>
-            );
-
-            return (
-              <li key={drive.id} style={{ ["--i" as string]: index }}>
-                {unlocked ? (
-                  <Link
-                    href={driveEntryHref(track.slug, drive, student.modulesPassed)}
-                    className="play-card block rounded-2xl border border-[var(--lane)] bg-[var(--cabin)] p-4 sm:p-5"
-                  >
-                    {body}
-                  </Link>
-                ) : (
-                  <div className="rounded-2xl border border-[var(--lane)]/70 bg-[var(--cabin)]/60 p-4 opacity-70 sm:p-5">
-                    {body}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ol>
+        <RoadMap
+          trackSlug={track.slug}
+          drives={drives}
+          passed={student.modulesPassed}
+        />
       </main>
     </div>
   );

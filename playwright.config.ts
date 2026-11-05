@@ -41,6 +41,7 @@ export default defineConfig({
         "**/money-walk.spec.ts",
         "**/bookshelf.spec.ts",
         "**/unlock.spec.ts",
+        "**/road.spec.ts",
         "**/wallet-*.spec.ts",
         "**/bitcoin-modes.spec.ts",
         "**/keyboard.spec.ts",
